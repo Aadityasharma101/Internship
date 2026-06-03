@@ -1,0 +1,60 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Home — News Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% if trending_articles %}
+    <section class="mb-5">
+        <h2 class="h4 fw-bold mb-3"><i class="bi bi-fire text-danger"></i> Trending</h2>
+        <div class="row g-3">
+            {% for article in trending_articles %}
+            <div class="col-md-4">
+                <div class="card h-100 border-danger border-2 shadow-sm">
+                    <div class="card-body">
+                        <span class="badge badge-trending mb-2">Trending</span>
+                        <h5 class="card-title">
+                            <a href="{% url 'article_detail' article.slug %}" class="text-decoration-none text-dark">
+                                {{ article.title|truncatechars:70 }}
+                            </a>
+                        </h5>
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-eye"></i> {{ article.stats.views_count }} views
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section>
+        <h2 class="h4 fw-bold mb-3">Latest News</h2>
+        <div class="row g-4">
+            {% for article in articles %}
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm">
+                    {% if article.featured_image_url %}
+                    <img src="{{ article.featured_image_url }}" class="card-img-top"
+                         alt="" style="height: 160px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body">
+                        {% if article.is_breaking %}<span class="badge badge-breaking small">Breaking</span>{% endif %}
+                        {% if article.category %}<span class="badge bg-secondary small">{{ article.category.name }}</span>{% endif %}
+                        <h5 class="card-title mt-2">
+                            <a href="{% url 'article_detail' article.slug %}" class="text-decoration-none text-dark">
+                                {{ article.title }}
+                            </a>
+                        </h5>
+                        <p class="card-text small text-muted">{{ article.excerpt|truncatechars:100 }}</p>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted">No published articles yet. Add them in Django Admin.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

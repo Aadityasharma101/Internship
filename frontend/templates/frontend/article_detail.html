@@ -1,0 +1,124 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{{ article.title }} — News Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <article class="bg-white rounded shadow-sm p-4 p-md-5">
+                <nav aria-label="breadcrumb" class="mb-3">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
+                        {% if article.category %}
+                        <li class="breadcrumb-item">{{ article.category.name }}</li>
+                        {% endif %}
+                        <li class="breadcrumb-item active" aria-current="page">Article</li>
+                    </ol>
+                </nav>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% if article.is_breaking %}
+                    <span class="badge badge-breaking">BREAKING</span>
+                    {% endif %}
+                    {% if is_trending %}
+                    <span class="badge badge-trending">
+                        <i class="bi bi-fire me-1"></i>Trending
+                    </span>
+                    {% endif %}
+                    {% if article.category %}
+                    <span class="badge bg-secondary">{{ article.category.name }}</span>
+                    {% endif %}
+                </div>
+
+                <h1 class="display-6 fw-bold mb-3">{{ article.title }}</h1>
+
+                <div class="d-flex flex-wrap align-items-center gap-3 text-muted small mb-4 pb-3 border-bottom">
+                    {% if article.author %}
+                    <span><i class="bi bi-person me-1"></i>{{ article.author.get_full_name|default:article.author.username }}</span>
+                    {% endif %}
+                    <span><i class="bi bi-calendar3 me-1"></i>{{ article.published_at|date:"F j, Y" }}</span>
+                    <span><i class="bi bi-eye me-1"></i>{{ views_count }} view{{ views_count|pluralize }}</span>
+                    {% if not is_trending %}
+                    <span class="text-muted opacity-75">
+                        (Trending at {{ trending_threshold }}+ views)
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if article.featured_image_url %}
+                <img src="{{ article.featured_image_url }}" alt="{{ article.title }}"
+                     class="img-fluid rounded mb-4 w-100" style="max-height: 420px; object-fit: cover;">
+                {% endif %}
+
+                {% if article.excerpt %}
+                <p class="lead text-muted border-start border-4 border-danger ps-3 mb-4">{{ article.excerpt }}</p>
+                {% endif %}
+
+                <div class="article-content">
+                    {{ article.content|linebreaks }}
+                </div>
+
+                {% if article.tags.exists %}
+                <div class="mt-4 pt-3 border-top">
+                    <span class="text-muted small me-2">Tags:</span>
+                    {% for tag in article.tags.all %}
+                    <span class="badge bg-light text-dark border">{{ tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="mt-4 pt-3 border-top d-flex flex-wrap gap-2 align-items-center">
+                    {% if user.is_authenticated %}
+                        {% include 'frontend/partials/bookmark_button.html' with article=article is_bookmarked=is_bookmarked %}
+                    {% else %}
+                    <a href="/admin/login/?next={{ request.path }}" class="btn btn-outline-warning">
+                        <i class="bi bi-bookmark me-1"></i>Login to save
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'bookmark_list' %}" class="btn btn-link text-decoration-none">
+                        View all bookmarks
+                    </a>
+                </div>
+            </article>
+        </div>
+
+        <div class="col-lg-4">
+            {% if trending_articles %}
+            <div class="card sidebar-card shadow-sm mb-4">
+                <div class="card-header bg-white fw-bold">
+                    <i class="bi bi-fire text-danger me-1"></i>Trending Now
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for t in trending_articles %}
+                    <li class="list-group-item">
+                        <a href="{% url 'article_detail' t.slug %}" class="text-decoration-none text-dark fw-semibold">
+                            {{ t.title|truncatechars:60 }}
+                        </a>
+                        <div class="small text-muted mt-1">
+                            <i class="bi bi-eye"></i> {{ t.stats.views_count }} views
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if related_articles %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Related Stories</div>
+                <ul class="list-group list-group-flush">
+                    {% for r in related_articles %}
+                    <li class="list-group-item">
+                        <a href="{% url 'article_detail' r.slug %}" class="text-decoration-none">
+                            {{ r.title|truncatechars:55 }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

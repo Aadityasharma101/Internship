@@ -1,0 +1,20 @@
+{% extends 'frontend/base.html' %}
+{% load static %}
+
+{% block title %}Home - News Portal{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Welcome to News Portal</h2>
+    <p>This is your news portal frontend. News data will be fetched from REST API endpoints.</p>
+    
+    <section id="news-list">
+        <!-- News items will be loaded here via JavaScript/API calls -->
+        <div class="loading">Loading news...</div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/news.js' %}"></script>
+{% endblock %}

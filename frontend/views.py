@@ -3,14 +3,15 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
+from urllib.parse import urlencode
 
 from news.models import Article, Category, Comment, Rating
 from news.services import (
     get_bookmarked_articles,
     get_trending_articles,
-    is_session_bookmarked,
+    is_article_bookmarked,
     record_article_view,
-    toggle_session_bookmark,
+    toggle_bookmark as toggle_article_bookmark,
 )
 
 
@@ -54,7 +55,7 @@ def article_detail(request, slug):
     views_count = record_article_view(article, request)
     article.stats.refresh_from_db()
 
-    is_bookmarked = is_session_bookmarked(request, article.pk)
+    is_bookmarked = is_article_bookmarked(request.user, article.pk)
     user_rating = None
     if request.user.is_authenticated:
         user_rating = Rating.objects.filter(user=request.user, article=article).first()
@@ -91,29 +92,38 @@ def article_detail(request, slug):
     )
 
 
+@login_required
 def bookmark_list(request):
-    articles = get_bookmarked_articles(request)
+    articles = get_bookmarked_articles(request.user)
     return render(request, 'frontend/bookmarks.html', {'articles': articles})
 
 
 @require_POST
 def toggle_bookmark(request, slug):
     article = get_object_or_404(Article, slug=slug, status=Article.Status.PUBLISHED)
-    bookmarked = toggle_session_bookmark(request, article.pk)
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or '/'
+
+    if not request.user.is_authenticated:
+        messages.info(request, 'Please sign in to save articles.')
+        login_url = f"{settings.LOGIN_URL}?{urlencode({'next': next_url})}"
+        return redirect(login_url)
+
+    bookmarked = toggle_article_bookmark(request.user, article)
 
     if bookmarked:
         messages.success(request, 'Article saved to bookmarks.')
     else:
         messages.success(request, 'Article removed from bookmarks.')
 
-    next_url = request.POST.get('next', request.META.get('HTTP_REFERER', '/'))
     if request.headers.get('HX-Request') or request.POST.get('ajax'):
         return render(
             request,
             'frontend/partials/bookmark_button.html',
             {'article': article, 'is_bookmarked': bookmarked},
         )
-    return redirect(next_url or 'article_detail', slug=slug)
+    if next_url:
+        return redirect(next_url)
+    return redirect('article_detail', slug=slug)
 
 
 @login_required

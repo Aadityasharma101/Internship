@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 
-from .models import Article, ArticleStats
+from .models import Article, ArticleStats, Bookmark
 
 
 def record_article_view(article: Article, request) -> int:
@@ -32,36 +32,27 @@ def get_trending_articles(limit=6):
     )
 
 
-SESSION_BOOKMARK_KEY = 'bookmarked_articles'
+def is_article_bookmarked(user, article_id):
+    if not user.is_authenticated:
+        return False
+    return Bookmark.objects.filter(user=user, article_id=article_id).exists()
 
 
-def get_session_bookmark_ids(request):
-    return request.session.get(SESSION_BOOKMARK_KEY, [])
+def toggle_bookmark(user, article):
+    bookmark, created = Bookmark.objects.get_or_create(user=user, article=article)
+    if created:
+        return True
+    bookmark.delete()
+    return False
 
 
-def is_session_bookmarked(request, article_id):
-    return article_id in get_session_bookmark_ids(request)
-
-
-def toggle_session_bookmark(request, article_id):
-    bookmarks = list(get_session_bookmark_ids(request))
-    if article_id in bookmarks:
-        bookmarks.remove(article_id)
-        bookmarked = False
-    else:
-        bookmarks.append(article_id)
-        bookmarked = True
-    request.session[SESSION_BOOKMARK_KEY] = bookmarks
-    request.session.modified = True
-    return bookmarked
-
-
-def get_bookmarked_articles(request):
-    ids = get_session_bookmark_ids(request)
-    if not ids:
+def get_bookmarked_articles(user):
+    if not user.is_authenticated:
         return Article.objects.none()
-    preserved = {pk: i for i, pk in enumerate(ids)}
-    qs = Article.objects.filter(pk__in=ids, status=Article.Status.PUBLISHED).select_related(
-        'category', 'author', 'stats'
+
+    bookmarks = (
+        Bookmark.objects.filter(user=user, article__status=Article.Status.PUBLISHED)
+        .select_related('article', 'article__category', 'article__author', 'article__stats')
+        .order_by('-created_at')
     )
-    return sorted(qs, key=lambda a: preserved.get(a.pk, 0))
+    return [bookmark.article for bookmark in bookmarks]

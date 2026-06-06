@@ -15,12 +15,15 @@ class Command(BaseCommand):
             username='admin',
             defaults={'email': 'admin@newshub.com', 'is_staff': True, 'is_superuser': True},
         )
-        if created or not admin.has_usable_password():
-            admin.set_password('admin123')
-            admin.is_staff = True
-            admin.is_superuser = True
-            admin.save()
+        admin.set_password('admin123')
+        admin.is_staff = True
+        admin.is_superuser = True
+        admin.is_active = True
+        admin.save()
+        if created:
             self.stdout.write(self.style.SUCCESS('Admin created: admin / admin123'))
+        else:
+            self.stdout.write(self.style.SUCCESS('Admin password reset: admin / admin123'))
 
         reporter, _ = User.objects.get_or_create(
             username='reporter',

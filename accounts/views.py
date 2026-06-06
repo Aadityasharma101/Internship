@@ -12,49 +12,57 @@ ROLE_ADMIN = 'admin'
 
 @require_http_methods(['GET', 'POST'])
 def unified_login(request):
-    if request.user.is_authenticated:
-        return _redirect_for_user(request.user, request.GET.get('next'))
-
     selected_role = request.GET.get('role', ROLE_READER)
     if selected_role not in (ROLE_READER, ROLE_EMPLOYEE, ROLE_ADMIN):
         selected_role = ROLE_READER
 
-    if request.method == 'POST':
-        role = request.POST.get('role', ROLE_READER)
-        username = request.POST.get('username', '').strip()
-        password = request.POST.get('password', '')
-        next_url = request.POST.get('next') or request.GET.get('next')
+    if request.method == 'GET':
+        if request.user.is_authenticated:
+            return _redirect_for_user(request.user, request.GET.get('next'))
+        return render(request, 'accounts/login.html', {
+            'selected_role': selected_role,
+            'next': request.GET.get('next', ''),
+        })
 
-        user = authenticate(request, username=username, password=password)
-        if user is None:
-            messages.error(request, 'Invalid username or password.')
+    role = request.POST.get('role', ROLE_READER)
+    username = request.POST.get('username', '').strip()
+    password = request.POST.get('password', '')
+    next_url = request.POST.get('next') or request.GET.get('next')
+
+    if request.user.is_authenticated:
+        logout(request)
+
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        messages.error(request, 'Invalid username or password.')
+        selected_role = role
+    elif role == ROLE_ADMIN:
+        if not user.is_superuser:
+            messages.error(request, 'This account does not have administrator access.')
             selected_role = role
-        elif role == ROLE_ADMIN:
-            if not user.is_superuser:
-                messages.error(request, 'This account does not have administrator access.')
-                selected_role = role
-            else:
-                login(request, user)
-                messages.success(request, f'Welcome, {user.username}.')
-                return redirect(next_url or 'admin_dashboard')
-        elif role == ROLE_EMPLOYEE:
-            if not user.is_staff:
-                messages.error(request, 'This account is not registered as an employee.')
-                selected_role = role
-            else:
-                login(request, user)
-                messages.success(request, f'Welcome back, {user.username}.')
-                if user.is_superuser:
-                    return redirect(next_url or 'admin_dashboard')
-                return redirect(next_url or 'employee_dashboard')
+        else:
+            login(request, user)
+            messages.success(request, f'Welcome, {user.username}.')
+            return redirect(next_url or 'admin_dashboard')
+    elif role == ROLE_EMPLOYEE:
+        if not user.is_staff:
+            messages.error(request, 'This account is not registered as an employee.')
+            selected_role = role
         else:
             login(request, user)
             messages.success(request, f'Welcome back, {user.username}.')
-            return redirect(next_url or 'home')
+            if user.is_superuser:
+                return redirect(next_url or 'admin_dashboard')
+            return redirect(next_url or 'employee_dashboard')
+    else:
+        login(request, user)
+        messages.success(request, f'Welcome back, {user.username}.')
+        return redirect(next_url or 'home')
 
     return render(request, 'accounts/login.html', {
         'selected_role': selected_role,
-        'next': request.GET.get('next', ''),
+        'next': next_url or '',
+        'username': username,
     })
 
 

@@ -9,3 +9,11 @@ def index(request):
     """
     context = {}
     return render(request, 'frontend/index.html', context)
+
+
+def newsletter(request):
+    """
+    Newsletter page view.
+    """
+    context = {}
+    return render(request, 'frontend/newsletter.html', context)

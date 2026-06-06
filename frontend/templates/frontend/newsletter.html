@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <div class="container py-5">
+
+        <div class="text-center mb-5">
+            <h1 class="display-5 fw-bold text-primary">Our Newsletter</h1>
+            <p class="lead text-muted mx-auto" style="max-width: 600px;">
+                Stay informed with the latest stories, insights, and updates delivered straight to your inbox every week.
+            </p>
+        </div>
+
+        <div class="card shadow-sm mb-5">
+            <div class="card-body text-center py-4">
+                <h2 class="h4 mb-3">Subscribe to Our Newsletter</h2>
+                <p class="text-muted mb-4">Get the best content handpicked by our editors. No spam, just meaningful stories.</p>
+                <form class="row g-3 justify-content-center" onsubmit="handleSubscribe(event)">
+                    <div class="col-sm-6 col-md-4">
+                        <input type="email" id="subscriber-email" class="form-control" placeholder="Enter your email address" required>
+                    </div>
+                    <div class="col-sm-auto">
+                        <button type="submit" class="btn btn-primary px-4">Subscribe Now</button>
+                    </div>
+                </form>
+                <p class="text-muted small mt-3 mb-0">By subscribing, you agree to receive email newsletters. You can unsubscribe at any time.</p>
+            </div>
+        </div>
+
+        <div class="row text-center mb-5">
+            <div class="col-md-4 mb-3 mb-md-0">
+                <h3 class="fw-bold text-primary">12,500+</h3>
+                <p class="text-muted mb-0">Active Subscribers</p>
+            </div>
+            <div class="col-md-4 mb-3 mb-md-0">
+                <h3 class="fw-bold text-primary">250+</h3>
+                <p class="text-muted mb-0">Newsletters Sent</p>
+            </div>
+            <div class="col-md-4">
+                <h3 class="fw-bold text-primary">98%</h3>
+                <p class="text-muted mb-0">Satisfaction Rate</p>
+            </div>
+        </div>
+
+        <h2 class="h3 mb-4">Featured Newsletter</h2>
+        <div class="card shadow-sm mb-5 border-top border-4 border-danger">
+            <div class="row g-0">
+                <div class="col-md-5 bg-primary bg-gradient d-none d-md-flex align-items-center justify-content-center text-white">
+                    <span class="display-6 fw-bold">FEATURED</span>
+                </div>
+                <div class="col-md-7">
+                    <div class="card-body">
+                        <span class="badge bg-danger mb-2">Weekly Edition</span>
+                        <h2 class="h4 card-title">Top Stories This Week</h2>
+                        <p class="text-muted small">June 5, 2026</p>
+                        <p class="card-text">This week's edition covers the most impactful news in technology, business, and culture from around the globe. Don't miss out on our editor's handpicked selection.</p>
+                        <a href="#" class="btn btn-danger">Read Featured Issue</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="h3 mb-4">Past Issues</h2>
+        <div class="row g-4 mb-5">
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-success">
+                    <div class="card-body">
+                        <span class="badge bg-success mb-2">Weekly</span>
+                        <h3 class="h5 card-title">Tech Innovations 2026</h3>
+                        <p class="text-muted small">May 29, 2026</p>
+                        <p class="card-text">Exploring the breakthrough technologies reshaping industries this year from AI to sustainable energy.</p>
+                        <a href="#" class="btn btn-outline-success btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-info">
+                    <div class="card-body">
+                        <span class="badge bg-info mb-2">Monthly</span>
+                        <h3 class="h5 card-title">Market Outlook</h3>
+                        <p class="text-muted small">May 15, 2026</p>
+                        <p class="card-text">Expert analysis on stock market trends, economic indicators, and what to watch in the coming quarter.</p>
+                        <a href="#" class="btn btn-outline-info btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-success">
+                    <div class="card-body">
+                        <span class="badge bg-success mb-2">Weekly</span>
+                        <h3 class="h5 card-title">Inside Startup Culture</h3>
+                        <p class="text-muted small">May 8, 2026</p>
+                        <p class="card-text">Stories from founders and innovators who are building the companies of tomorrow in today's economy.</p>
+                        <a href="#" class="btn btn-outline-success btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-success">
+                    <div class="card-body">
+                        <span class="badge bg-success mb-2">Weekly</span>
+                        <h3 class="h5 card-title">Science Breakthroughs</h3>
+                        <p class="text-muted small">April 30, 2026</p>
+                        <p class="card-text">The latest discoveries in physics, biology, and space exploration that could change our understanding of the world.</p>
+                        <a href="#" class="btn btn-outline-success btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-info">
+                    <div class="card-body">
+                        <span class="badge bg-info mb-2">Monthly</span>
+                        <h3 class="h5 card-title">Monthly Roundup</h3>
+                        <p class="text-muted small">April 22, 2026</p>
+                        <p class="card-text">A comprehensive summary of the most important events and trends that shaped the month.</p>
+                        <a href="#" class="btn btn-outline-info btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-top border-3 border-success">
+                    <div class="card-body">
+                        <span class="badge bg-success mb-2">Weekly</span>
+                        <h3 class="h5 card-title">Digital Economy</h3>
+                        <p class="text-muted small">April 15, 2026</p>
+                        <p class="card-text">Cryptocurrency updates, fintech innovations, and how digital payments are transforming commerce.</p>
+                        <a href="#" class="btn btn-outline-success btn-sm stretched-link">Read Issue</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="card bg-light shadow-sm mb-5">
+            <div class="card-body">
+                <h2 class="h4 text-center mb-4">What You'll Get</h2>
+                <div class="row g-4 text-center">
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 mb-2">&#128214;</div>
+                        <h4 class="h6">Curated Content</h4>
+                        <p class="small text-muted mb-0">Handpicked articles, reports, and insights worth your time.</p>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 mb-2">&#128336;</div>
+                        <h4 class="h6">Weekly Delivery</h4>
+                        <p class="small text-muted mb-0">Consistent, timely updates delivered every Saturday morning.</p>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 mb-2">&#128172;</div>
+                        <h4 class="h6">Expert Voices</h4>
+                        <p class="small text-muted mb-0">Contributions from industry leaders and subject matter experts.</p>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 mb-2">&#128274;</div>
+                        <h4 class="h6">No Spam</h4>
+                        <p class="small text-muted mb-0">We respect your inbox and never share your information.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Unsubscribe</h2>
+                <p class="text-muted mb-3">Already subscribed but want to leave? Enter your email below to unsubscribe.</p>
+                <form class="row g-2" onsubmit="handleUnsubscribe(event)">
+                    <div class="col-sm-6 col-md-4">
+                        <input type="email" id="unsubscribe-email" class="form-control" placeholder="Your email address" required>
+                    </div>
+                    <div class="col-sm-auto">
+                        <button type="submit" class="btn btn-outline-danger">Unsubscribe</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function handleSubscribe(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('subscriber-email');
+            const email = emailInput.value.trim();
+            if (email) {
+                alert('Thank you for subscribing! A confirmation email has been sent to ' + email + '.');
+                emailInput.value = '';
+            }
+        }
+
+        function handleUnsubscribe(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('unsubscribe-email');
+            const email = emailInput.value.trim();
+            if (email) {
+                alert('Unsubscribe request received for ' + email + '. You will no longer receive our newsletters.');
+                emailInput.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

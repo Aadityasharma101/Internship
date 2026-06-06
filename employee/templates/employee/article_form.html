@@ -1,0 +1,32 @@
+{% extends 'employee/dashboard_base.html' %}
+
+{% block dash_title %}{{ title }}{% endblock %}
+
+{% block dash_content %}
+<div class="mb-4">
+    <a href="{% url 'employee_dashboard' %}" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Back to dashboard</a>
+    <h1 class="h3 fw-bold mt-2">{{ title }}</h1>
+</div>
+
+<div class="bg-white rounded-3 shadow-sm p-4">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+            {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="form-check">
+                {{ field }}
+                <label class="form-check-label">{{ field.label }}</label>
+            </div>
+            {% else %}
+            <label class="form-label fw-semibold">{{ field.label }}</label>
+            {{ field }}
+            {% endif %}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn nh-btn-primary">Save Article</button>
+    </form>
+</div>
+{% endblock %}

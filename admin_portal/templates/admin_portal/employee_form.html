@@ -1,0 +1,24 @@
+{% extends 'admin_portal/dashboard_base.html' %}
+
+{% block dash_title %}Add Employee{% endblock %}
+
+{% block dash_content %}
+<div class="mb-4">
+    <a href="{% url 'admin_employee_list' %}" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Back</a>
+    <h1 class="h3 fw-bold mt-2">Create Staff Account</h1>
+</div>
+
+<div class="bg-white rounded-3 shadow-sm p-4" style="max-width: 500px;">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="mb-3">
+            <label class="form-label fw-semibold">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn nh-btn-primary">Create Employee</button>
+    </form>
+</div>
+{% endblock %}

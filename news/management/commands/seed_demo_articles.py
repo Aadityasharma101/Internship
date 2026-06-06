@@ -8,12 +8,23 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Create sample categories and published articles for demo/testing.'
+    help = 'Create sample categories, users, and published articles for demo/testing.'
 
     def handle(self, *args, **options):
+        admin, created = User.objects.get_or_create(
+            username='admin',
+            defaults={'email': 'admin@newshub.com', 'is_staff': True, 'is_superuser': True},
+        )
+        if created or not admin.has_usable_password():
+            admin.set_password('admin123')
+            admin.is_staff = True
+            admin.is_superuser = True
+            admin.save()
+            self.stdout.write(self.style.SUCCESS('Admin created: admin / admin123'))
+
         reporter, _ = User.objects.get_or_create(
             username='reporter',
-            defaults={'email': 'reporter@newsportal.com', 'is_staff': True},
+            defaults={'email': 'reporter@newshub.com', 'is_staff': True},
         )
         if not reporter.has_usable_password():
             reporter.set_password('reporter123')
@@ -32,33 +43,54 @@ class Command(BaseCommand):
             defaults={'description': 'Sports headlines'},
         )
 
-        election_tag, _ = Tag.objects.get_or_create(name='Election')
-        ai_tag, _ = Tag.objects.get_or_create(name='AI')
-
         samples = [
+            {
+                'title': 'AI Revolution Changes How We Work',
+                'category': tech,
+                'excerpt': 'Artificial intelligence is transforming workplaces across every industry at unprecedented speed.',
+                'content': 'From automated workflows to intelligent assistants, AI tools are reshaping how teams collaborate and deliver results.\n\nExperts predict that adaptability will be the most valuable skill in the years ahead.',
+                'is_breaking': False,
+                'image_seed': 'ai-work',
+            },
+            {
+                'title': 'New Climate Bill Passes Senate Vote',
+                'category': politics,
+                'excerpt': 'Landmark legislation aims to cut emissions by 50% before the end of the decade.',
+                'content': 'Lawmakers celebrated a bipartisan breakthrough after months of negotiation.\n\nThe bill includes funding for renewable energy infrastructure and green job training programs.',
+                'is_breaking': True,
+                'image_seed': 'climate',
+            },
+            {
+                'title': 'Championship Final Ends in Dramatic Overtime',
+                'category': sports,
+                'excerpt': 'Underdogs clinch the title after a last-second play stunned the crowd.',
+                'content': 'Fans packed the stadium as the underdogs completed an unforgettable comeback in overtime.\n\nThe winning coach credited teamwork and preparation for the historic win.',
+                'is_breaking': False,
+                'image_seed': 'sports-final',
+            },
             {
                 'title': 'National Election Results Show Record Turnout',
                 'category': politics,
-                'tags': [election_tag],
                 'excerpt': 'Voters turned out in historic numbers across the country.',
-                'content': 'Election officials confirmed record participation in every region. Analysts say youth turnout drove much of the surge.\n\nResults are expected to be certified within 48 hours.',
+                'content': 'Election officials confirmed record participation in every region. Analysts say youth turnout drove much of the surge.',
                 'is_breaking': True,
+                'image_seed': 'election',
             },
             {
-                'title': 'New AI Policy Framework Announced by Government',
+                'title': 'Startup Unveils Next-Gen Electric Vehicle',
                 'category': tech,
-                'tags': [ai_tag],
-                'excerpt': 'Regulators outline rules for safe and transparent AI deployment.',
-                'content': 'The framework focuses on transparency, data privacy, and accountability for public-sector AI systems.\n\nIndustry leaders welcomed the clarity but asked for more consultation on startup compliance costs.',
+                'excerpt': 'The new model promises 500 miles of range on a single charge.',
+                'content': 'Industry analysts called the announcement a major milestone for affordable EV adoption.\n\nPre-orders open next month with deliveries expected by year end.',
                 'is_breaking': False,
+                'image_seed': 'ev-car',
             },
             {
-                'title': 'Championship Final Ends in Dramatic Overtime Victory',
+                'title': 'Olympic Athlete Breaks World Record',
                 'category': sports,
-                'tags': [],
-                'excerpt': 'Underdogs clinch the title after a last-second play.',
-                'content': 'Fans packed the stadium as the underdogs completed an unforgettable comeback in overtime.\n\nThe winning coach credited teamwork and preparation for the historic win.',
+                'excerpt': 'A stunning performance captivated audiences worldwide.',
+                'content': 'The athlete shattered a decades-old record that many thought would never fall.\n\nTeammates and coaches praised years of relentless training.',
                 'is_breaking': False,
+                'image_seed': 'olympics',
             },
         ]
 
@@ -74,18 +106,16 @@ class Command(BaseCommand):
                     'is_breaking': data['is_breaking'],
                     'published_at': timezone.now(),
                     'featured_image_url': 'https://picsum.photos/seed/{}/800/450'.format(
-                        data['title'][:8].replace(' ', '')
+                        data['image_seed']
                     ),
                 },
             )
             if created:
-                for tag in data['tags']:
-                    article.tags.add(tag)
                 self.stdout.write(self.style.SUCCESS(f'Created: {article.title}'))
             else:
                 self.stdout.write(f'Already exists: {article.title}')
 
-        self.stdout.write(self.style.SUCCESS(
-            '\nDemo ready. Reporter login: reporter / reporter123'
-        ))
-        self.stdout.write('Open an article: /article/<slug>/')
+        self.stdout.write(self.style.SUCCESS('\n=== Demo Ready ==='))
+        self.stdout.write('Admin:    admin / admin123  ->  /admin/login/')
+        self.stdout.write('Employee: reporter / reporter123  ->  /employee/login/')
+        self.stdout.write('Readers:  register at /register/ to comment & rate')

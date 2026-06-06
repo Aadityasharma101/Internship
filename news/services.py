@@ -25,12 +25,43 @@ def record_article_view(article: Article, request) -> int:
 
 
 def get_trending_articles(limit=6):
-    threshold = getattr(settings, 'TRENDING_VIEWS_THRESHOLD', 50)
     return (
-        Article.objects.filter(
-            status=Article.Status.PUBLISHED,
-            stats__views_count__gte=threshold,
-        )
+        Article.objects.filter(status=Article.Status.PUBLISHED)
         .select_related('category', 'author', 'stats')
         .order_by('-stats__views_count')[:limit]
     )
+
+
+SESSION_BOOKMARK_KEY = 'bookmarked_articles'
+
+
+def get_session_bookmark_ids(request):
+    return request.session.get(SESSION_BOOKMARK_KEY, [])
+
+
+def is_session_bookmarked(request, article_id):
+    return article_id in get_session_bookmark_ids(request)
+
+
+def toggle_session_bookmark(request, article_id):
+    bookmarks = list(get_session_bookmark_ids(request))
+    if article_id in bookmarks:
+        bookmarks.remove(article_id)
+        bookmarked = False
+    else:
+        bookmarks.append(article_id)
+        bookmarked = True
+    request.session[SESSION_BOOKMARK_KEY] = bookmarks
+    request.session.modified = True
+    return bookmarked
+
+
+def get_bookmarked_articles(request):
+    ids = get_session_bookmark_ids(request)
+    if not ids:
+        return Article.objects.none()
+    preserved = {pk: i for i, pk in enumerate(ids)}
+    qs = Article.objects.filter(pk__in=ids, status=Article.Status.PUBLISHED).select_related(
+        'category', 'author', 'stats'
+    )
+    return sorted(qs, key=lambda a: preserved.get(a.pk, 0))

@@ -58,7 +58,8 @@ class Article(models.Model):
     slug = models.SlugField(max_length=280, unique=True, blank=True)
     content = models.TextField()
     excerpt = models.CharField(max_length=500, blank=True)
-    featured_image_url = models.URLField(max_length=200, blank=True)
+    featured_image = models.ImageField(upload_to='articles/', blank=True, null=True)
+    featured_image_url = models.URLField(max_length=500, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -101,6 +102,21 @@ class Article(models.Model):
         threshold = getattr(settings, 'TRENDING_VIEWS_THRESHOLD', 50)
         return self.views_count >= threshold
 
+    @property
+    def image_url(self):
+        if self.featured_image:
+            return self.featured_image.url
+        return self.featured_image_url or ''
+
+    @property
+    def average_rating(self):
+        agg = self.ratings.aggregate(avg=models.Avg('score'))
+        return round(agg['avg'] or 0, 1)
+
+    @property
+    def rating_count(self):
+        return self.ratings.count()
+
 
 class ArticleStats(models.Model):
     article = models.OneToOneField(
@@ -122,6 +138,49 @@ class ArticleTag(models.Model):
 
     class Meta:
         unique_together = ('article', 'tag')
+
+
+class Comment(models.Model):
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name='comments',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='comments',
+    )
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username} on {self.article.title}'
+
+
+class Rating(models.Model):
+    article = models.ForeignKey(
+        Article,
+        on_delete=models.CASCADE,
+        related_name='ratings',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ratings',
+    )
+    score = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'article')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username} → {self.score}/5'
 
 
 class Bookmark(models.Model):

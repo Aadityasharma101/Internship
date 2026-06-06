@@ -1,0 +1,39 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Sign In — NewsHub{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="nh-auth-card">
+        <h1>Sign In</h1>
+        <p class="text-muted mb-4">Access your NewsHub account</p>
+
+        <form method="post">
+            {% csrf_token %}
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">I am signing in as</label>
+                <select name="role" class="form-select" required>
+                    <option value="reader" {% if selected_role == 'reader' %}selected{% endif %}>Reader</option>
+                    <option value="employee" {% if selected_role == 'employee' %}selected{% endif %}>Employee</option>
+                    <option value="admin" {% if selected_role == 'admin' %}selected{% endif %}>Administrator</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Username</label>
+                <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" name="password" class="form-control" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn nh-btn-primary w-100 py-2">Sign In</button>
+        </form>
+
+        <p class="text-center mt-4 mb-0 text-muted small">
+            New here? <a href="{% url 'register' %}" class="fw-semibold">Create a free account</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

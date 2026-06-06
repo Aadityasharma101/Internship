@@ -1,0 +1,78 @@
+{% extends 'admin_portal/dashboard_base.html' %}
+
+{% block dash_title %}Dashboard{% endblock %}
+
+{% block dash_content %}
+<h1 class="h3 fw-bold mb-4">Admin Dashboard</h1>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="dash-stat-card">
+            <div class="stat-value">{{ total_news }}</div>
+            <div class="stat-label">Total News</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dash-stat-card">
+            <div class="stat-value">{{ total_views }}</div>
+            <div class="stat-label">Total Views</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dash-stat-card">
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dash-stat-card">
+            <div class="stat-value">{{ total_employees }}</div>
+            <div class="stat-label">Employees</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <h2 class="h5 fw-bold mb-3"><i class="bi bi-chat-dots"></i> Recent Comments</h2>
+        <div class="bg-white rounded-3 shadow-sm p-3">
+            {% for comment in recent_comments %}
+            <div class="border-bottom py-3 {% if forloop.last %}border-0{% endif %}">
+                <div class="d-flex justify-content-between">
+                    <strong>{{ comment.user.username }}</strong>
+                    <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
+                </div>
+                <div class="small text-muted mb-1">
+                    Article: <em>{{ comment.article.title|truncatechars:50 }}</em>
+                    {% if comment.article.author %} · by {{ comment.article.author.username }}{% endif %}
+                </div>
+                <p class="mb-0">{{ comment.text }}</p>
+            </div>
+            {% empty %}
+            <p class="text-muted mb-0">No comments yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <h2 class="h5 fw-bold mb-3"><i class="bi bi-newspaper"></i> Recent Articles</h2>
+        <div class="bg-white rounded-3 shadow-sm">
+            <div class="list-group list-group-flush">
+                {% for article in recent_articles %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold small">{{ article.title|truncatechars:45 }}</div>
+                        <small class="text-muted">{{ article.author.username|default:"—" }} · {{ article.views_count }} views</small>
+                    </div>
+                    <a href="{% url 'admin_article_edit' article.slug %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <a href="{% url 'admin_employee_add' %}" class="btn nh-btn-primary btn-sm"><i class="bi bi-person-plus"></i> Add Employee</a>
+            <a href="{% url 'admin_article_list' %}" class="btn btn-outline-secondary btn-sm">All Articles</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,8 +1,8 @@
 <form method="post" action="{% url 'toggle_bookmark' article.slug %}" class="d-inline">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ request.path }}">
-    <button type="submit" class="btn {% if is_bookmarked %}btn-warning{% else %}btn-outline-warning{% endif %}">
-        <i class="bi {% if is_bookmarked %}bi-bookmark-fill{% else %}bi-bookmark{% endif %} me-1"></i>
-        {% if is_bookmarked %}Saved{% else %}Save{% endif %}
+    <button type="submit" class="btn {% if is_bookmarked %}btn-warning{% else %}btn-outline-warning{% endif %} btn-sm">
+        <i class="bi bi-star{% if is_bookmarked %}-fill{% endif %}"></i>
+        {% if is_bookmarked %}Saved{% else %}Bookmark{% endif %}
     </button>
 </form>

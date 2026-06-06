@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Article, ArticleStats, ArticleTag, Bookmark, Category, Tag
+from .models import Article, ArticleStats, ArticleTag, Bookmark, Category, Comment, Rating, Tag
 
 
 class ArticleTagInline(admin.TabularInline):
@@ -40,3 +40,14 @@ class ArticleStatsAdmin(admin.ModelAdmin):
 class BookmarkAdmin(admin.ModelAdmin):
     list_display = ('user', 'article', 'created_at')
     list_filter = ('created_at',)
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ('user', 'article', 'created_at')
+    search_fields = ('text', 'user__username', 'article__title')
+
+
+@admin.register(Rating)
+class RatingAdmin(admin.ModelAdmin):
+    list_display = ('user', 'article', 'score', 'created_at')

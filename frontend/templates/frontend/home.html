@@ -1,60 +1,122 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Home — News Portal{% endblock %}
+{% block title %}NewsHub — Top Stories{% endblock %}
 
 {% block content %}
-<div class="container">
-    {% if trending_articles %}
-    <section class="mb-5">
-        <h2 class="h4 fw-bold mb-3"><i class="bi bi-fire text-danger"></i> Trending</h2>
-        <div class="row g-3">
-            {% for article in trending_articles %}
-            <div class="col-md-4">
-                <div class="card h-100 border-danger border-2 shadow-sm">
-                    <div class="card-body">
-                        <span class="badge badge-trending mb-2">Trending</span>
-                        <h5 class="card-title">
-                            <a href="{% url 'article_detail' article.slug %}" class="text-decoration-none text-dark">
-                                {{ article.title|truncatechars:70 }}
-                            </a>
-                        </h5>
-                        <p class="small text-muted mb-0">
-                            <i class="bi bi-eye"></i> {{ article.stats.views_count }} views
-                        </p>
-                    </div>
-                </div>
+{% if breaking_article %}
+<section class="nh-ticker">
+    <div class="container nh-ticker-inner">
+        <span class="nh-breaking-label">LIVE</span>
+        <a href="{% url 'article_detail' breaking_article.slug %}" class="nh-ticker-text text-white text-decoration-none">
+            {{ breaking_article.title }}
+        </a>
+    </div>
+</section>
+{% endif %}
+
+<div class="container py-4">
+    {% if featured_article %}
+    <section class="nh-lead-story mb-5">
+        <div class="row g-4 align-items-center">
+            <div class="col-lg-7">
+                <a href="{% url 'article_detail' featured_article.slug %}" class="nh-lead-img-link d-block">
+                    {% if featured_article.image_url %}
+                    <img src="{{ featured_article.image_url }}" alt="{{ featured_article.title }}" class="nh-lead-img">
+                    {% else %}
+                    <div class="nh-lead-img nh-lead-img-placeholder"></div>
+                    {% endif %}
+                    {% if featured_article.is_breaking %}
+                    <span class="nh-lead-badge">Breaking</span>
+                    {% endif %}
+                </a>
             </div>
-            {% endfor %}
+            <div class="col-lg-5">
+                {% if featured_article.category %}
+                <span class="nh-lead-category">{{ featured_article.category.name }}</span>
+                {% endif %}
+                <h1 class="nh-lead-title">
+                    <a href="{% url 'article_detail' featured_article.slug %}">{{ featured_article.title }}</a>
+                </h1>
+                <p class="nh-lead-excerpt">{{ featured_article.excerpt }}</p>
+                <div class="nh-lead-meta">
+                    {% if featured_article.author %}
+                    <span>By {{ featured_article.author.get_full_name|default:featured_article.author.username }}</span>
+                    {% endif %}
+                    <span>{{ featured_article.published_at|timesince }} ago</span>
+                    {% if show_views %}
+                    <span class="nh-staff-only"><i class="bi bi-eye"></i> {{ featured_article.views_count }} views</span>
+                    {% endif %}
+                </div>
+                <a href="{% url 'article_detail' featured_article.slug %}" class="nh-read-more">Continue Reading</a>
+            </div>
         </div>
     </section>
+    <hr class="nh-divider">
     {% endif %}
 
-    <section>
-        <h2 class="h4 fw-bold mb-3">Latest News</h2>
-        <div class="row g-4">
-            {% for article in articles %}
-            <div class="col-md-6 col-lg-4">
-                <div class="card h-100 shadow-sm">
-                    {% if article.featured_image_url %}
-                    <img src="{{ article.featured_image_url }}" class="card-img-top"
-                         alt="" style="height: 160px; object-fit: cover;">
-                    {% endif %}
-                    <div class="card-body">
-                        {% if article.is_breaking %}<span class="badge badge-breaking small">Breaking</span>{% endif %}
-                        {% if article.category %}<span class="badge bg-secondary small">{{ article.category.name }}</span>{% endif %}
-                        <h5 class="card-title mt-2">
-                            <a href="{% url 'article_detail' article.slug %}" class="text-decoration-none text-dark">
-                                {{ article.title }}
-                            </a>
-                        </h5>
-                        <p class="card-text small text-muted">{{ article.excerpt|truncatechars:100 }}</p>
-                    </div>
-                </div>
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="nh-section-header">
+                <h2 class="nh-section-title">Latest Stories</h2>
+                {% if selected_category %}
+                <a href="{% url 'home' %}" class="nh-clear-filter">Clear filter</a>
+                {% endif %}
             </div>
-            {% empty %}
-            <p class="text-muted">No published articles yet. Add them in Django Admin.</p>
-            {% endfor %}
+
+            <div class="row g-4">
+                {% for article in articles %}
+                <div class="col-md-6">
+                    <article class="nh-card nh-card-horizontal">
+                        <a href="{% url 'article_detail' article.slug %}" class="nh-card-img-wrap">
+                            {% if article.image_url %}
+                            <img src="{{ article.image_url }}" alt="{{ article.title }}">
+                            {% endif %}
+                            {% if article.is_breaking %}
+                            <span class="nh-card-badge-breaking">Breaking</span>
+                            {% endif %}
+                            {% if show_views %}
+                            <span class="nh-card-views"><i class="bi bi-eye"></i> {{ article.views_count }}</span>
+                            {% endif %}
+                        </a>
+                        <div class="nh-card-body">
+                            {% if article.category %}
+                            <div class="nh-card-category">{{ article.category.name }}</div>
+                            {% endif %}
+                            <h3 class="nh-card-title">
+                                <a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a>
+                            </h3>
+                            <p class="nh-card-excerpt">{{ article.excerpt|truncatechars:120 }}</p>
+                            <div class="nh-card-meta">{{ article.published_at|timesince }} ago</div>
+                        </div>
+                    </article>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5 text-muted">
+                    <p>No stories in this section right now.</p>
+                </div>
+                {% endfor %}
+            </div>
         </div>
-    </section>
+
+        <div class="col-lg-4">
+            <aside class="nh-sidebar-card sticky-top" style="top: 1rem;">
+                <div class="nh-sidebar-header">Most Read</div>
+                <ol class="nh-most-read">
+                    {% for article in trending_articles %}
+                    <li>
+                        <a href="{% url 'article_detail' article.slug %}">{{ article.title }}</a>
+                        {% if show_views %}
+                        <span class="nh-trend-meta nh-staff-only">{{ article.views_count }} views</span>
+                        {% else %}
+                        <span class="nh-trend-meta">{{ article.category.name|default:"News" }}</span>
+                        {% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="text-muted small px-3 py-2">Stories will appear here as readers engage.</li>
+                    {% endfor %}
+                </ol>
+            </aside>
+        </div>
+    </div>
 </div>
 {% endblock %}

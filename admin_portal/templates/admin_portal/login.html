@@ -1,0 +1,36 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Admin Login — NewsHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="nh-auth-card">
+        <div class="text-center mb-3">
+            <i class="bi bi-shield-lock display-4 text-danger"></i>
+        </div>
+        <h1 class="text-center">Admin Portal</h1>
+        <p class="text-muted text-center mb-4">Full control over articles, staff, and users</p>
+
+        <form method="post">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required autofocus>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn nh-btn-danger w-100">Admin Login</button>
+        </form>
+
+        <p class="text-center mt-3 mb-0 text-muted small">
+            Default: <code>admin</code> / <code>admin123</code><br>
+            <a href="{% url 'home' %}">← Back to NewsHub</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

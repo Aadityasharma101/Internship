@@ -1,0 +1,107 @@
+{% extends 'employee/layouts/dashboard_base.html' %}
+
+{% block dash_title %}Newsroom Dashboard{% endblock %}
+{% block dash_heading %}Newsroom dashboard{% endblock %}
+
+{% block dash_content %}
+<div class="stats-grid">
+    <article class="stat-card">
+        <span class="stat-label">My articles</span>
+        <strong class="stat-value">{{ article_count }}</strong>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Published</span>
+        <strong class="stat-value">{{ published_count }}</strong>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Drafts</span>
+        <strong class="stat-value">{{ draft_count }}</strong>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Pending</span>
+        <strong class="stat-value">{{ pending_count }}</strong>
+    </article>
+</div>
+
+{% if api_error %}
+    <div class="alert alert-warning shadow-sm">{{ api_error }}</div>
+{% endif %}
+
+<div class="dashboard-split">
+    <section class="panel-card">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow mb-1">Workspace</p>
+                <h2 class="panel-title">Your latest articles</h2>
+            </div>
+            <a href="{% url 'employee_article_add' %}" class="btn btn-dark rounded-pill">Add news</a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table newsroom-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Views</th>
+                        <th>Comments</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for article in articles %}
+                        <tr>
+                            <td>
+                                <strong>{{ article.title|truncatechars:52 }}</strong>
+                                {% if article.category %}<div class="table-subtext">{{ article.category.name }}</div>{% endif %}
+                            </td>
+                            <td>
+                                <span class="status-pill status-{{ article.status|lower }}">{{ article.status }}</span>
+                            </td>
+                            <td>{{ article.views_count }}</td>
+                            <td>{{ article.comment_count }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'employee_article_edit' article.id %}" class="btn btn-sm btn-outline-secondary rounded-pill">Edit</a>
+                                <form method="post" action="{% url 'employee_article_delete' article.id %}" class="d-inline" onsubmit="return confirm('Delete this article from the API?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                No articles yet. Use "Add news" to publish the first story.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <aside class="panel-card panel-side">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow mb-1">Pulse</p>
+                <h2 class="panel-title">Recent comments</h2>
+            </div>
+        </div>
+
+        <div class="comment-stream">
+            {% for comment in recent_comments %}
+                <article class="comment-item">
+                    <div class="comment-meta">
+                        <strong>{{ comment.user.username }}</strong>
+                        <span>{{ comment.created_at|timesince }} ago</span>
+                    </div>
+                    <p class="comment-story">On {{ comment.article.title|truncatechars:50 }}</p>
+                    <p class="comment-text">{{ comment.text }}</p>
+                </article>
+            {% empty %}
+                <p class="empty-copy mb-0">No comments are attached to your stories yet.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</div>
+{% endblock %}

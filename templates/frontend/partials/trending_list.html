@@ -1,0 +1,19 @@
+<ol class="trend-list">
+    {% for article in articles %}
+        <li class="trend-item">
+            <a href="{% url 'article_detail' article.id %}">
+                <span class="trend-index">{{ forloop.counter }}</span>
+                <span class="trend-copy">
+                    <span class="trend-title">{{ article.title|truncatechars:72 }}</span>
+                    <span class="trend-meta">
+                        {% if article.category %}{{ article.category.name }}{% else %}General{% endif %}
+                        <span class="trend-dot"></span>
+                        {% if article.published_at %}{{ article.published_at|timesince }} ago{% endif %}
+                    </span>
+                </span>
+            </a>
+        </li>
+    {% empty %}
+        <li class="trend-empty">Trending stories will appear once readers start engaging with published articles.</li>
+    {% endfor %}
+</ol>

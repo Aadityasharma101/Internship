@@ -1,0 +1,19 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">Lunar IT Solutions</title>
+  <desc id="logoDesc">Blue crescent moon with red Lunar wordmark and white IT Solutions text on transparent background.</desc>
+  <defs>
+    <linearGradient id="moonBlue" x1="56" y1="40" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4FA8"/>
+      <stop offset="1" stop-color="#0E2E73"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="640" height="180" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#102033" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M118 40C84.5 40 58 66.5 58 100C58 133.5 84.5 160 118 160C126.9 160 135.4 158.2 143.2 155C116.2 151.2 96 127.6 96 100C96 72.4 116.2 48.8 143.2 45C135.4 41.8 126.9 40 118 40Z" fill="url(#moonBlue)"/>
+    <path d="M132 42C100 45.4 76 72.4 76 100C76 127.6 100 154.6 132 158C115.8 149.2 104 126.4 104 100C104 73.6 115.8 50.8 132 42Z" fill="#2D6BCC" opacity="0.92"/>
+    <text x="165" y="102" fill="#D91818" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="1">LUNAR</text>
+    <text x="167" y="138" fill="#102033" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" letter-spacing="12">IT SOLUTIONS</text>
+  </g>
+</svg>

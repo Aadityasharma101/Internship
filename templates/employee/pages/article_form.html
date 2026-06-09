@@ -1,0 +1,64 @@
+{% extends 'employee/layouts/dashboard_base.html' %}
+
+{% block dash_title %}{{ title }}{% endblock %}
+{% block dash_heading %}{{ title }}{% endblock %}
+
+{% block dash_content %}
+<div class="form-layout">
+    <section class="panel-card">
+        <div class="panel-head align-items-start">
+            <div>
+                <p class="eyebrow mb-1">News entry</p>
+                <h2 class="panel-title">{{ title }}</h2>
+            </div>
+            <a href="{% url 'employee_dashboard' %}" class="btn btn-outline-secondary rounded-pill">Back to dashboard</a>
+        </div>
+
+        <form method="post" class="news-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="form-grid">
+                {% for field in form %}
+                    <div class="{% if field.field.widget.input_type == 'checkbox' %}form-check-wrap{% elif field.name == 'body' %}field-wide{% elif field.name == 'category_name' %}field-wide{% endif %}">
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                            <div class="form-check custom-check">
+                                {{ field }}
+                                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            </div>
+                        {% else %}
+                            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        {% endif %}
+                        {% if field.errors %}
+                            <div class="text-danger small mt-1">{{ field.errors }}</div>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <div class="form-text small">{{ field.help_text }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-dark rounded-pill px-4">Save article</button>
+            </div>
+        </form>
+    </section>
+
+    <aside class="panel-card panel-side">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow mb-1">Tip</p>
+                <h2 class="panel-title">Publishing notes</h2>
+            </div>
+        </div>
+        <ul class="tip-list">
+            <li>Use a strong headline and complete story body for the external API.</li>
+            <li>Choose an API category or type a new category name if the list is empty.</li>
+            <li>Paste an image URL so the public news cards stay visual.</li>
+            <li>The final status is controlled by the backend API workflow.</li>
+        </ul>
+    </aside>
+</div>
+{% endblock %}

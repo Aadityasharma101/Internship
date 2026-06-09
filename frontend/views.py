@@ -1,162 +1,60 @@
-from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
-from urllib.parse import urlencode
+from django.shortcuts import render
 
-from news.models import Article, Category, Comment, Rating
-from news.services import (
-    get_bookmarked_articles,
-    get_trending_articles,
-    is_article_bookmarked,
-    record_article_view,
-    toggle_bookmark as toggle_article_bookmark,
-)
+from .api import ApiError, get_article, list_trending_articles, search_articles, session_access_token
 
 
 def home(request):
-    category_slug = request.GET.get('category', '')
-    articles = (
-        Article.objects.filter(status=Article.Status.PUBLISHED)
-        .select_related('category', 'author', 'stats')
-        .order_by('-published_at')
-    )
-    if category_slug:
-        articles = articles.filter(category__slug=category_slug)
+    category_slug = request.GET.get('category', '').strip()
+    api_error = ''
+    try:
+        articles = search_articles(category_slug=category_slug)
+        trending_articles = list_trending_articles()
+    except ApiError as error:
+        articles = []
+        trending_articles = []
+        api_error = str(error)
 
-    breaking = articles.filter(is_breaking=True).first()
-    categories = Category.objects.all()
-    article_list = list(articles[:13])
-    featured = breaking or (article_list[0] if article_list else None)
-    featured_pk = featured.pk if featured else None
-    grid_articles = [a for a in article_list if a.pk != featured_pk][:12]
+    article_pool = list(articles[:10])
+    hero_article = article_pool[0] if article_pool else None
+    spotlight_articles = article_pool[1:4]
+    news_cards = article_pool[1:7]
 
     return render(
         request,
-        'frontend/home.html',
+        'frontend/pages/home.html',
         {
-            'articles': grid_articles,
-            'featured_article': featured,
-            'trending_articles': get_trending_articles(),
-            'breaking_article': breaking,
-            'categories': categories,
+            'hero_article': hero_article,
+            'spotlight_articles': spotlight_articles,
+            'news_cards': news_cards,
+            'trending_articles': trending_articles,
             'selected_category': category_slug,
+            'total_headlines': len(articles),
+            'api_error': api_error,
         },
     )
 
 
-def article_detail(request, slug):
-    article = get_object_or_404(
-        Article.objects.select_related('category', 'author', 'stats').prefetch_related('tags'),
-        slug=slug,
-        status=Article.Status.PUBLISHED,
-    )
-    views_count = record_article_view(article, request)
-    article.stats.refresh_from_db()
-
-    is_bookmarked = is_article_bookmarked(request.user, article.pk)
-    user_rating = None
-    if request.user.is_authenticated:
-        user_rating = Rating.objects.filter(user=request.user, article=article).first()
-
-    comments = (
-        article.comments.select_related('user').order_by('-created_at')[:50]
-    )
-    trending_articles = get_trending_articles(limit=6)
-    related = (
-        Article.objects.filter(
-            status=Article.Status.PUBLISHED,
-            category=article.category,
-        )
-        .exclude(pk=article.pk)
-        .select_related('stats')[:4]
-        if article.category
-        else Article.objects.none()
-    )
+def article_detail(request, article_id):
+    api_error = ''
+    article = None
+    trending_articles = []
+    related = []
+    try:
+        article = get_article(article_id, token=session_access_token(request))
+        trending_articles = list_trending_articles()
+        if article.category:
+            related = [item for item in search_articles(category_slug=article.category.slug) if item.id != article.id][:4]
+    except ApiError as error:
+        api_error = str(error)
 
     return render(
         request,
-        'frontend/article_detail.html',
+        'frontend/pages/article_detail.html',
         {
             'article': article,
-            'views_count': views_count,
-            'is_trending': article.is_trending,
-            'is_bookmarked': is_bookmarked,
+            'views_count': article.views_count if article else 0,
             'trending_articles': trending_articles,
             'related_articles': related,
-            'trending_threshold': getattr(settings, 'TRENDING_VIEWS_THRESHOLD', 50),
-            'comments': comments,
-            'user_rating': user_rating,
+            'api_error': api_error,
         },
     )
-
-
-@login_required
-def bookmark_list(request):
-    articles = get_bookmarked_articles(request.user)
-    return render(request, 'frontend/bookmarks.html', {'articles': articles})
-
-
-@require_POST
-def toggle_bookmark(request, slug):
-    article = get_object_or_404(Article, slug=slug, status=Article.Status.PUBLISHED)
-    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or '/'
-
-    if not request.user.is_authenticated:
-        messages.info(request, 'Please sign in to save articles.')
-        login_url = f"{settings.LOGIN_URL}?{urlencode({'next': next_url})}"
-        return redirect(login_url)
-
-    bookmarked = toggle_article_bookmark(request.user, article)
-
-    if bookmarked:
-        messages.success(request, 'Article saved to bookmarks.')
-    else:
-        messages.success(request, 'Article removed from bookmarks.')
-
-    if request.headers.get('HX-Request') or request.POST.get('ajax'):
-        return render(
-            request,
-            'frontend/partials/bookmark_button.html',
-            {'article': article, 'is_bookmarked': bookmarked},
-        )
-    if next_url:
-        return redirect(next_url)
-    return redirect('article_detail', slug=slug)
-
-
-@login_required
-@require_POST
-def add_comment(request, slug):
-    article = get_object_or_404(Article, slug=slug, status=Article.Status.PUBLISHED)
-    text = request.POST.get('text', '').strip()
-    if not text:
-        messages.error(request, 'Comment cannot be empty.')
-    elif len(text) > 2000:
-        messages.error(request, 'Comment is too long.')
-    else:
-        Comment.objects.create(article=article, user=request.user, text=text)
-        messages.success(request, 'Comment posted!')
-    return redirect('article_detail', slug=slug)
-
-
-@login_required
-@require_POST
-def rate_article(request, slug):
-    article = get_object_or_404(Article, slug=slug, status=Article.Status.PUBLISHED)
-    try:
-        score = int(request.POST.get('score', 0))
-    except (TypeError, ValueError):
-        score = 0
-
-    if score < 1 or score > 5:
-        messages.error(request, 'Please select a rating between 1 and 5.')
-    else:
-        Rating.objects.update_or_create(
-            user=request.user,
-            article=article,
-            defaults={'score': score},
-        )
-        messages.success(request, f'You rated this article {score}/5 stars!')
-    return redirect('article_detail', slug=slug)

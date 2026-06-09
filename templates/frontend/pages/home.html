@@ -1,0 +1,146 @@
+﻿{% extends 'frontend/layouts/base.html' %}
+
+{% block title %}Lunar IT Solutions - Home{% endblock %}
+
+{% block content %}
+<section class="hero-zone">
+    <div class="container py-4 py-lg-5">
+        <div class="section-head hero-intro-head">
+            <div>
+                <p class="eyebrow mb-1">Todayâ€™s briefing</p>
+                <h2 class="section-title">Featured news, latest updates, and trending stories</h2>
+            </div>
+            <div class="section-meta">
+                Live from the external API
+            </div>
+        </div>
+
+        {% if hero_article %}
+            <div class="hero-grid">
+                <article class="hero-panel">
+                    <div class="hero-copy">
+                        <div class="hero-kicker-row">
+                            <span class="hero-badge">Featured story</span>
+                            {% if hero_article.category %}
+                                <span class="hero-mini-meta">{{ hero_article.category.name }}</span>
+                            {% endif %}
+                        </div>
+                        <h1 class="hero-title">
+                            <a href="{% url 'article_detail' hero_article.id %}">{{ hero_article.title }}</a>
+                        </h1>
+                        <p class="hero-excerpt">
+                            {{ hero_article.excerpt|default:hero_article.content|truncatechars:220 }}
+                        </p>
+                        <div class="hero-meta">
+                            {% if hero_article.author %}
+                                <span>By {{ hero_article.author.get_full_name|default:hero_article.author.username }}</span>
+                            {% endif %}
+                            {% if hero_article.published_at %}
+                                <span>{{ hero_article.published_at|timesince }} ago</span>
+                            {% endif %}
+                            <span>{{ hero_article.views_count|default:0 }} views</span>
+                        </div>
+                        <div class="hero-actions">
+                            <a href="{% url 'article_detail' hero_article.id %}" class="btn btn-dark rounded-pill px-4">Read story</a>
+                            <a href="#latest" class="btn btn-outline-dark rounded-pill px-4">Browse latest</a>
+                        </div>
+                    </div>
+                    <a class="hero-media" href="{% url 'article_detail' hero_article.id %}">
+                        {% if hero_article.image_url %}
+                            <img src="{{ hero_article.image_url }}" alt="{{ hero_article.title }}">
+                        {% else %}
+                            <div class="hero-placeholder"></div>
+                        {% endif %}
+                    </a>
+                </article>
+
+                <aside class="hero-rail">
+                    <div class="panel-head">
+                        <div>
+                            <p class="eyebrow mb-1">Top picks</p>
+                            <h2 class="panel-title">More stories</h2>
+                        </div>
+                        <span class="panel-chip">{{ spotlight_articles|length }} stories</span>
+                    </div>
+
+                    <div class="hero-rail-list">
+                        {% for article in spotlight_articles %}
+                            {% include 'frontend/partials/news_card.html' with article=article compact=True %}
+                        {% empty %}
+                            <div class="empty-state">More stories will appear here when the API returns additional articles.</div>
+                        {% endfor %}
+                    </div>
+                </aside>
+            </div>
+        {% else %}
+            <article class="hero-panel hero-empty">
+                <div>
+                    <span class="hero-badge">Featured story</span>
+                    <h1 class="hero-title">Stories will appear here once the API has published news.</h1>
+                    {% if api_error %}
+                        <p class="hero-excerpt mb-0">{{ api_error }}</p>
+                    {% else %}
+                        <p class="hero-excerpt mb-0">Create news from the staff dashboard and it will be stored in the external API.</p>
+                    {% endif %}
+                </div>
+            </article>
+        {% endif %}
+
+        {% if api_error and hero_article %}
+            <div class="api-alert mt-3">
+                <strong>API note:</strong> {{ api_error }}
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<section id="latest" class="stories-section">
+    <div class="container py-4 py-lg-5">
+        <div class="section-head">
+            <div>
+                <p class="eyebrow mb-1">Fresh coverage</p>
+                <h2 class="section-title">Latest API news</h2>
+            </div>
+            <div class="section-meta">
+                {{ total_headlines }} headline{{ total_headlines|pluralize }}
+            </div>
+        </div>
+
+        <div class="story-grid">
+            {% for article in news_cards %}
+                {% include 'frontend/partials/news_card.html' with article=article %}
+            {% empty %}
+                <div class="empty-state">
+                    No API news cards yet. Publish stories from the staff dashboard to populate this section.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section id="trending" class="trending-zone">
+    <div class="container py-4 py-lg-5">
+        <div class="trend-panel trend-panel-wide">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow mb-1">Trending now</p>
+                    <h2 class="panel-title">Popular stories on the API</h2>
+                </div>
+                <span class="panel-chip">{{ trending_articles|length }} stories</span>
+            </div>
+
+            <div class="trend-grid">
+                <div class="trend-copy-block">
+                                        <p class="trend-intro">
+                        This section highlights articles that are drawing the most attention, so readers can quickly see what’s getting traction.
+                    </p>
+                </div>
+                <div class="trend-list-wrap">
+                    {% include 'frontend/partials/trending_list.html' with articles=trending_articles %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+

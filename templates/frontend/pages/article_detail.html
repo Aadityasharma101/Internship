@@ -1,0 +1,75 @@
+{% extends 'frontend/layouts/base.html' %}
+
+{% block title %}{% if article %}{{ article.title }}{% else %}Story unavailable{% endif %} - Lunar IT Solutions{% endblock %}
+
+{% block content %}
+<section class="article-zone">
+    <div class="container py-4 py-lg-5">
+        {% if article %}
+            <div class="article-layout">
+                <article class="article-panel">
+                    <header class="article-header">
+                        {% if article.category %}
+                            <a href="{% url 'home' %}?category={{ article.category.slug }}" class="eyebrow">{{ article.category.name }}</a>
+                        {% else %}
+                            <span class="eyebrow">Featured report</span>
+                        {% endif %}
+                        <h1 class="article-title">{{ article.title }}</h1>
+                        {% if article.excerpt %}
+                            <p class="article-deck">{{ article.excerpt }}</p>
+                        {% endif %}
+                        <div class="article-meta">
+                            {% if article.author %}
+                                <span>By {{ article.author.get_full_name|default:article.author.username }}</span>
+                            {% endif %}
+                            {% if article.published_at %}
+                                <span>{{ article.published_at|date:"F j, Y" }}</span>
+                            {% endif %}
+                            <span>{{ views_count }} views</span>
+                        </div>
+                    </header>
+
+                    {% if article.image_url %}
+                        <figure class="article-figure">
+                            <img src="{{ article.image_url }}" alt="{{ article.title }}">
+                        </figure>
+                    {% endif %}
+
+                    <div class="article-content">
+                        {{ article.content|linebreaks }}
+                    </div>
+                </article>
+
+                <aside class="article-sidebar">
+                    <section class="sidebar-card">
+                        <div class="sidebar-head">Trending now</div>
+                        {% include 'frontend/partials/trending_list.html' with articles=trending_articles %}
+                    </section>
+
+                    {% if related_articles %}
+                        <section class="sidebar-card">
+                            <div class="sidebar-head">Related stories</div>
+                            <div class="related-list">
+                                {% for related in related_articles %}
+                                    <a href="{% url 'article_detail' related.id %}" class="related-item">
+                                        <span class="related-title">{{ related.title|truncatechars:64 }}</span>
+                                        <span class="related-meta">
+                                            {% if related.category %}{{ related.category.name }}{% else %}General{% endif %}
+                                        </span>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endif %}
+                </aside>
+            </div>
+        {% else %}
+            <section class="article-panel">
+                <p class="eyebrow">API response</p>
+                <h1 class="article-title">Story unavailable</h1>
+                <p class="article-deck mb-0">{{ api_error|default:"The external API did not return this story." }}</p>
+            </section>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

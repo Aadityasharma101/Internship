@@ -1,0 +1,31 @@
+<article class="story-card{% if compact %} story-card-compact{% endif %}">
+    <a class="story-media{% if compact %} story-media-compact{% endif %}" href="{% url 'article_detail' article.id %}">
+        {% if article.image_url %}
+            <img src="{{ article.image_url }}" alt="{{ article.title }}">
+        {% else %}
+            <div class="story-placeholder"></div>
+        {% endif %}
+        {% if article.is_breaking and not compact %}
+            <span class="story-ribbon">Breaking</span>
+        {% endif %}
+    </a>
+    <div class="story-body{% if compact %} story-body-compact{% endif %}">
+        {% if article.category %}
+            <div class="story-kicker">{{ article.category.name }}</div>
+        {% endif %}
+        <h3 class="story-title{% if compact %} story-title-compact{% endif %}">
+            <a href="{% url 'article_detail' article.id %}">{{ article.title }}</a>
+        </h3>
+        {% if not compact %}
+            <p class="story-excerpt">{{ article.excerpt|default:article.content|truncatechars:140 }}</p>
+        {% endif %}
+        <div class="story-meta">
+            {% if article.author %}
+                <span>{{ article.author.get_full_name|default:article.author.username }}</span>
+            {% endif %}
+            {% if article.published_at %}
+                <span>{{ article.published_at|timesince }} ago</span>
+            {% endif %}
+        </div>
+    </div>
+</article>

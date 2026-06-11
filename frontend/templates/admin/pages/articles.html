@@ -1,0 +1,120 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Articles - Admin Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Articles{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2>Articles</h2>
+        <p class="text-muted">Review published stories, drafts, categories, authors, and recent updates.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshArticlesBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+        <button class="btn-add" id="openArticleModalBtn" type="button">
+            <i class="fa-solid fa-plus"></i>
+            Add Article
+        </button>
+    </div>
+</div>
+
+<div class="articles-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total articles</span>
+        <strong id="totalArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Published</span>
+        <strong id="publishedArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Drafts</span>
+        <strong id="draftArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Featured</span>
+        <strong id="featuredArticles">0</strong>
+    </div>
+</div>
+
+<div class="articles-toolbar">
+    <div class="articles-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="articleSearchInput" placeholder="Search articles by title, author, category, or status">
+    </div>
+    <span class="toolbar-count" id="visibleArticlesCount">0 articles shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="articles-table">
+        <thead>
+            <tr>
+                <th>Article</th>
+                <th>Category</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th>Featured</th>
+                <th>Published</th>
+                <th>Updated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="articlesTableBody">
+            <tr class="loading-row">
+                <td colspan="8">Loading articles...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevArticleBtn" type="button">Previous</button>
+    <span id="articlePageInfo">Page 1</span>
+    <button id="nextArticleBtn" type="button">Next</button>
+</div>
+
+<div id="articleModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Create New Article</h3>
+
+        <div class="form-group">
+            <label for="articleTitle">Title</label>
+            <input type="text" id="articleTitle" placeholder="Article title">
+        </div>
+
+        <div class="form-group">
+            <label for="articleCategory">Category</label>
+            <input type="text" id="articleCategory" placeholder="Category">
+        </div>
+
+        <div class="form-group">
+            <label for="articleStatus">Status</label>
+            <input type="text" id="articleStatus" placeholder="Draft or published">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-primary" id="createArticleBtn" type="button">
+                Create Article
+            </button>
+            <button class="btn-secondary" id="closeArticleModalBtn" type="button">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'admin/js/articles.js' %}"></script>
+{% endblock %}

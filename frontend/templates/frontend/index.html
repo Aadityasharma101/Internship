@@ -6,11 +6,45 @@
 {% block content %}
 <div class="container">
     <h2>Welcome to News Portal</h2>
-    <p>This is your news portal frontend. News data will be fetched from REST API endpoints.</p>
-    
+    <p>This is your news portal frontend. News data is fetched from the REST API.</p>
+
     <section id="news-list">
-        <!-- News items will be loaded here via JavaScript/API calls -->
-        <div class="loading">Loading news...</div>
+        {% if articles %}
+        <div class="comments-list">
+            {% for article in articles %}
+            <article class="news-item">
+                <h3>{{ article.title|default:"No Title" }}</h3>
+                <p>Category: {{ article.category_name|default:"Uncategorized" }}</p>
+                <small>
+                    {% if article.published_at %}
+                    Posted: {{ article.published_at }}
+                    {% else %}
+                    News
+                    {% endif %}
+                </small>
+                <br>
+                <a href="{% url 'frontend:news_detail' article.id %}"
+                   style="color:#2c3e50; text-decoration:underline; font-weight:600;">
+                    Read More &rarr;
+                </a>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="comments-empty">No news available at the moment.</div>
+        {% endif %}
+    </section>
+
+    <section style="margin-top:2rem;">
+        <h3 style="margin-bottom:0.5rem;">Demo: Comment Card UI</h3>
+        {% load comment_tags %}
+        <div id="demo-comments">
+            {% render_comment_card author_name="Jane Cooper" text="Great article! Looking forward to more updates." created_at=now|date:"c" %}
+            {% render_comment_card author_name="Wade Warren" text="I think this raises some important points worth discussing." created_at=now|date:"c" %}
+        </div>
+        <br>
+        <div class="comments-header" style="margin-bottom:0.5rem;">JavaScript-driven comments</div>
+        <div id="js-comments" class="comments-list"></div>
     </section>
 </div>
 {% endblock %}

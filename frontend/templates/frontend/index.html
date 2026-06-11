@@ -4,48 +4,49 @@
 {% block title %}Home - News Portal{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>Welcome to News Portal</h2>
-    <p>This is your news portal frontend. News data is fetched from the REST API.</p>
-
-    <section id="news-list">
-        {% if articles %}
-        <div class="comments-list">
-            {% for article in articles %}
-            <article class="news-item">
-                <h3>{{ article.title|default:"No Title" }}</h3>
-                <p>Category: {{ article.category_name|default:"Uncategorized" }}</p>
-                <small>
-                    {% if article.published_at %}
-                    Posted: {{ article.published_at }}
-                    {% else %}
-                    News
-                    {% endif %}
-                </small>
-                <br>
-                <a href="{% url 'frontend:news_detail' article.id %}"
-                   style="color:#2c3e50; text-decoration:underline; font-weight:600;">
-                    Read More &rarr;
-                </a>
-            </article>
-            {% endfor %}
+<div class="page-shell" data-api-base="/api">
+    <section class="breaking-news-banner">
+        <div class="container">
+            <span class="breaking-badge">BREAKING</span>
+            <h2 id="breaking-headline">Loading latest headline...</h2>
         </div>
-        {% else %}
-        <div class="comments-empty">No news available at the moment.</div>
-        {% endif %}
     </section>
 
-    <section style="margin-top:2rem;">
-        <h3 style="margin-bottom:0.5rem;">Demo: Comment Card UI</h3>
-        {% load comment_tags %}
-        <div id="demo-comments">
-            {% render_comment_card author_name="Jane Cooper" text="Great article! Looking forward to more updates." created_at=now|date:"c" %}
-            {% render_comment_card author_name="Wade Warren" text="I think this raises some important points worth discussing." created_at=now|date:"c" %}
+    <section class="browse-section">
+        <div class="container">
+            <h3 class="browse-label">BROWSE</h3>
+            <div id="category-filter" class="category-filter" aria-live="polite">
+                <span class="category-btn active">All</span>
+            </div>
         </div>
-        <br>
-        <div class="comments-header" style="margin-bottom:0.5rem;">JavaScript-driven comments</div>
-        <div id="js-comments" class="comments-list"></div>
     </section>
+
+    <div class="container page-sections">
+        <section class="featured-section">
+            <h2 class="section-title">Featured Story</h2>
+            <div id="featured-hero" class="featured-hero loading-state">
+                <p>Loading featured story...</p>
+            </div>
+        </section>
+
+        <div class="main-grid">
+            <section class="articles-section">
+                <h2 class="section-title">Top Stories — Live</h2>
+                <div id="latest-news-grid" class="articles-grid loading-state">
+                    <div class="loading-spinner">Loading articles...</div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="sidebar-widget">
+                    <h3 class="sidebar-title">Trending Now</h3>
+                    <div id="trending-news-grid" class="top-stories-list loading-state">
+                        <p class="loading-text">Loading trending stories...</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

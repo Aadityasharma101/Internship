@@ -2,6 +2,7 @@ const DEFAULT_MEDIA_BASE = 'https://news-portal-hvgs.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
 const DETAIL_FETCH_TIMEOUT_MS = 10000;
 const MAX_DETAIL_REQUESTS = 2;
+let CURRENT_FEED = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     const appRoot = document.querySelector('.page-shell');
@@ -14,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiBase = apiBaseFromRoot || apiBaseFromBody || '/api';
 
     initializeHomepage(apiBase);
+    // start polling for new articles
+    startFeedPolling(apiBase, 15000);
 });
 
 function getMediaBase() {
@@ -34,6 +37,9 @@ async function initializeHomepage(apiBase) {
 
         const feedArticles = extractArticles(feedResponse.status === 'fulfilled' ? feedResponse.value : null);
         const trendingArticles = extractArticles(trendingResponse.status === 'fulfilled' ? trendingResponse.value : null);
+
+        // store current feed so polling can detect changes
+        CURRENT_FEED = feedArticles.slice();
 
         const latestArticles = take(feedArticles.length ? feedArticles : trendingArticles, 6).map((article) => mergeArticleData(article));
         const trendingCards = take(trendingArticles, 4).map((article) => mergeArticleData(article));
@@ -72,6 +78,35 @@ async function initializeHomepage(apiBase) {
         renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
         renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
     }
+}
+
+// Poll the feed periodically and insert any new articles at top
+function startFeedPolling(apiBase, intervalMs = 15000) {
+    setInterval(async () => {
+        try {
+            const fresh = await fetchJson(`${apiBase}/articles/feed/`, true);
+            const freshArticles = extractArticles(fresh || null);
+            if (!freshArticles.length) return;
+
+            // If the newest article id differs, assume new data available
+            const newestId = freshArticles[0]?.id;
+            const currentNewest = CURRENT_FEED[0]?.id;
+            if (newestId && newestId !== currentNewest) {
+                // update current feed and re-render top sections
+                CURRENT_FEED = freshArticles.slice();
+                const latestArticles = take(CURRENT_FEED, 6).map((article) => mergeArticleData(article));
+                const featuredArticle = mergeArticleData(CURRENT_FEED[0] || null);
+                const featuredHero = document.getElementById('featured-hero');
+                const latestNewsGrid = document.getElementById('latest-news-grid');
+                renderFeaturedHero(featuredHero, featuredArticle);
+                renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
+                // optionally update breaking headline
+                updateBreakingHeadline(featuredArticle);
+            }
+        } catch (e) {
+            console.warn('Feed polling error', e);
+        }
+    }, intervalMs);
 }
 
 async function fetchJson(url, allowNotFound = false, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -315,7 +350,10 @@ function resolveMediaUrl(url) {
     }
 
     if (value.startsWith('/')) {
-        return `${mediaBase}${value}`;
+        const resolved = `${mediaBase}${value}`;
+        // debug log when images fail to load in browser console can help
+        // (network tab shows exact request)
+        return resolved;
     }
 
     return `${mediaBase}/media/${value}`;

@@ -6,6 +6,8 @@ const DEFAULT_API_BASE = '/api';
 document.addEventListener('DOMContentLoaded', () => {
     initActiveNav();
     initLiveNavbar();
+    // refresh navbar data periodically so counts/categories reflect new backend inserts
+    setInterval(initLiveNavbar, 15000);
 });
 
 function getApiBase() {

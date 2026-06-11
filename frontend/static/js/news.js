@@ -1,8 +1,8 @@
-const DEFAULT_API_BASE = '/api';
 const DEFAULT_MEDIA_BASE = 'https://news-portal-hvgs.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
 const DETAIL_FETCH_TIMEOUT_MS = 10000;
 const MAX_DETAIL_REQUESTS = 2;
+let CURRENT_FEED = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     const appRoot = document.querySelector('.page-shell');
@@ -10,7 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    initializeHomepage(appRoot.dataset.apiBase || DEFAULT_API_BASE);
+    const apiBaseFromRoot = appRoot.dataset.apiBase;
+    const apiBaseFromBody = document.body?.dataset?.apiBase;
+    const apiBase = apiBaseFromRoot || apiBaseFromBody || '/api';
+
+    initializeHomepage(apiBase);
+    // start polling for new articles
+    startFeedPolling(apiBase, 15000);
 });
 
 function getMediaBase() {
@@ -31,6 +37,9 @@ async function initializeHomepage(apiBase) {
 
         const feedArticles = extractArticles(feedResponse.status === 'fulfilled' ? feedResponse.value : null);
         const trendingArticles = extractArticles(trendingResponse.status === 'fulfilled' ? trendingResponse.value : null);
+
+        // store current feed so polling can detect changes
+        CURRENT_FEED = feedArticles.slice();
 
         const latestArticles = take(feedArticles.length ? feedArticles : trendingArticles, 6).map((article) => mergeArticleData(article));
         const trendingCards = take(trendingArticles, 4).map((article) => mergeArticleData(article));
@@ -69,6 +78,35 @@ async function initializeHomepage(apiBase) {
         renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
         renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
     }
+}
+
+// Poll the feed periodically and insert any new articles at top
+function startFeedPolling(apiBase, intervalMs = 15000) {
+    setInterval(async () => {
+        try {
+            const fresh = await fetchJson(`${apiBase}/articles/feed/`, true);
+            const freshArticles = extractArticles(fresh || null);
+            if (!freshArticles.length) return;
+
+            // If the newest article id differs, assume new data available
+            const newestId = freshArticles[0]?.id;
+            const currentNewest = CURRENT_FEED[0]?.id;
+            if (newestId && newestId !== currentNewest) {
+                // update current feed and re-render top sections
+                CURRENT_FEED = freshArticles.slice();
+                const latestArticles = take(CURRENT_FEED, 6).map((article) => mergeArticleData(article));
+                const featuredArticle = mergeArticleData(CURRENT_FEED[0] || null);
+                const featuredHero = document.getElementById('featured-hero');
+                const latestNewsGrid = document.getElementById('latest-news-grid');
+                renderFeaturedHero(featuredHero, featuredArticle);
+                renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
+                // optionally update breaking headline
+                updateBreakingHeadline(featuredArticle);
+            }
+        } catch (e) {
+            console.warn('Feed polling error', e);
+        }
+    }, intervalMs);
 }
 
 async function fetchJson(url, allowNotFound = false, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -312,7 +350,10 @@ function resolveMediaUrl(url) {
     }
 
     if (value.startsWith('/')) {
-        return `${mediaBase}${value}`;
+        const resolved = `${mediaBase}${value}`;
+        // debug log when images fail to load in browser console can help
+        // (network tab shows exact request)
+        return resolved;
     }
 
     return `${mediaBase}/media/${value}`;
@@ -396,4 +437,68 @@ function updateCategoryFilter(categories) {
     container.innerHTML = labels
         .map((label, index) => `<span class="category-btn${index === 0 ? ' active' : ''}">${escapeHtml(label)}</span>`)
         .join('');
+}
+
+// --- Minimal rendering helpers (prevent ReferenceError if API data missing) ---
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function renderError(container, message) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    container.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+}
+
+function renderFeaturedHero(container, article) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!article) {
+        container.innerHTML = '<p>No featured story available.</p>';
+        return;
+    }
+    const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
+    container.innerHTML = `
+        <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
+            ${img}
+            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+        </a>
+    `;
+}
+
+function renderNewsGrid(container, articles, opts = {}) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!articles || !articles.length) {
+        container.innerHTML = '<p>No articles available.</p>';
+        return;
+    }
+    container.innerHTML = articles.map((a) => {
+        const thumb = a.imageUrl || '/static/images/placeholder.svg';
+        return `
+        <article class="news-card">
+            <a href="/news/${escapeHtml(a.id)}/">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
+                <h4>${escapeHtml(a.title)}</h4>
+                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+            </a>
+        </article>
+    `}).join('');
+}
+
+function renderTrendingGrid(container, cards) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!cards || !cards.length) {
+        container.innerHTML = '<p>No trending stories.</p>';
+        return;
+    }
+    container.innerHTML = cards.map((c) => `<div class="trending-item"><a href="/news/${escapeHtml(c.id)}/">${escapeHtml(c.title)}</a></div>`).join('');
 }

@@ -400,3 +400,63 @@ function updateCategoryFilter(categories) {
         .map((label, index) => `<span class="category-btn${index === 0 ? ' active' : ''}">${escapeHtml(label)}</span>`)
         .join('');
 }
+
+// --- Minimal rendering helpers (prevent ReferenceError if API data missing) ---
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function renderError(container, message) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    container.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+}
+
+function renderFeaturedHero(container, article) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!article) {
+        container.innerHTML = '<p>No featured story available.</p>';
+        return;
+    }
+    const img = article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">` : '';
+    container.innerHTML = `
+        <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
+            ${img}
+            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+        </a>
+    `;
+}
+
+function renderNewsGrid(container, articles, opts = {}) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!articles || !articles.length) {
+        container.innerHTML = '<p>No articles available.</p>';
+        return;
+    }
+    container.innerHTML = articles.map((a) => `
+        <article class="news-card">
+            <a href="/news/${escapeHtml(a.id)}/">
+                <h4>${escapeHtml(a.title)}</h4>
+                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+            </a>
+        </article>
+    `).join('');
+}
+
+function renderTrendingGrid(container, cards) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!cards || !cards.length) {
+        container.innerHTML = '<p>No trending stories.</p>';
+        return;
+    }
+    container.innerHTML = cards.map((c) => `<div class="trending-item"><a href="/news/${escapeHtml(c.id)}/">${escapeHtml(c.title)}</a></div>`).join('');
+}

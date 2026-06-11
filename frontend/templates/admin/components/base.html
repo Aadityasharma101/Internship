@@ -1,0 +1,166 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}NewsPortal Admin Panel{% endblock %}</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'admin/css/style.css' %}">
+    
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+<div class="admin-container">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar">
+
+        <div class="sidebar-brand">
+            <div class="brand-logo">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div class="brand-text">
+                <h1>NewsPortal</h1>
+                <span>ADMIN PANEL</span>
+            </div>
+        </div>
+
+        <div class="sidebar-menu">
+
+            <div class="menu-section">OVERVIEW</div>
+
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <a href="{% url 'frontend:dashboard' %}">
+                        <i class="fa-solid fa-table-columns"></i> Dashboard
+                    </a>
+                </li>
+            </ul>
+
+            <div class="menu-section">CONTENT</div>
+
+            <ul class="menu-list">
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
+                    <a href="{% url 'frontend:users' %}">
+                        <i class="fa-regular fa-user"></i> Users
+                    </a>
+                    <span class="badge badge-orange">2</span>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'categories' %}active{% endif %}">
+                    <a href="#">
+                        <i class="fa-solid fa-layer-group"></i> Categories
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'articles' %}active{% endif %}">
+                    <a href="{% url 'frontend:articles' %}">
+                        <i class="fa-solid fa-newspaper"></i> Articles
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'media' %}active{% endif %}">
+                    <a href="#">
+                        <i class="fa-regular fa-images"></i> Media Library
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'comments' %}active{% endif %}">
+                    <a href="#">
+                        <i class="fa-regular fa-comment-dots"></i> Comments
+                    </a>
+                    <span class="badge badge-orange">12</span>
+                </li>
+
+            </ul>
+
+        </div>
+
+        <!-- USER INFO -->
+        <div class="sidebar-user">
+
+            <div class="user-avatar">
+                {{ user.username|default:"AD"|slice:":2"|upper }}
+            </div>
+
+            <div class="user-info">
+                <span class="user-name">
+                    {% if user.is_authenticated %}
+                        {{ user.username }}
+                    {% else %}
+                        Admin User
+                    {% endif %}
+                </span>
+                <span class="user-role">Super Admin</span>
+            </div>
+
+        </div>
+
+    </aside>
+
+    <!-- ================= MAIN AREA ================= -->
+    <div class="main-wrapper">
+
+        <!-- NAVBAR -->
+        <header class="navbar">
+
+            <div class="nav-breadcrumbs">
+                <span class="crumb-parent">Admin</span>
+                <span class="crumb-divider">/</span>
+                <span class="crumb-current">
+                    {% block breadcrumb %}Dashboard{% endblock %}
+                </span>
+            </div>
+
+            <div class="nav-actions">
+
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" placeholder="Search...">
+                </div>
+
+                <button class="nav-icon-btn">
+                    <i class="fa-regular fa-bell"></i>
+                    <span class="notification-dot"></span>
+                </button>
+
+                <button class="nav-icon-btn">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+
+                <button class="nav-icon-btn">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+
+            </div>
+
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+
+</div>
+
+<!-- JS -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="{% static 'js/axios.js' %}"></script>
+<script src="{% static 'admin/js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

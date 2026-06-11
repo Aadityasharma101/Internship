@@ -1,0 +1,143 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Users - Admin Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/users.css' %}">
+{% endblock %}
+
+
+{% block breadcrumb %}Users{% endblock %}
+
+{% block content %}
+
+<!-- ================= HEADER ================= -->
+<div class="page-header">
+
+    <div>
+        <h2>Users</h2>
+        <p class="text-muted">Review registered users, roles, verification, and account status.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshUsersBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+        <button class="btn-add" id="openUserModalBtn" type="button">
+            <i class="fa-solid fa-plus"></i>
+            Add User
+        </button>
+    </div>
+
+</div>
+
+<div class="users-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total users</span>
+        <strong id="totalUsers">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Active</span>
+        <strong id="activeUsers">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Verified</span>
+        <strong id="verifiedUsers">0</strong>
+    </div>
+</div>
+
+<div class="users-toolbar">
+    <div class="users-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="userSearchInput" placeholder="Search users by name, email, role, or bio">
+    </div>
+    <span class="toolbar-count" id="visibleUsersCount">0 users shown</span>
+</div>
+
+<!-- ================= TABLE ================= -->
+<div class="table-wrapper">
+
+    <table class="users-table">
+
+        <thead>
+            <tr>
+                <th>Profile</th>
+                <th>User</th>
+                <th>Bio</th>
+                <th>Role</th>
+                <th>Verified</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody id="usersTableBody">
+
+            <!-- JS will inject rows here -->
+
+            <tr class="loading-row">
+                <td colspan="8">Loading users...</td>
+            </tr>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<!-- ================= PAGINATION ================= -->
+<div class="pagination">
+
+    <button id="prevBtn" type="button">Previous</button>
+
+    <span id="pageInfo">Page 1</span>
+
+    <button id="nextBtn" type="button">Next</button>
+
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="userModal" class="modal hidden">
+
+    <div class="modal-content">
+
+        <h3>Create New User</h3>
+
+        <div class="form-group">
+            <label for="first_name">First name</label>
+            <input type="text" id="first_name" placeholder="First Name">
+        </div>
+
+        <div class="form-group">
+            <label for="last_name">Last name</label>
+            <input type="text" id="last_name" placeholder="Last Name">
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Email">
+        </div>
+
+        <div class="modal-actions">
+
+            <button class="btn-primary" id="createUserBtn" type="button">
+                Create User
+            </button>
+
+            <button class="btn-secondary" id="closeUserModalBtn" type="button">
+                Cancel
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'admin/js/users.js' %}"></script>
+{% endblock %}

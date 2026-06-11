@@ -136,8 +136,10 @@
         }
     }
 
+    const API_BASE = document.body?.dataset?.apiBase || '/api';
+
     function loadComments() {
-        fetch(`/api/articles/${articleId}/comment/`)
+        fetch(`${API_BASE}/articles/${articleId}/comment/`)
             .then(res => res.json())
             .then(data => {
                 let comments = [];
@@ -162,7 +164,7 @@
             alert('Please enter a comment.');
             return;
         }
-        fetch(`/articles/${articleId}/comment/`, {
+        fetch(`${API_BASE}/articles/${articleId}/comment/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: text })

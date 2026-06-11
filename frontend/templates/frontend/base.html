@@ -8,14 +8,14 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body data-api-base="/api" data-media-base="{{ API_MEDIA_BASE }}">
+<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}">
     <header class="header">
         <div class="header-top">
             <div class="container">
                 <div class="header-content">
                     <div class="logo-section">
                         <a href="{% url 'frontend:index' %}" class="logo-link" aria-label="Go to homepage">
-                            <img src="{% static 'images/logo.png' %}" alt="Company logo" class="logo-image">
+                            <img src="{% static 'images/logo.svg' %}" alt="Company logo" class="logo-image">
                         </a>
                         <span class="tagline">Updated continuously from trusted newsrooms</span>
                     </div>

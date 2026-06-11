@@ -1,4 +1,3 @@
-const DEFAULT_API_BASE = '/api';
 const DEFAULT_MEDIA_BASE = 'https://news-portal-hvgs.onrender.com';
 const FETCH_TIMEOUT_MS = 15000;
 const DETAIL_FETCH_TIMEOUT_MS = 10000;
@@ -10,7 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    initializeHomepage(appRoot.dataset.apiBase || DEFAULT_API_BASE);
+    const apiBaseFromRoot = appRoot.dataset.apiBase;
+    const apiBaseFromBody = document.body?.dataset?.apiBase;
+    const apiBase = apiBaseFromRoot || apiBaseFromBody || '/api';
+
+    initializeHomepage(apiBase);
 });
 
 function getMediaBase() {

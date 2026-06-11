@@ -6,5 +6,6 @@ def api_settings(_request):
     api_root = api_root.rstrip('/')
     return {
         'API_MEDIA_BASE': api_root,
-        'API_BASE': f"{api_root}/api",
+        # Use the raw API root so frontend fetches match backend paths (no extra /api)
+        'API_BASE': api_root,
     }

@@ -462,7 +462,8 @@ function renderFeaturedHero(container, article) {
         container.innerHTML = '<p>No featured story available.</p>';
         return;
     }
-    const img = article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">` : '';
+    const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
     container.innerHTML = `
         <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
             ${img}
@@ -479,14 +480,17 @@ function renderNewsGrid(container, articles, opts = {}) {
         container.innerHTML = '<p>No articles available.</p>';
         return;
     }
-    container.innerHTML = articles.map((a) => `
+    container.innerHTML = articles.map((a) => {
+        const thumb = a.imageUrl || '/static/images/placeholder.svg';
+        return `
         <article class="news-card">
             <a href="/news/${escapeHtml(a.id)}/">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
                 <h4>${escapeHtml(a.title)}</h4>
                 <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
             </a>
         </article>
-    `).join('');
+    `}).join('');
 }
 
 function renderTrendingGrid(container, cards) {

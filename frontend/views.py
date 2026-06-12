@@ -11,6 +11,24 @@ def index(request):
     return render(request, 'frontend/index.html', context)
 
 
+def register(request):
+    """
+    User registration page.
+    Form submission is handled by frontend JavaScript against the DRF API.
+    """
+    context = {}
+    return render(request, 'frontend/pages/register.html', context)
+
+
+def login(request):
+    """
+    User login page.
+    Authentication is handled by frontend JavaScript against the DRF JWT API.
+    """
+    context = {}
+    return render(request, 'frontend/pages/login.html', context)
+
+
 def dashboard(request):
     """
     Newsletter page view.

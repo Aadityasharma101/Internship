@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | News Portal</title>
+    <link rel="stylesheet" href="{% static 'css/register.css' %}">
+</head>
+<body>
+    <main class="register-page login-page">
+        <section class="brand-panel" aria-label="News Portal login introduction">
+            <div class="brand-content">
+                <a class="brand" href="{% url 'frontend:index' %}" aria-label="News Portal home">
+                    <span class="brand-mark">N</span>
+                    <span>News Portal</span>
+                </a>
+
+                <div class="brand-copy">
+                    <p class="eyebrow">Welcome back</p>
+                    <h1>Sign in to your news desk.</h1>
+                    <p>
+                        Continue reading the latest stories, manage your saved articles,
+                        and keep your personalized news stream close.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-panel" aria-labelledby="login-title">
+            <div class="register-card">
+                <div class="card-header">
+                    <p class="section-label">Account Login</p>
+                    <h2 id="login-title">Login</h2>
+                    <p>Use your registered email and password to continue.</p>
+                </div>
+
+                <div id="formMessage" class="form-message" role="status" aria-live="polite"></div>
+
+                <form id="loginForm" class="register-form" novalidate>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">@</span>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                autocomplete="email"
+                                placeholder="you@example.com"
+                            >
+                        </div>
+                        <small class="error-message" id="emailError"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">*</span>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                autocomplete="current-password"
+                                placeholder="Enter your password"
+                            >
+                        </div>
+                        <small class="error-message" id="passwordError"></small>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <span class="btn-text">Login</span>
+                        <span class="btn-loader" aria-hidden="true"></span>
+                    </button>
+                </form>
+
+                <p class="login-link">
+                    New to News Portal?
+                    <a href="{% url 'frontend:register' %}">Create an account</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <script src="{% static 'js/login.js' %}"></script>
+</body>
+</html>

@@ -121,3 +121,24 @@ def news_detail(request, article_id):
 def newsletter(request):
     context = {}
     return render(request, "frontend/newsletter.html", context)
+def dashboard(request):
+    """
+    Newsletter page view.
+    """
+    context = {}
+    return render(request, 'admin/components/base.html', context)
+
+def users(request):
+    """
+    Users page view.
+    """
+    context = {}
+    return render(request, 'admin/pages/users.html', context)
+
+
+def articles(request):
+    """
+    Articles page view.
+    """
+    context = {}
+    return render(request, 'admin/pages/articles.html', context)

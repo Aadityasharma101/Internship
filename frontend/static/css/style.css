@@ -68,3 +68,18 @@ footer {
         padding: 1rem;
     }
 }
+
+
+/* If a comment has a parent, indent it slightly to look like a reply thread */
+.comment-card.reply-card {
+    margin-left: 40px;
+    background-color: #f8fafc; /* Slightly distinct background for replies */
+    border-left: 3px solid #cbd5e1; /* Visual thread line */
+}
+
+/* On small mobile screens, reduce reply indentation so it doesn't squish */
+@media (max-width: 480px) {
+    .comment-card.reply-card {
+        margin-left: 16px;
+    }
+}

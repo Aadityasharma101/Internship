@@ -1,18 +1,32 @@
-<div class="comment-card">
-    <div class="comment-avatar">
+<!-- templates/frontend/components/comment_card.html -->
+<div class="comment-card {% if comment.parent %}reply-card{% endif %}">
+    <!-- Left Side: Avatar -->
+    <div class="comment-avatar-wrapper">
         {% if comment.profile_pic %}
-            <img src="{{ comment.profile_pic }}" alt="{{ comment.author_name }} avatar" loading="lazy">
+            <img src="{{ comment.profile_pic }}" alt="{{ comment.author_name }}'s avatar" class="comment-avatar">
         {% else %}
-            <span class="comment-avatar-placeholder">{{ comment.author_initials|default:"?" }}</span>
+            <!-- Fallback: Author initials -->
+            <div class="comment-avatar-placeholder">
+                {{ comment.author_initials }}
+            </div>
         {% endif %}
     </div>
-    <div class="comment-body">
+
+    <!-- Right Side: Content -->
+    <div class="comment-content">
         <div class="comment-header">
-            <span class="comment-author">{{ comment.author_name }}</span>
-            <time class="comment-time" datetime="{{ comment.created_at|default:'' }}" title="{{ comment.created_at|default:'' }}">
+            <!-- Author name -->
+            <span class="comment-username">{{ comment.author_name }}</span>
+            
+            <!-- Timestamp -->
+            <span class="comment-timestamp">
                 {{ comment.time_ago }}
-            </time>
+            </span>
         </div>
-        <p class="comment-text">{{ comment.text|default:comment.body }}</p>
+        
+        <!-- Comment body -->
+        <div class="comment-body">
+            <p>{{ comment.text }}</p>
+        </div>
     </div>
 </div>

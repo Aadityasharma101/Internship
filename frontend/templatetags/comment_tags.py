@@ -3,13 +3,16 @@ from django import template
 register = template.Library()
 
 @register.inclusion_tag('frontend/components/comment_card.html', takes_context=False)
-def render_comment_card(comment):
-    if not isinstance(comment, dict):
+def render_comment_card(comment=None, author_name=None, text=None, created_at=None, profile_pic=None):
+    if comment is None:
         comment = {}
-    author_name = comment.get('author_name', comment.get('author', comment.get('name', 'Anonymous')))
-    created_at = comment.get('created_at', comment.get('timestamp', ''))
-    text = comment.get('text', comment.get('body', comment.get('content', comment.get('message', ''))))
-    profile_pic = comment.get('profile_pic', comment.get('avatar_url', ''))
+    elif not isinstance(comment, dict):
+        comment = {}
+    
+    author_name = author_name or comment.get('author_name', comment.get('author', comment.get('name', 'Anonymous')))
+    created_at = created_at or comment.get('created_at', comment.get('timestamp', ''))
+    text = text or comment.get('text', comment.get('body', comment.get('content', comment.get('message', ''))))
+    profile_pic = profile_pic or comment.get('profile_pic', comment.get('avatar_url', ''))
 
     name_parts = author_name.strip().split()
     if len(name_parts) >= 2:

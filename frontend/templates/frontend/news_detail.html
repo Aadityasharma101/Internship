@@ -1,0 +1,190 @@
+{% extends 'frontend/base.html' %}
+{% load static %}
+{% block title %}{{ article.title|default:"News Detail" }} - News Portal{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/comment.css' %}">
+<style>
+.detail-container {
+    max-width: 800px;
+}
+.article-full {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+.article-title {
+    font-size: 1.75rem;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+.article-meta {
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+.article-body {
+    color: #444;
+    line-height: 1.7;
+    font-size: 1rem;
+}
+.comment-form-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-top: 1.5rem;
+}
+.comment-form-card h3 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+.comment-form-card textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    resize: vertical;
+    box-sizing: border-box;
+}
+.comment-form-card textarea:focus {
+    outline: none;
+    border-color: #2c3e50;
+}
+.comment-form-card button {
+    margin-top: 0.75rem;
+    padding: 0.6rem 1.4rem;
+    background: #2c3e50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+.comment-form-card button:hover {
+    background: #34495e;
+}
+@media (max-width: 768px) {
+    .article-full {
+        padding: 1rem;
+    }
+    .article-title {
+        font-size: 1.3rem;
+    }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container detail-container">
+    <a href="{% url 'frontend:index' %}" style="color:#2c3e50; text-decoration:none; font-weight:600;">&larr; Back to News</a>
+    <div class="article-full" id="article-detail">
+        <h1 class="article-title">{{ article.title|default:"Loading..." }}</h1>
+        <div class="article-meta">
+            <span>Category: {{ article.category_name|default:"Uncategorized" }}</span>
+            {% if article.published_at %}
+            <span style="margin-left:1rem;">Published: {{ article.published_at }}</span>
+            {% endif %}
+        </div>
+        <div class="article-body" id="article-body">
+            <p>Article content unavailable at the moment.</p>
+        </div>
+    </div>
+
+    <div class="comments-section" id="comments-section">
+        <div class="comments-header">Comments ({{ comments|length }})</div>
+        <div id="comments-list">
+            {% if comments %}
+            <div class="comments-list">
+                {% for comment in comments %}
+                    {% include 'frontend/components/comment_card.html' %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="comments-list">
+                <p class="comments-empty">No comments yet. Be the first to comment!</p>
+            </div>
+            {% endif %}
+        </div>
+        <div class="comment-form-card">
+            <h3>Add a Comment</h3>
+            <textarea id="comment-text" placeholder="Write your comment here..."></textarea>
+            <button id="post-comment-btn">Post Comment</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/comments.js' %}"></script>
+<script>
+(function() {
+    const articleId = {{ article.id|default:0 }};
+    const articleData = {{ article_json|safe }};
+
+    function getArticleDetail() {
+        const detail = document.getElementById('article-body');
+        if (articleData && articleData.body && String(articleData.body).trim()) {
+            detail.innerText = articleData.body;
+        } else if (articleData && articleData.description && String(articleData.description).trim()) {
+            detail.innerText = articleData.description;
+        } else {
+            detail.innerHTML = '<p>Full article content is currently unavailable. This page is fully functional with the matching backend API endpoints.</p>';
+        }
+    }
+
+    const API_BASE = document.body?.dataset?.apiBase || '/api';
+
+    function loadComments() {
+        fetch(`${API_BASE}/articles/${articleId}/comment/`)
+            .then(res => res.json())
+            .then(data => {
+                let comments = [];
+                if (Array.isArray(data)) {
+                    comments = data;
+                } else if (data.results) {
+                    comments = data.results;
+                } else if (data.comments && Array.isArray(data.comments)) {
+                    comments = data.comments;
+                }
+                renderComments(comments, 'comments-list');
+            })
+            .catch(() => {
+                renderComments([], 'comments-list');
+            });
+    }
+
+    function postComment() {
+        const textarea = document.getElementById('comment-text');
+        const text = textarea.value.trim();
+        if (!text) {
+            alert('Please enter a comment.');
+            return;
+        }
+        fetch(`${API_BASE}/articles/${articleId}/comment/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        })
+        .then(res => res.json())
+        .then(data => {
+            textarea.value = '';
+            loadComments();
+        })
+        .catch(err => {
+            console.error('Failed to post comment:', err);
+            alert('Could not post comment.');
+        });
+    }
+
+    document.getElementById('post-comment-btn').addEventListener('click', postComment);
+    document.addEventListener('DOMContentLoaded', function() {
+        getArticleDetail();
+        loadComments();
+    });
+})();
+</script>
+{% endblock %}

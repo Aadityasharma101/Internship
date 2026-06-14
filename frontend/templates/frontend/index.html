@@ -4,14 +4,49 @@
 {% block title %}Home - News Portal{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2>Welcome to News Portal</h2>
-    <p>This is your news portal frontend. News data will be fetched from REST API endpoints.</p>
-    
-    <section id="news-list">
-        <!-- News items will be loaded here via JavaScript/API calls -->
-        <div class="loading">Loading news...</div>
+<div class="page-shell" data-api-base="{{ API_BASE }}">
+    <section class="breaking-news-banner">
+        <div class="container">
+            <span class="breaking-badge">BREAKING</span>
+            <h2 id="breaking-headline">Loading latest headline...</h2>
+        </div>
     </section>
+
+    <section class="browse-section">
+        <div class="container">
+            <h3 class="browse-label">BROWSE</h3>
+            <div id="category-filter" class="category-filter" aria-live="polite">
+                <span class="category-btn active">All</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="container page-sections">
+        <section class="featured-section">
+            <h2 class="section-title">Featured Story</h2>
+            <div id="featured-hero" class="featured-hero loading-state">
+                <p>Loading featured story...</p>
+            </div>
+        </section>
+
+        <div class="main-grid">
+            <section class="articles-section">
+                <h2 class="section-title">Top Stories — Live</h2>
+                <div id="latest-news-grid" class="articles-grid loading-state">
+                    <div class="loading-spinner">Loading articles...</div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="sidebar-widget">
+                    <h3 class="sidebar-title">Trending Now</h3>
+                    <div id="trending-news-grid" class="top-stories-list loading-state">
+                        <p class="loading-text">Loading trending stories...</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

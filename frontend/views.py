@@ -142,3 +142,11 @@ def articles(request):
     """
     context = {}
     return render(request, 'admin/pages/articles.html', context)
+
+
+def categories(request):
+    """
+    Categories page view.
+    """
+    context = {}
+    return render(request, 'admin/pages/categories.html', context)

@@ -1,0 +1,117 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | News Portal</title>
+    <link rel="stylesheet" href="{% static 'css/register.css' %}">
+</head>
+<body>
+    <main class="register-page">
+        <section class="brand-panel" aria-label="News Portal introduction">
+            <div class="brand-content">
+                <a class="brand" href="{% url 'frontend:index' %}" aria-label="News Portal home">
+                    <span class="brand-mark">N</span>
+                    <span>News Portal</span>
+                </a>
+
+                <div class="brand-copy">
+                    <p class="eyebrow">Trusted stories, faster access</p>
+                    <h1>Join the newsroom community.</h1>
+                    <p>
+                        Create your account to follow breaking updates, save articles,
+                        and stay connected with the latest headlines.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-panel" aria-labelledby="register-title">
+            <div class="register-card">
+                <div class="card-header">
+                    <p class="section-label">Create Account</p>
+                    <h2 id="register-title">Register</h2>
+                    <p>Enter your details to start reading personalized news.</p>
+                </div>
+
+                <div id="formMessage" class="form-message" role="status" aria-live="polite"></div>
+
+                <form id="registerForm" class="register-form" novalidate>
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">#</span>
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                autocomplete="username"
+                                placeholder="Choose a username"
+                            >
+                        </div>
+                        <small class="error-message" id="usernameError"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">@</span>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                autocomplete="email"
+                                placeholder="you@example.com"
+                            >
+                        </div>
+                        <small class="error-message" id="emailError"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">*</span>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                autocomplete="new-password"
+                                placeholder="Minimum 8 characters"
+                            >
+                        </div>
+                        <small class="error-message" id="passwordError"></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <div class="input-wrap">
+                            <span class="input-icon" aria-hidden="true">*</span>
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                autocomplete="new-password"
+                                placeholder="Re-enter your password"
+                            >
+                        </div>
+                        <small class="error-message" id="confirmPasswordError"></small>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <span class="btn-text">Create Account</span>
+                        <span class="btn-loader" aria-hidden="true"></span>
+                    </button>
+                </form>
+
+                <p class="login-link">
+                    Already have an account?
+                    <a href="{% url 'frontend:login' %}">Sign in</a>
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <script src="{% static 'js/register.js' %}"></script>
+</body>
+</html>

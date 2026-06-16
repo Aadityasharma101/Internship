@@ -185,9 +185,7 @@ def news_detail(request, article_id):
 
 def newsletter(request):
     context = {}
-<<<<<<< HEAD
-    return render(request, 'frontend/index.html', context)
-
+    return render(request, "frontend/newsletter.html", context)
 
 def register(request):
     """
@@ -197,7 +195,6 @@ def register(request):
     context = {}
     return render(request, 'frontend/pages/register.html', context)
 
-
 def login(request):
     """
     User login page.
@@ -206,10 +203,6 @@ def login(request):
     context = {}
     return render(request, 'frontend/pages/login.html', context)
 
-
-=======
-    return render(request, "frontend/newsletter.html", context)
->>>>>>> 5053eb38004cff0a05527ef76a6de9a4c0ab2cc8
 def dashboard(request):
     """
     Newsletter page view.

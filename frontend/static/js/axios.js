@@ -1,8 +1,21 @@
 // static/admin/js/api.js
 
-const API_BASE_URL = 'https://news-portal-hvgs.onrender.com/api/';
-const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxMTQzMjQyLCJpYXQiOjE3ODExNDI5NDMsImp0aSI6ImFkNTZjNDNmYjIwZjQzMGJhYzg3ODk2ZDMwMjc1NzU4IiwidXNlcl9pZCI6IjEifQ.mHPZdlG2GkdAQAaOeBsiD7CITjqK-9VNXq9Raceh0-g';
-const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTIyODg2MiwiaWF0IjoxNzgxMTQyNDYyLCJqdGkiOiI2YjU5MTJmOThmZjc0NDFjOWJhZDg4YWM3M2VlYTIzYiIsInVzZXJfaWQiOiIxIn0.PXY-CJY0A_0YDCSS5cV6Hb7FuScsQ4UAXxjGQqWlwKg';
+const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
+const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
+const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNjIwNTU0LCJpYXQiOjE3ODE2MjAyNTQsImp0aSI6IjczNzMwZDk1NzlmYTRiNjliNmE5ZGNhZDcyZTRiMmQ1IiwidXNlcl9pZCI6IjEifQ.lW7M4x8IMEL7Ybd34VcY3x04q_5X7Da4kZaVHdu_M0A';
+const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTcwNjY1NCwiaWF0IjoxNzgxNjIwMjU0LCJqdGkiOiJlMzc5NWNkYTkwOGY0NzllYjVlYTI5MmVjYWI5ZDYxMiIsInVzZXJfaWQiOiIxIn0.AH5GfOJ-Wb9wfzAT724TrOKjNArGmrOGgXWMKBB05Vw';
+
+function apiUrl(path = '') {
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+
+    if (path.startsWith('/')) {
+        return `${API_ORIGIN_URL}${path}`;
+    }
+
+    return path;
+}
 
 function decodeJwtPayload(token) {
     try {
@@ -91,11 +104,11 @@ api.interceptors.response.use(
                     let refreshResponse;
 
                     try {
-                        refreshResponse = await axios.post(`${API_BASE_URL}token/refresh/`, {
-                            refresh: storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN
-                        });
-                    } catch (storedRefreshError) {
-                        refreshResponse = await axios.post(`${API_BASE_URL}token/refresh/`, {
+                    refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
+                        refresh: storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN
+                    });
+                } catch (storedRefreshError) {
+                        refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
                             refresh: FALLBACK_ADMIN_REFRESH_TOKEN
                         });
                     }

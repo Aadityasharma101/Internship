@@ -1,12 +1,27 @@
+from django.http import HttpResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 import json
 import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime
 import re
+import requests
 
 NEWS_API_BASE = "https://news-portal-hvgs.onrender.com"
+HOP_BY_HOP_HEADERS = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+    "content-encoding",
+    "content-length",
+}
 
 
 def fetch_json(path):
@@ -17,6 +32,56 @@ def fetch_json(path):
     })
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode())
+
+
+@csrf_exempt
+def api_proxy(request, path):
+    query = request.META.get("QUERY_STRING")
+    url = f"{NEWS_API_BASE}/{path}"
+
+    if query:
+        url = f"{url}?{query}"
+
+    headers = {
+        "Accept": request.headers.get("Accept", "application/json"),
+        "User-Agent": "Mozilla/5.0",
+    }
+
+    content_type = request.headers.get("Content-Type")
+    authorization = request.headers.get("Authorization")
+
+    if content_type:
+        headers["Content-Type"] = content_type
+
+    if authorization:
+        headers["Authorization"] = authorization
+
+    body = request.body if request.method not in ("GET", "HEAD") else None
+
+    try:
+        remote_response = requests.request(
+            request.method,
+            url,
+            data=body,
+            headers=headers,
+            timeout=30,
+        )
+    except requests.RequestException as error:
+        return HttpResponse(
+            json.dumps({"detail": str(error)}),
+            status=502,
+            content_type="application/json",
+        )
+
+    django_response = HttpResponse(
+        remote_response.content,
+        status=remote_response.status_code,
+        content_type=remote_response.headers.get("Content-Type", "application/json"),
+    )
+    for header, value in remote_response.headers.items():
+        if header.lower() not in HOP_BY_HOP_HEADERS and header.lower() != "content-type":
+            django_response[header] = value
+    return django_response
 
 
 def _time_ago(date_string):
@@ -150,3 +215,11 @@ def categories(request):
     """
     context = {}
     return render(request, 'admin/pages/categories.html', context)
+
+
+def media(request):
+    """
+    Media library page view.
+    """
+    context = {}
+    return render(request, 'admin/pages/media.html', context)

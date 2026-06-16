@@ -3,7 +3,7 @@ let lastCategoryResponse = null;
 let currentCategories = [];
 let activeCategoryEndpoint = null;
 
-const CATEGORY_ENDPOINTS = ['articles/categories/', 'categories/'];
+const CATEGORY_ENDPOINTS = ['/articles/categories/'];
 
 const categoriesTableBody = document.getElementById('categoriesTableBody');
 const prevCategoryBtn = document.getElementById('prevCategoryBtn');
@@ -252,7 +252,7 @@ function updatePagination(data) {
 
 async function fetchCategoriesFromEndpoint(endpoint, page) {
     const separator = endpoint.includes('?') ? '&' : '?';
-    const response = await api.get(`${endpoint}${separator}page=${page}`);
+    const response = await api.get(apiUrl(`${endpoint}${separator}page=${page}`));
 
     return response.data;
 }

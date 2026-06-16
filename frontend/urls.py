@@ -11,4 +11,6 @@ urlpatterns = [
     path('users/', views.users, name='users'),
     path('articles/', views.articles, name='articles'),
     path('categories/', views.categories, name='categories'),
+    path('media/', views.media, name='media'),
+    path('remote/<path:path>', views.api_proxy, name='api_proxy'),
 ]

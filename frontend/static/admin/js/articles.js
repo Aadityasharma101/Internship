@@ -3,7 +3,7 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = null;
 
-const ARTICLE_ENDPOINTS = ['articles/', 'news/'];
+const ARTICLE_ENDPOINTS = ['/articles/feed/'];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');
@@ -102,6 +102,7 @@ function getArticleAuthor(article) {
             'author.name',
             'author.username',
             'author.email',
+            'author_name',
             'user.full_name',
             'user.name',
             'user.username',
@@ -153,7 +154,7 @@ function getUpdatedDate(article) {
 }
 
 function getArticleUrl(article) {
-    return getNestedValue(article, ['url', 'absolute_url', 'link', 'slug']);
+    return getNestedValue(article, ['url', 'absolute_url', 'link', 'slug']) || (article.id ? `/news/${article.id}/` : null);
 }
 
 function setTableMessage(message, type = 'muted') {
@@ -289,7 +290,7 @@ function updatePagination(data) {
 
 async function fetchArticlesFromEndpoint(endpoint, page) {
     const separator = endpoint.includes('?') ? '&' : '?';
-    const response = await api.get(`${endpoint}${separator}page=${page}`);
+    const response = await api.get(apiUrl(`${endpoint}${separator}page=${page}`));
 
     return response.data;
 }

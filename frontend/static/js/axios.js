@@ -2,8 +2,8 @@
 
 const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
 const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
-const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNjIwNTU0LCJpYXQiOjE3ODE2MjAyNTQsImp0aSI6IjczNzMwZDk1NzlmYTRiNjliNmE5ZGNhZDcyZTRiMmQ1IiwidXNlcl9pZCI6IjEifQ.lW7M4x8IMEL7Ybd34VcY3x04q_5X7Da4kZaVHdu_M0A';
-const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTcwNjY1NCwiaWF0IjoxNzgxNjIwMjU0LCJqdGkiOiJlMzc5NWNkYTkwOGY0NzllYjVlYTI5MmVjYWI5ZDYxMiIsInVzZXJfaWQiOiIxIn0.AH5GfOJ-Wb9wfzAT724TrOKjNArGmrOGgXWMKBB05Vw';
+const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNzUwNjM5LCJpYXQiOjE3ODE3NTAzMzksImp0aSI6ImViN2EwMjA2OWE2ZTRlMjg4YTliN2UyNTZkMGRmNmM4IiwidXNlcl9pZCI6IjEifQ.IaV1-0TqrLY6TFBHB6g6VdbWW1g3N_BvyIKDfrKUfig';
+const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTgzNjczOSwiaWF0IjoxNzgxNzUwMzM5LCJqdGkiOiIwZGRjNjI3M2U0NWM0M2UwODNhMGM2YjExNTNhODUxMyIsInVzZXJfaWQiOiIxIn0.omYvbEFaDw7ygEUgdYAL98kYzSuxcht5IMfx5NVQf7E';
 
 function apiUrl(path = '') {
     if (/^https?:\/\//i.test(path)) {
@@ -38,14 +38,18 @@ function isTokenExpired(token) {
 }
 
 function getAccessToken() {
-    const storedToken = localStorage.getItem('access_token');
+    const storedToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
     if (storedToken && !isTokenExpired(storedToken)) {
+        localStorage.setItem('access_token', storedToken);
+        localStorage.setItem('accessToken', storedToken);
         return storedToken;
     }
 
     localStorage.setItem('access_token', FALLBACK_ADMIN_ACCESS_TOKEN);
+    localStorage.setItem('accessToken', FALLBACK_ADMIN_ACCESS_TOKEN);
     localStorage.setItem('refresh_token', FALLBACK_ADMIN_REFRESH_TOKEN);
+    localStorage.setItem('refreshToken', FALLBACK_ADMIN_REFRESH_TOKEN);
 
     return FALLBACK_ADMIN_ACCESS_TOKEN;
 }
@@ -100,7 +104,7 @@ api.interceptors.response.use(
                 originalRequest._retry = true;
 
                 try {
-                    const storedRefreshToken = localStorage.getItem('refresh_token');
+                    const storedRefreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
                     let refreshResponse;
 
                     try {
@@ -115,7 +119,9 @@ api.interceptors.response.use(
 
                     const newAccessToken = refreshResponse.data.access;
                     localStorage.setItem('access_token', newAccessToken);
-                    localStorage.setItem('refresh_token', FALLBACK_ADMIN_REFRESH_TOKEN);
+                    localStorage.setItem('accessToken', newAccessToken);
+                    localStorage.setItem('refresh_token', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
+                    localStorage.setItem('refreshToken', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
                     originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
                     return api(originalRequest);

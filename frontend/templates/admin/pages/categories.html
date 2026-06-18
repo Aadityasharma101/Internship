@@ -4,6 +4,7 @@
 {% block title %}Categories - Admin Panel{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/categories.css' %}">
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
 {% endblock %}
 
 {% block breadcrumb %}Categories{% endblock %}
@@ -85,25 +86,40 @@
 
 <div id="categoryModal" class="modal hidden">
     <div class="modal-content">
-        <h3>Create New Category</h3>
+        <h3 id="categoryModalTitle">Create New Category</h3>
+        <input type="hidden" id="categoryId">
 
-        <div class="form-group">
-            <label for="categoryName">Name</label>
-            <input type="text" id="categoryName" placeholder="Category name">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="categoryName">Name</label>
+                <input type="text" id="categoryName" placeholder="Category name">
+            </div>
+
+            <div class="form-group">
+                <label for="categorySlug">Slug</label>
+                <input type="text" id="categorySlug" placeholder="category-slug">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="categoryDescription">Description</label>
+                <textarea id="categoryDescription" placeholder="Short description"></textarea>
+            </div>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="categoryActive" checked>
+                Active category
+            </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="categoryFeatured">
+                Featured category
+            </label>
         </div>
 
-        <div class="form-group">
-            <label for="categorySlug">Slug</label>
-            <input type="text" id="categorySlug" placeholder="category-slug">
-        </div>
-
-        <div class="form-group">
-            <label for="categoryDescription">Description</label>
-            <input type="text" id="categoryDescription" placeholder="Short description">
-        </div>
+        <p class="modal-status" id="categoryFormStatus"></p>
 
         <div class="modal-actions">
-            <button class="btn-primary" id="createCategoryBtn" type="button">
+            <button class="btn-primary" id="saveCategoryBtn" type="button">
                 Create Category
             </button>
             <button class="btn-secondary" id="closeCategoryModalBtn" type="button">

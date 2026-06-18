@@ -1,0 +1,60 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Comments - Admin Panel{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">{% endblock %}
+{% block breadcrumb %}Comments{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Comments</h2>
+        <p class="text-muted">Review user comments to see article feedback and conversation quality.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshPreferenceBtn" type="button"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total comments</span><strong id="totalPreferences">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Users</span><strong id="preferenceUsers">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Articles</span><strong id="preferenceArticles">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Latest</span><strong id="latestPreference">None</strong></div>
+</div>
+
+<div class="resource-toolbar">
+    <div class="resource-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="preferenceSearchInput" placeholder="Search comments by user, article, text, or status"></div>
+    <span class="toolbar-count" id="visiblePreferenceCount">0 comments shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="resource-table">
+        <thead><tr><th>User</th><th>Article</th><th>Comment</th><th>Status</th><th>Created</th></tr></thead>
+        <tbody id="preferenceTableBody"><tr class="loading-row"><td colspan="5">Loading comments...</td></tr></tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevPreferenceBtn" type="button">Previous</button>
+    <span id="preferencePageInfo">Page 1</span>
+    <button id="nextPreferenceBtn" type="button">Next</button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.preferenceConfig = {
+    itemPlural: 'comments',
+    endpoints: ['/comments/', 'comments/', '/articles/comments/', 'articles/comments/'],
+    columns: [
+        { type: 'user', keys: ['user.email', 'author.email', 'email'] },
+        { type: 'article', keys: ['article.title', 'article_title'] },
+        { keys: ['text', 'body', 'content', 'comment'], fallback: 'No comment text' },
+        { type: 'pill', keys: ['status', 'state', 'is_approved'], fallback: 'Visible', className: 'pill-green' },
+        { type: 'date', keys: ['created_at', 'commented_at', 'updated_at'] }
+    ]
+};
+</script>
+<script src="{% static 'admin/js/preference_view.js' %}"></script>
+{% endblock %}

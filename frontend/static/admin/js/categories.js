@@ -1,9 +1,9 @@
 let currentCategoryPage = 1;
 let lastCategoryResponse = null;
 let currentCategories = [];
-let activeCategoryEndpoint = null;
+let activeCategoryEndpoint = '/articles/categories/';
 
-const CATEGORY_ENDPOINTS = ['/articles/categories/'];
+const CATEGORY_ENDPOINTS = ['/articles/categories/', 'articles/categories/', '/categories/', 'categories/'];
 
 const categoriesTableBody = document.getElementById('categoriesTableBody');
 const prevCategoryBtn = document.getElementById('prevCategoryBtn');
@@ -17,73 +17,38 @@ const featuredCategories = document.getElementById('featuredCategories');
 const linkedArticles = document.getElementById('linkedArticles');
 const visibleCategoriesCount = document.getElementById('visibleCategoriesCount');
 const categoryModal = document.getElementById('categoryModal');
+const categoryModalTitle = document.getElementById('categoryModalTitle');
 const openCategoryModalBtn = document.getElementById('openCategoryModalBtn');
 const closeCategoryModalBtn = document.getElementById('closeCategoryModalBtn');
+const saveCategoryBtn = document.getElementById('saveCategoryBtn');
+const categoryFormStatus = document.getElementById('categoryFormStatus');
 
-function escapeHTML(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
+const categoryFields = {
+    id: document.getElementById('categoryId'),
+    name: document.getElementById('categoryName'),
+    slug: document.getElementById('categorySlug'),
+    description: document.getElementById('categoryDescription'),
+    active: document.getElementById('categoryActive'),
+    featured: document.getElementById('categoryFeatured')
+};
 
-function formatDate(value) {
-    if (!value) {
-        return 'Not available';
-    }
+const { escapeHTML, formatDate, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
 
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return 'Not available';
-    }
-
-    return new Intl.DateTimeFormat('en', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    }).format(date);
-}
-
-function normalizeText(value, fallback = 'Not available') {
-    if (value === null || value === undefined || value === '') {
-        return fallback;
-    }
-
-    return String(value);
-}
-
-function getNestedValue(source, keys) {
-    for (const key of keys) {
-        const value = key.split('.').reduce((item, part) => item?.[part], source);
-
-        if (value !== null && value !== undefined && value !== '') {
-            return value;
-        }
-    }
-
-    return null;
+function normalize(value, fallback = 'Not available') {
+    return value === null || value === undefined || value === '' ? fallback : String(value);
 }
 
 function getCategoryName(category) {
-    return normalizeText(
-        getNestedValue(category, ['name', 'title', 'label', 'category_name']),
-        'Untitled category'
-    );
+    return normalize(getValue(category, ['name', 'title', 'label', 'category_name']), 'Untitled category');
 }
 
 function getCategoryDescription(category) {
-    return normalizeText(
-        getNestedValue(category, ['description', 'summary', 'details']),
-        'No description added'
-    );
+    return normalize(getValue(category, ['description', 'summary', 'details']), 'No description added');
 }
 
 function getCategorySlug(category) {
-    return normalizeText(
-        getNestedValue(category, ['slug', 'code', 'key']),
+    return normalize(
+        getValue(category, ['slug', 'code', 'key']),
         getCategoryName(category).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
     );
 }
@@ -97,7 +62,7 @@ function getCategoryStatus(category) {
         return 'Inactive';
     }
 
-    return normalizeText(getNestedValue(category, ['status', 'state']), 'Active');
+    return normalize(getValue(category, ['status', 'state']), 'Active');
 }
 
 function isActive(category) {
@@ -105,44 +70,13 @@ function isActive(category) {
 }
 
 function isFeatured(category) {
-    return Boolean(getNestedValue(category, ['is_featured', 'featured', 'show_on_homepage', 'homepage']));
+    return Boolean(getValue(category, ['is_featured', 'featured', 'show_on_homepage', 'homepage']));
 }
 
 function getArticleCount(category) {
-    const value = getNestedValue(category, [
-        'article_count',
-        'articles_count',
-        'news_count',
-        'posts_count',
-        'count'
-    ]);
-
+    const value = getValue(category, ['article_count', 'articles_count', 'news_count', 'posts_count', 'count'], 0);
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function getCreatedDate(category) {
-    return getNestedValue(category, ['created_at', 'created_on', 'date_created']);
-}
-
-function getUpdatedDate(category) {
-    return getNestedValue(category, ['updated_at', 'modified_at', 'created_at']);
-}
-
-function getCategoryUrl(category) {
-    return getNestedValue(category, ['url', 'absolute_url', 'link']);
-}
-
-function getCategoryInitial(category) {
-    return getCategoryName(category).trim().charAt(0).toUpperCase() || 'C';
-}
-
-function setTableMessage(message, type = 'muted') {
-    categoriesTableBody.innerHTML = `
-        <tr class="${type}-row">
-            <td colspan="8">${escapeHTML(message)}</td>
-        </tr>
-    `;
 }
 
 function getStatusClass(status) {
@@ -152,57 +86,27 @@ function getStatusClass(status) {
         return 'status-active';
     }
 
-    if (key.includes('archive')) {
-        return 'status-archived';
-    }
-
     return 'status-inactive';
-}
-
-function renderCategoryActions(category) {
-    const url = getCategoryUrl(category);
-    const name = getCategoryName(category);
-    const viewAction = url
-        ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" title="View category" aria-label="View ${escapeHTML(name)}">
-                <i class="fa-regular fa-eye"></i>
-            </a>`
-        : `<button type="button" title="View category" aria-label="View ${escapeHTML(name)}">
-                <i class="fa-regular fa-eye"></i>
-            </button>`;
-
-    return `
-        <div class="row-actions">
-            ${viewAction}
-            <button type="button" title="Edit category" aria-label="Edit ${escapeHTML(name)}">
-                <i class="fa-regular fa-pen-to-square"></i>
-            </button>
-        </div>
-    `;
 }
 
 function renderCategories(categories) {
     const query = categorySearchInput.value.trim().toLowerCase();
-    const filteredCategories = categories.filter((category) => {
-        const searchable = [
-            getCategoryName(category),
-            getCategoryDescription(category),
-            getCategorySlug(category),
-            getCategoryStatus(category)
-        ].join(' ').toLowerCase();
-
-        return searchable.includes(query);
-    });
+    const filteredCategories = categories.filter((category) => [
+        getCategoryName(category),
+        getCategoryDescription(category),
+        getCategorySlug(category),
+        getCategoryStatus(category)
+    ].join(' ').toLowerCase().includes(query));
 
     visibleCategoriesCount.textContent = `${filteredCategories.length} categor${filteredCategories.length === 1 ? 'y' : 'ies'} shown`;
 
     if (!filteredCategories.length) {
-        setTableMessage(query ? 'No categories match your search.' : 'No categories found.');
+        setMessage(categoriesTableBody, 8, query ? 'No categories match your search.' : 'No categories found.');
         return;
     }
 
     categoriesTableBody.innerHTML = filteredCategories.map((category) => {
         const name = getCategoryName(category);
-        const description = getCategoryDescription(category);
         const status = getCategoryStatus(category);
         const featured = isFeatured(category);
 
@@ -210,28 +114,29 @@ function renderCategories(categories) {
             <tr>
                 <td>
                     <div class="category-cell">
-                        <span class="category-icon">${escapeHTML(getCategoryInitial(category))}</span>
+                        <span class="category-icon">${escapeHTML(name.trim().charAt(0).toUpperCase() || 'C')}</span>
                         <div class="category-title-wrap">
                             <strong>${escapeHTML(name)}</strong>
-                            <span class="category-description">${escapeHTML(description)}</span>
+                            <span class="category-description">${escapeHTML(getCategoryDescription(category))}</span>
                         </div>
                     </div>
                 </td>
                 <td><span class="slug-pill">${escapeHTML(getCategorySlug(category))}</span></td>
-                <td>
-                    <span class="status-pill ${getStatusClass(status)}">
-                        ${escapeHTML(status)}
-                    </span>
-                </td>
-                <td>
-                    <span class="feature-pill ${featured ? 'feature-yes' : 'feature-no'}">
-                        ${featured ? 'Featured' : 'Standard'}
-                    </span>
-                </td>
+                <td><span class="status-pill ${getStatusClass(status)}">${escapeHTML(status)}</span></td>
+                <td><span class="feature-pill ${featured ? 'feature-yes' : 'feature-no'}">${featured ? 'Featured' : 'Standard'}</span></td>
                 <td class="category-meta-muted">${escapeHTML(getArticleCount(category))}</td>
-                <td class="category-meta-muted">${escapeHTML(formatDate(getCreatedDate(category)))}</td>
-                <td class="category-meta-muted">${escapeHTML(formatDate(getUpdatedDate(category)))}</td>
-                <td>${renderCategoryActions(category)}</td>
+                <td class="category-meta-muted">${escapeHTML(formatDate(getValue(category, ['created_at', 'created_on', 'date_created'])))}</td>
+                <td class="category-meta-muted">${escapeHTML(formatDate(getValue(category, ['updated_at', 'modified_at', 'created_at'])))}</td>
+                <td>
+                    <div class="row-actions">
+                        <button type="button" data-action="edit" data-id="${escapeHTML(category.id)}" title="Edit category" aria-label="Edit ${escapeHTML(name)}">
+                            <i class="fa-regular fa-pen-to-square"></i>
+                        </button>
+                        <button class="danger-action" type="button" data-action="delete" data-id="${escapeHTML(category.id)}" title="Delete category" aria-label="Delete ${escapeHTML(name)}">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </div>
+                </td>
             </tr>
         `;
     }).join('');
@@ -250,61 +155,130 @@ function updatePagination(data) {
     categoryPageInfo.textContent = `Page ${currentCategoryPage}`;
 }
 
-async function fetchCategoriesFromEndpoint(endpoint, page) {
-    const separator = endpoint.includes('?') ? '&' : '?';
-    const response = await api.get(apiUrl(`${endpoint}${separator}page=${page}`));
-
-    return response.data;
-}
-
-async function fetchCategories(page) {
-    const endpoints = activeCategoryEndpoint
-        ? [activeCategoryEndpoint, ...CATEGORY_ENDPOINTS.filter((endpoint) => endpoint !== activeCategoryEndpoint)]
-        : CATEGORY_ENDPOINTS;
-
-    let lastError = null;
-
-    for (const endpoint of endpoints) {
-        try {
-            const data = await fetchCategoriesFromEndpoint(endpoint, page);
-            activeCategoryEndpoint = endpoint;
-            return data;
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw lastError;
-}
-
 async function loadCategories(page = 1) {
-    setTableMessage('Loading categories...', 'loading');
+    setMessage(categoriesTableBody, 8, 'Loading categories...', 'loading');
 
     try {
-        const data = await fetchCategories(page);
-        const categories = Array.isArray(data) ? data : (data.results || []);
-
+        const result = await loadList(CATEGORY_ENDPOINTS, page);
+        activeCategoryEndpoint = result.endpoint;
         currentCategoryPage = page;
-        lastCategoryResponse = Array.isArray(data)
-            ? { previous: null, next: null, count: categories.length }
-            : data;
-        currentCategories = categories;
+        lastCategoryResponse = result.data;
+        currentCategories = result.data.results;
 
-        updateSummary(currentCategories, lastCategoryResponse.count);
+        updateSummary(currentCategories, result.data.count);
         renderCategories(currentCategories);
-        updatePagination(lastCategoryResponse);
+        updatePagination(result.data);
     } catch (error) {
         console.error('Error loading categories:', error);
-        const notFound = error?.response?.status === 404;
-        const message = notFound
-            ? 'Category API endpoint is not available yet.'
-            : 'Unable to load categories. Please check the API token or try again.';
-
-        setTableMessage(message);
+        setMessage(categoriesTableBody, 8, 'Unable to load categories. Please check the API token or try again.');
         updateSummary([], 0);
         updatePagination({ previous: null, next: null });
     }
 }
+
+function resetForm() {
+    categoryFields.id.value = '';
+    categoryFields.name.value = '';
+    categoryFields.slug.value = '';
+    categoryFields.description.value = '';
+    categoryFields.active.checked = true;
+    categoryFields.featured.checked = false;
+    categoryFormStatus.textContent = '';
+}
+
+function openCreateModal() {
+    resetForm();
+    categoryModalTitle.textContent = 'Create New Category';
+    saveCategoryBtn.textContent = 'Create Category';
+    categoryModal.classList.remove('hidden');
+}
+
+function openEditModal(category) {
+    resetForm();
+    categoryFields.id.value = category.id || '';
+    categoryFields.name.value = getCategoryName(category) === 'Untitled category' ? '' : getCategoryName(category);
+    categoryFields.slug.value = getCategorySlug(category);
+    categoryFields.description.value = getValue(category, ['description', 'summary', 'details'], '');
+    categoryFields.active.checked = isActive(category);
+    categoryFields.featured.checked = isFeatured(category);
+    categoryModalTitle.textContent = 'Edit Category';
+    saveCategoryBtn.textContent = 'Save Changes';
+    categoryModal.classList.remove('hidden');
+}
+
+function closeModal() {
+    categoryModal.classList.add('hidden');
+}
+
+function buildPayload() {
+    return {
+        name: categoryFields.name.value.trim()
+    };
+}
+
+async function saveCategory() {
+    const id = categoryFields.id.value;
+    const payload = buildPayload();
+
+    if (!payload.name) {
+        categoryFormStatus.textContent = 'Name is required.';
+        return;
+    }
+
+    saveCategoryBtn.disabled = true;
+    categoryFormStatus.textContent = id ? 'Saving category...' : 'Creating category...';
+
+    try {
+        if (id) {
+            await updateItem(activeCategoryEndpoint, id, payload);
+        } else {
+            await createItem([activeCategoryEndpoint, ...CATEGORY_ENDPOINTS], payload);
+        }
+        closeModal();
+        await loadCategories(currentCategoryPage);
+    } catch (error) {
+        console.error('Unable to save category:', error);
+        categoryFormStatus.textContent = 'Unable to save category. Check required fields and permissions.';
+    } finally {
+        saveCategoryBtn.disabled = false;
+    }
+}
+
+async function removeCategory(category) {
+    if (!window.confirm(`Delete "${getCategoryName(category)}"? This cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        await deleteItem(activeCategoryEndpoint, category.id);
+        await loadCategories(currentCategoryPage);
+    } catch (error) {
+        console.error('Unable to delete category:', error);
+        window.alert('Unable to delete this category. Check your permissions and try again.');
+    }
+}
+
+categoriesTableBody.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-action]');
+
+    if (!button) {
+        return;
+    }
+
+    const category = currentCategories.find((item) => String(item.id) === String(button.dataset.id));
+
+    if (!category) {
+        return;
+    }
+
+    if (button.dataset.action === 'edit') {
+        openEditModal(category);
+    }
+
+    if (button.dataset.action === 'delete') {
+        removeCategory(category);
+    }
+});
 
 prevCategoryBtn.addEventListener('click', () => {
     if (lastCategoryResponse?.previous && currentCategoryPage > 1) {
@@ -320,12 +294,12 @@ nextCategoryBtn.addEventListener('click', () => {
 
 refreshCategoriesBtn.addEventListener('click', () => loadCategories(currentCategoryPage));
 categorySearchInput.addEventListener('input', () => renderCategories(currentCategories));
-
-openCategoryModalBtn.addEventListener('click', () => categoryModal.classList.remove('hidden'));
-closeCategoryModalBtn.addEventListener('click', () => categoryModal.classList.add('hidden'));
+openCategoryModalBtn.addEventListener('click', openCreateModal);
+closeCategoryModalBtn.addEventListener('click', closeModal);
+saveCategoryBtn.addEventListener('click', saveCategory);
 categoryModal.addEventListener('click', (event) => {
     if (event.target === categoryModal) {
-        categoryModal.classList.add('hidden');
+        closeModal();
     }
 });
 

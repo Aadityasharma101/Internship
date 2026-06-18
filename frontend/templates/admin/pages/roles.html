@@ -1,0 +1,105 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Roles - Admin Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Roles{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Roles</h2>
+        <p class="text-muted">Create staff roles and remove roles that are no longer used.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshResourceBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+        <button class="btn-add" id="openResourceModalBtn" type="button">
+            <i class="fa-solid fa-plus"></i> Add Role
+        </button>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total roles</span><strong id="totalResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Active</span><strong id="activeResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">System roles</span><strong id="secondaryResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Purpose</span><strong>Access</strong></div>
+</div>
+
+<div class="resource-toolbar">
+    <div class="resource-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="resourceSearchInput" placeholder="Search roles by name or description">
+    </div>
+    <span class="toolbar-count" id="visibleResourceCount">0 roles shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="resource-table">
+        <thead>
+            <tr><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="resourceTableBody">
+            <tr class="loading-row"><td colspan="4">Loading roles...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevResourceBtn" type="button">Previous</button>
+    <span id="resourcePageInfo">Page 1</span>
+    <button id="nextResourceBtn" type="button">Next</button>
+</div>
+
+<div id="resourceModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 id="resourceModalTitle">Create Role</h3>
+        <input type="hidden" id="resourceId">
+        <form id="resourceForm">
+            <div class="form-group">
+                <label for="roleName">Role name</label>
+                <input type="text" id="roleName" placeholder="Editor">
+            </div>
+            <div class="form-group">
+                <label for="roleDescription">Description</label>
+                <textarea id="roleDescription" placeholder="What this role can manage"></textarea>
+            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" id="roleActive" checked>
+                Active role
+            </label>
+        </form>
+        <p class="modal-status" id="resourceFormStatus"></p>
+        <div class="modal-actions">
+            <button class="btn-primary" id="saveResourceBtn" type="button">Create</button>
+            <button class="btn-secondary" id="closeResourceModalBtn" type="button">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.simpleCrudConfig = {
+    itemName: 'Role',
+    itemPlural: 'roles',
+    endpoints: ['roles/', '/roles/', 'users/roles/', '/users/roles/'],
+    secondaryKeys: ['is_system', 'system'],
+    titleField: { name: 'role_name', keys: ['role_name', 'name', 'title'] },
+    columns: [
+        { name: 'role_name', keys: ['role_name', 'name', 'title'], primary: true, description: { keys: ['description', 'details'], fallback: 'No description added' } },
+        { name: 'is_active', keys: ['is_active', 'active', 'status'], type: 'status' },
+        { name: 'created_at', keys: ['created_at', 'created_on'], type: 'date' }
+    ],
+    fields: [
+        { id: 'roleName', name: 'role_name', label: 'Role name', required: true }
+    ]
+};
+</script>
+<script src="{% static 'admin/js/simple_crud.js' %}"></script>
+{% endblock %}

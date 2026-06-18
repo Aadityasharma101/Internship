@@ -1,0 +1,120 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Categories - Admin Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/categories.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Categories{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2>Categories</h2>
+        <p class="text-muted">Organize news sections, monitor activity, and review category coverage.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshCategoriesBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+        <button class="btn-add" id="openCategoryModalBtn" type="button">
+            <i class="fa-solid fa-plus"></i>
+            Add Category
+        </button>
+    </div>
+</div>
+
+<div class="categories-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total categories</span>
+        <strong id="totalCategories">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Active</span>
+        <strong id="activeCategories">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Featured</span>
+        <strong id="featuredCategories">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Articles linked</span>
+        <strong id="linkedArticles">0</strong>
+    </div>
+</div>
+
+<div class="categories-toolbar">
+    <div class="categories-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="categorySearchInput" placeholder="Search categories by name, slug, description, or status">
+    </div>
+    <span class="toolbar-count" id="visibleCategoriesCount">0 categories shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="categories-table">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Slug</th>
+                <th>Status</th>
+                <th>Featured</th>
+                <th>Articles</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="categoriesTableBody">
+            <tr class="loading-row">
+                <td colspan="8">Loading categories...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevCategoryBtn" type="button">Previous</button>
+    <span id="categoryPageInfo">Page 1</span>
+    <button id="nextCategoryBtn" type="button">Next</button>
+</div>
+
+<div id="categoryModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Create New Category</h3>
+
+        <div class="form-group">
+            <label for="categoryName">Name</label>
+            <input type="text" id="categoryName" placeholder="Category name">
+        </div>
+
+        <div class="form-group">
+            <label for="categorySlug">Slug</label>
+            <input type="text" id="categorySlug" placeholder="category-slug">
+        </div>
+
+        <div class="form-group">
+            <label for="categoryDescription">Description</label>
+            <input type="text" id="categoryDescription" placeholder="Short description">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-primary" id="createCategoryBtn" type="button">
+                Create Category
+            </button>
+            <button class="btn-secondary" id="closeCategoryModalBtn" type="button">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'admin/js/categories.js' %}"></script>
+{% endblock %}

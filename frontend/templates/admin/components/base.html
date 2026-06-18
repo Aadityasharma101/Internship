@@ -59,7 +59,7 @@
                 </li>
 
                 <li class="menu-item {% if request.resolver_match.url_name == 'categories' %}active{% endif %}">
-                    <a href="#">
+                    <a href="{% url 'frontend:categories' %}">
                         <i class="fa-solid fa-layer-group"></i> Categories
                     </a>
                 </li>
@@ -71,7 +71,7 @@
                 </li>
 
                 <li class="menu-item {% if request.resolver_match.url_name == 'media' %}active{% endif %}">
-                    <a href="#">
+                    <a href="{% url 'frontend:media' %}">
                         <i class="fa-regular fa-images"></i> Media Library
                     </a>
                 </li>

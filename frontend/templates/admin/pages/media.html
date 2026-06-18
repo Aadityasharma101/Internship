@@ -1,0 +1,132 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Media Library - Admin Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/media.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Media Library{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h2>Media Library</h2>
+        <p class="text-muted">Browse uploaded images, review file details, and manage reusable article assets.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshMediaBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+        <button class="btn-add" id="openMediaModalBtn" type="button">
+            <i class="fa-solid fa-upload"></i>
+            Upload Media
+        </button>
+    </div>
+</div>
+
+<div class="media-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total files</span>
+        <strong id="totalMedia">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Images</span>
+        <strong id="imageMedia">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Documents</span>
+        <strong id="documentMedia">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Storage used</span>
+        <strong id="storageUsed">0 KB</strong>
+    </div>
+</div>
+
+<div class="media-toolbar">
+    <div class="media-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="mediaSearchInput" placeholder="Search media by name, type, uploader, or date">
+    </div>
+    <div class="media-view-toggle" aria-label="Media view options">
+        <button class="active" id="gridViewBtn" type="button" title="Grid view" aria-label="Grid view">
+            <i class="fa-solid fa-grip"></i>
+        </button>
+        <button id="tableViewBtn" type="button" title="Table view" aria-label="Table view">
+            <i class="fa-solid fa-list"></i>
+        </button>
+    </div>
+    <span class="toolbar-count" id="visibleMediaCount">0 files shown</span>
+</div>
+
+<div class="media-grid" id="mediaGrid">
+    <div class="media-message loading-row">Loading media...</div>
+</div>
+
+<div class="table-wrapper hidden" id="mediaTableWrapper">
+    <table class="media-table">
+        <thead>
+            <tr>
+                <th>File</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Uploaded by</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="mediaTableBody">
+            <tr class="loading-row">
+                <td colspan="6">Loading media...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevMediaBtn" type="button">Previous</button>
+    <span id="mediaPageInfo">Page 1</span>
+    <button id="nextMediaBtn" type="button">Next</button>
+</div>
+
+<div id="mediaModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Upload Media</h3>
+
+        <div class="form-group">
+            <label for="mediaFileInput">File</label>
+            <input type="file" id="mediaFileInput" accept="image/*,.pdf,.doc,.docx">
+        </div>
+
+        <div class="form-group">
+            <label for="mediaTitleInput">Title</label>
+            <input type="text" id="mediaTitleInput" placeholder="Optional display title">
+        </div>
+
+        <div class="form-group">
+            <label for="mediaAltInput">Alt text</label>
+            <input type="text" id="mediaAltInput" placeholder="Short image description">
+        </div>
+
+        <p class="modal-note" id="mediaUploadStatus">Choose a file to add it to the library.</p>
+
+        <div class="modal-actions">
+            <button class="btn-primary" id="uploadMediaBtn" type="button">
+                Upload
+            </button>
+            <button class="btn-secondary" id="closeMediaModalBtn" type="button">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'admin/js/media.js' %}"></script>
+{% endblock %}

@@ -1,66 +1,504 @@
-// News.js - Handle news data fetching and display
+const DEFAULT_MEDIA_BASE = 'https://news-portal-hvgs.onrender.com';
+const FETCH_TIMEOUT_MS = 15000;
+const DETAIL_FETCH_TIMEOUT_MS = 10000;
+const MAX_DETAIL_REQUESTS = 2;
+let CURRENT_FEED = [];
 
-document.addEventListener('DOMContentLoaded', function() {
-    const newsList = document.getElementById('news-list');
-    if (!newsList) {
+document.addEventListener('DOMContentLoaded', () => {
+    const appRoot = document.querySelector('.page-shell');
+    if (!appRoot) {
         return;
     }
-    loadNews();
+
+    const apiBaseFromRoot = appRoot.dataset.apiBase;
+    const apiBaseFromBody = document.body?.dataset?.apiBase;
+    const apiBase = apiBaseFromRoot || apiBaseFromBody || '/api';
+
+    initializeHomepage(apiBase);
+    // start polling for new articles
+    startFeedPolling(apiBase, 15000);
 });
 
-async function loadNews() {
-    const newsList = document.getElementById('news-list');
+function getMediaBase() {
+    const mediaBase = document.body?.dataset?.mediaBase || DEFAULT_MEDIA_BASE;
+    return mediaBase.replace(/\/$/, '');
+}
+
+async function initializeHomepage(apiBase) {
+    const featuredHero = document.getElementById('featured-hero');
+    const latestNewsGrid = document.getElementById('latest-news-grid');
+    const trendingNewsGrid = document.getElementById('trending-news-grid');
 
     try {
-        const response = await fetch('/api/articles/feed/?ordering=-id');
+        const [feedResponse, trendingResponse] = await Promise.allSettled([
+            fetchJson(`${apiBase}/articles/feed/`),
+            fetchJson(`${apiBase}/articles/trending/`),
+        ]);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const feedArticles = extractArticles(feedResponse.status === 'fulfilled' ? feedResponse.value : null);
+        const trendingArticles = extractArticles(trendingResponse.status === 'fulfilled' ? trendingResponse.value : null);
+
+        // store current feed so polling can detect changes
+        CURRENT_FEED = feedArticles.slice();
+
+        const latestArticles = take(feedArticles.length ? feedArticles : trendingArticles, 6).map((article) => mergeArticleData(article));
+        const trendingCards = take(trendingArticles, 4).map((article) => mergeArticleData(article));
+        const featuredArticle = mergeArticleData(feedArticles[0] || trendingArticles[0] || null);
+
+        renderFeaturedHero(featuredHero, featuredArticle);
+        renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
+        renderTrendingGrid(trendingNewsGrid, trendingCards);
+        updateBreakingHeadline(featuredArticle);
+        updateCategoryFilter(categoriesFromArticles(feedArticles, trendingArticles));
+
+        if (!feedArticles.length && !trendingArticles.length) {
+            renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
+        }
+        if (!trendingArticles.length) {
+            renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
         }
 
-        const data = await response.json();
-        displayNews(data);
+        hydrateArticleImages(apiBase, [
+            {
+                articles: [featuredArticle].filter(Boolean),
+                render: () => renderFeaturedHero(featuredHero, featuredArticle),
+            },
+            {
+                articles: latestArticles,
+                render: () => renderNewsGrid(latestNewsGrid, latestArticles, { compact: false }),
+            },
+            {
+                articles: trendingCards,
+                render: () => renderTrendingGrid(trendingNewsGrid, trendingCards),
+            },
+        ]);
     } catch (error) {
-        console.error('Error loading news:', error);
-        if (newsList) {
-            newsList.innerHTML = '<p class="error">Failed to load news. Please try again later.</p>';
-        }
+        console.error('Failed to load homepage news:', error);
+        renderError(featuredHero, 'We could not load the featured story right now.');
+        renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
+        renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
     }
 }
 
-function displayNews(data) {
-    const newsList = document.getElementById('news-list');
-    if (!newsList) {
+// Poll the feed periodically and insert any new articles at top
+function startFeedPolling(apiBase, intervalMs = 15000) {
+    setInterval(async () => {
+        try {
+            const fresh = await fetchJson(`${apiBase}/articles/feed/`, true);
+            const freshArticles = extractArticles(fresh || null);
+            if (!freshArticles.length) return;
+
+            // If the newest article id differs, assume new data available
+            const newestId = freshArticles[0]?.id;
+            const currentNewest = CURRENT_FEED[0]?.id;
+            if (newestId && newestId !== currentNewest) {
+                // update current feed and re-render top sections
+                CURRENT_FEED = freshArticles.slice();
+                const latestArticles = take(CURRENT_FEED, 6).map((article) => mergeArticleData(article));
+                const featuredArticle = mergeArticleData(CURRENT_FEED[0] || null);
+                const featuredHero = document.getElementById('featured-hero');
+                const latestNewsGrid = document.getElementById('latest-news-grid');
+                renderFeaturedHero(featuredHero, featuredArticle);
+                renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
+                // optionally update breaking headline
+                updateBreakingHeadline(featuredArticle);
+            }
+        } catch (e) {
+            console.warn('Feed polling error', e);
+        }
+    }, intervalMs);
+}
+
+async function fetchJson(url, allowNotFound = false, timeoutMs = FETCH_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                Accept: 'application/json',
+            },
+            signal: controller.signal,
+        });
+
+        if (allowNotFound && response.status === 404) {
+            return null;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        return response.json();
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function extractArticles(payload) {
+    if (!payload) {
+        return [];
+    }
+
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (Array.isArray(payload.results)) {
+        return payload.results;
+    }
+
+    if (payload.id || payload.title) {
+        return [payload];
+    }
+
+    return [];
+}
+
+function take(items, count) {
+    return items.slice(0, count);
+}
+
+async function hydrateArticleImages(apiBase, sections) {
+    const articleMap = new Map();
+
+    sections.forEach(({ articles }) => {
+        articles.forEach((article) => {
+            if (!article?.id || articleMap.has(article.id)) {
+                return;
+            }
+            articleMap.set(article.id, article);
+        });
+    });
+
+    const articlesNeedingImages = [...articleMap.values()].filter((article) => !article.imageUrl);
+    if (!articlesNeedingImages.length) {
         return;
     }
 
-    const articles = Array.isArray(data) ? data : (data.results || data || []);
+    const detailEntries = await mapConcurrent(
+        articlesNeedingImages.map((article) => article.id),
+        MAX_DETAIL_REQUESTS,
+        async (articleId) => {
+            const detail = await fetchArticleDetail(apiBase, articleId);
+            return detail ? [articleId, detail] : null;
+        }
+    );
 
-    if (!articles.length) {
-        newsList.innerHTML = '<p>No news available at the moment.</p>';
+    const detailMap = new Map(
+        detailEntries.filter(Boolean).map(([articleId, detail]) => [articleId, detail])
+    );
+
+    if (!detailMap.size) {
         return;
     }
 
-    newsList.innerHTML = articles.map(article => `
-        <article class="news-item">
-            <h3>${article.title || 'No Title'}</h3>
-            <p>Category: ${article.category_name || 'Uncategorized'}</p>
-            <small>Posted: ${formatDate(article.published_at)}</small>
-            <br>
-            <a href="/news/${article.id}/" style="color:#2c3e50; text-decoration:underline;">Read More</a>
-        </article>
-    `).join('');
+    sections.forEach(({ articles, render }) => {
+        let sectionUpdated = false;
+
+        articles.forEach((article) => {
+            const detail = detailMap.get(article.id);
+            if (!detail) {
+                return;
+            }
+
+            const merged = mergeArticleData(article, detail);
+            if (merged.imageUrl && merged.imageUrl !== article.imageUrl) {
+                Object.assign(article, merged);
+                sectionUpdated = true;
+            }
+        });
+
+        if (sectionUpdated) {
+            render();
+        }
+    });
+}
+
+async function mapConcurrent(items, limit, worker) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    async function runWorker() {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex], currentIndex);
+        }
+    }
+
+    const workers = Array.from({ length: Math.min(limit, items.length) }, () => runWorker());
+    await Promise.all(workers);
+    return results;
+}
+
+async function fetchArticleDetail(apiBase, articleId) {
+    if (!articleId) {
+        return null;
+    }
+
+    try {
+        const detail = await fetchJson(
+            `${apiBase}/articles/${articleId}/`,
+            true,
+            DETAIL_FETCH_TIMEOUT_MS
+        );
+
+        if (!detail || typeof detail !== 'object' || !Object.keys(detail).length) {
+            return null;
+        }
+
+        return detail;
+    } catch (error) {
+        console.warn(`Could not load detail for article ${articleId}`, error);
+        return null;
+    }
+}
+
+function mergeArticleData(baseArticle, detailArticle = null) {
+    if (!baseArticle && !detailArticle) {
+        return null;
+    }
+
+    const combined = {
+        ...(baseArticle || {}),
+        ...(detailArticle || {}),
+    };
+
+    combined.summary = getSummary(combined);
+    combined.displayDate = formatDate(combined.published_at);
+    combined.imageUrl = resolveMediaUrl(extractImageSource(combined));
+    combined.categoryLabel = combined.category_name || combined.category || 'Top Story';
+    combined.authorLabel = combined.author_name || 'News Desk';
+
+    return combined;
+}
+
+function extractImageSource(article) {
+    if (!article) {
+        return '';
+    }
+
+    const candidates = [
+        article.image,
+        article.image_url,
+        article.thumbnail,
+        article.thumbnail_url,
+        article.photo,
+        article.photo_url,
+        article.cover_image,
+        article.cover_image_url,
+        article.preview,
+        article.preview_url,
+        article.featured_image,
+        article.featured_image_url,
+        article.banner,
+        article.banner_url,
+        article.media,
+        article.media_url,
+    ];
+
+    for (const candidate of candidates) {
+        if (candidate) {
+            return candidate;
+        }
+    }
+
+    return '';
+}
+
+function resolveMediaUrl(url) {
+    if (!url) {
+        return '';
+    }
+
+    if (typeof url === 'object') {
+        return resolveMediaUrl(
+            url.url ||
+            url.src ||
+            url.path ||
+            url.file ||
+            url.image ||
+            url.media ||
+            url.secure_url ||
+            url.absolute_url ||
+            ''
+        );
+    }
+
+    const value = String(url).trim();
+    if (!value) {
+        return '';
+    }
+
+    if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
+        return value;
+    }
+
+    const mediaBase = getMediaBase();
+
+    if (value.startsWith('/media-proxy/')) {
+        return value;
+    }
+
+    if (value.startsWith('/media/')) {
+        return `${mediaBase}${value}`;
+    }
+
+    if (value.startsWith('media/')) {
+        return `${mediaBase}/${value}`;
+    }
+
+    if (value.startsWith('/')) {
+        const resolved = `${mediaBase}${value}`;
+        // debug log when images fail to load in browser console can help
+        // (network tab shows exact request)
+        return resolved;
+    }
+
+    return `${mediaBase}/media/${value}`;
+}
+
+function getSummary(article) {
+    if (!article) {
+        return '';
+    }
+
+    if (article.summary) {
+        return article.summary;
+    }
+
+    const sourceText = article.body || article.description || '';
+    if (!sourceText) {
+        return 'Read the full article for more details.';
+    }
+
+    return truncateText(sourceText, 140);
+}
+
+function truncateText(text, limit) {
+    const cleanText = String(text).replace(/\s+/g, ' ').trim();
+    if (cleanText.length <= limit) {
+        return cleanText;
+    }
+
+    return `${cleanText.slice(0, limit).trimEnd()}...`;
 }
 
 function formatDate(dateString) {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    if (isNaN(date)) {
-        return 'N/A';
+    if (!dateString) {
+        return 'Updated recently';
     }
+
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+        return 'Updated recently';
+    }
+
     return date.toLocaleDateString('en-US', {
-        year: 'numeric',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        year: 'numeric',
     });
+}
+
+function categoriesFromArticles(...articleLists) {
+    const seen = new Set();
+    const categories = [];
+
+    articleLists.flat().forEach((article) => {
+        const label = article.category_name || article.category || article.categoryLabel;
+        if (!label || seen.has(label)) {
+            return;
+        }
+        seen.add(label);
+        categories.push(label);
+    });
+
+    return categories;
+}
+
+function updateBreakingHeadline(article) {
+    const headline = document.getElementById('breaking-headline');
+    if (!headline) {
+        return;
+    }
+
+    headline.textContent = article?.title || 'No breaking stories available right now.';
+}
+
+function updateCategoryFilter(categories) {
+    const container = document.getElementById('category-filter');
+    if (!container) {
+        return;
+    }
+
+    const labels = categories.length ? categories : ['All'];
+    container.innerHTML = labels
+        .map((label, index) => `<span class="category-btn${index === 0 ? ' active' : ''}">${escapeHtml(label)}</span>`)
+        .join('');
+}
+
+// --- Minimal rendering helpers (prevent ReferenceError if API data missing) ---
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function renderError(container, message) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    container.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+}
+
+function renderFeaturedHero(container, article) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!article) {
+        container.innerHTML = '<p>No featured story available.</p>';
+        return;
+    }
+    const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
+    container.innerHTML = `
+        <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
+            ${img}
+            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+        </a>
+    `;
+}
+
+function renderNewsGrid(container, articles, opts = {}) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!articles || !articles.length) {
+        container.innerHTML = '<p>No articles available.</p>';
+        return;
+    }
+    container.innerHTML = articles.map((a) => {
+        const thumb = a.imageUrl || '/static/images/placeholder.svg';
+        return `
+        <article class="news-card">
+            <a href="/news/${escapeHtml(a.id)}/">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
+                <h4>${escapeHtml(a.title)}</h4>
+                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+            </a>
+        </article>
+    `}).join('');
+}
+
+function renderTrendingGrid(container, cards) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+    if (!cards || !cards.length) {
+        container.innerHTML = '<p>No trending stories.</p>';
+        return;
+    }
+    container.innerHTML = cards.map((c) => `<div class="trending-item"><a href="/news/${escapeHtml(c.id)}/">${escapeHtml(c.title)}</a></div>`).join('');
 }

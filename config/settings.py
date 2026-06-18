@@ -64,6 +64,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.media',
+                # Provide API base values to templates so frontend can call external API
+                'frontend.context_processors.api_settings',
             ],
         },
     },
@@ -120,9 +122,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / 'frontend' / 'static',
 ]
 
 # Media files (User uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# External API base used by the frontend. Change if you want a different backend.
+API_BASE_URL = 'https://news-portal-hvgs.onrender.com'

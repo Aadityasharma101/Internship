@@ -5,22 +5,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}News Portal{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <header>
-        <nav>
-            <h1>News Portal</h1>
+<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}">
+    <header class="header">
+        <div class="header-top">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo-section">
+                        <a href="{% url 'frontend:index' %}" class="logo-link" aria-label="Go to homepage">
+                            <img src="{% static 'images/logo.png' %}" alt="Company logo" class="logo-image">
+                        </a>
+                        <span class="tagline">Updated continuously from trusted newsrooms</span>
+                    </div>
+                    <div class="header-actions">
+                        <input type="search" class="search-box" placeholder="Search news..." aria-label="Search news">
+                        <button class="btn-signin" type="button">Sign in</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="navbar" aria-label="Main navigation">
+            <div class="container navbar-inner">
+                <div class="nav-tabs site-nav__links">
+                    <a href="{% url 'frontend:index' %}" class="nav-tab">Home</a>
+                    <a href="{% url 'frontend:newsletter' %}" class="nav-tab">Newsletter</a>
+                </div>
+                <div id="nav-categories" class="nav-categories" aria-live="polite"></div>
+                <span id="nav-live-count" class="nav-live-count">Loading live stories...</span>
+            </div>
         </nav>
     </header>
 
-    <main>
+    <main class="main-content">
         {% block content %}{% endblock %}
     </main>
 
-    <footer>
-        <p>&copy; 2026 News Portal. All rights reserved.</p>
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 News Portal. All rights reserved.</p>
+        </div>
     </footer>
 
     <script src="{% static 'js/main.js' %}"></script>

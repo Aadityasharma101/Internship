@@ -546,15 +546,18 @@ async function uploadMedia() {
     }
 
     const formData = new FormData();
-    formData.append('file', file);
     formData.append('title', mediaTitleInput.value.trim() || file.name);
-    formData.append('alt_text', mediaAltInput.value.trim());
+    formData.append('client_name', mediaAltInput.value.trim() || 'Media Library');
+    formData.append('image', file);
+    formData.append('target_url', typeof API_ORIGIN_URL === 'string' ? API_ORIGIN_URL : window.location.origin);
+    formData.append('position', 'sidebar');
+    formData.append('end_date', new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString());
 
     uploadMediaBtn.disabled = true;
     mediaUploadStatus.textContent = 'Uploading...';
 
     try {
-        await api.post(apiUrl('/articles/create/'), formData, {
+        await api.post(apiUrl(ADS_MEDIA_ENDPOINT), formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
         mediaUploadStatus.textContent = 'Upload complete.';
@@ -565,7 +568,7 @@ async function uploadMedia() {
         loadMedia(currentMediaPage);
     } catch (error) {
         console.error('Error uploading media:', error);
-        mediaUploadStatus.textContent = 'Unable to upload media. Please check article creation permissions.';
+        mediaUploadStatus.textContent = 'Unable to upload media. Check required fields and permissions.';
     } finally {
         uploadMediaBtn.disabled = false;
     }

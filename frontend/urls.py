@@ -16,5 +16,11 @@ urlpatterns = [
     path('articles/', views.articles, name='articles'),
     path('categories/', views.categories, name='categories'),
     path('media/', views.media, name='media'),
+    path('roles/', views.roles, name='roles'),
+    path('advertise/', views.advertise, name='advertise'),
+    path('tags/', views.tags, name='tags'),
+    path('bookmarks/', views.bookmarks, name='bookmarks'),
+    path('comments/', views.comments, name='comments'),
+    path('reacts/', views.reacts, name='reacts'),
     path('remote/<path:path>', views.api_proxy, name='api_proxy'),
 ]

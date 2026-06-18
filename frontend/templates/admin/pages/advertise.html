@@ -1,0 +1,108 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Advertise - Admin Panel{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">{% endblock %}
+{% block breadcrumb %}Advertise{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Advertise</h2>
+        <p class="text-muted">Manage advertisement placements, links, images, and campaign status.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshResourceBtn" type="button"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+        <button class="btn-add" id="openResourceModalBtn" type="button"><i class="fa-solid fa-plus"></i> Add Advertise</button>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total ads</span><strong id="totalResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Active</span><strong id="activeResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Featured</span><strong id="secondaryResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Purpose</span><strong>Revenue</strong></div>
+</div>
+
+<div class="resource-toolbar">
+    <div class="resource-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="resourceSearchInput" placeholder="Search ads by title, placement, sponsor, or URL"></div>
+    <span class="toolbar-count" id="visibleResourceCount">0 ads shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="resource-table">
+        <thead><tr><th>Advertise</th><th>Placement</th><th>Status</th><th>Link</th><th>Updated</th><th>Actions</th></tr></thead>
+        <tbody id="resourceTableBody"><tr class="loading-row"><td colspan="6">Loading advertise...</td></tr></tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevResourceBtn" type="button">Previous</button>
+    <span id="resourcePageInfo">Page 1</span>
+    <button id="nextResourceBtn" type="button">Next</button>
+</div>
+
+<div id="resourceModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 id="resourceModalTitle">Create Advertise</h3>
+        <input type="hidden" id="resourceId">
+        <form id="resourceForm" class="form-grid">
+            <div class="form-group">
+                <label for="adTitle">Title</label>
+                <input type="text" id="adTitle" placeholder="Homepage banner">
+            </div>
+            <div class="form-group">
+                <label for="adPlacement">Placement</label>
+                <input type="text" id="adPlacement" placeholder="homepage_top">
+            </div>
+            <div class="form-group full-width">
+                <label for="adImage">Image URL</label>
+                <input type="url" id="adImage" placeholder="https://example.com/banner.jpg">
+            </div>
+            <div class="form-group full-width">
+                <label for="adLink">Target URL</label>
+                <input type="url" id="adLink" placeholder="https://sponsor.example.com">
+            </div>
+            <div class="form-group full-width">
+                <label for="adDescription">Description</label>
+                <textarea id="adDescription" placeholder="Campaign notes"></textarea>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="adActive" checked> Active ad</label>
+            <label class="checkbox-row"><input type="checkbox" id="adFeatured"> Featured placement</label>
+        </form>
+        <p class="modal-status" id="resourceFormStatus"></p>
+        <div class="modal-actions">
+            <button class="btn-primary" id="saveResourceBtn" type="button">Create</button>
+            <button class="btn-secondary" id="closeResourceModalBtn" type="button">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.simpleCrudConfig = {
+    itemName: 'Advertise',
+    itemPlural: 'ads',
+    endpoints: ['/advertise/', 'advertise/', '/advertisements/', 'advertisements/', '/ads/', 'ads/'],
+    titleField: { name: 'title', keys: ['title', 'name', 'campaign_name'] },
+    columns: [
+        { name: 'title', keys: ['title', 'name', 'campaign_name'], primary: true, description: { keys: ['description', 'summary', 'sponsor'], fallback: 'No notes added' } },
+        { name: 'placement', keys: ['placement', 'position', 'slot'], fallback: 'Not set' },
+        { name: 'is_active', keys: ['is_active', 'active', 'status'], type: 'status' },
+        { name: 'target_url', keys: ['target_url', 'url', 'link'], type: 'url' },
+        { name: 'updated_at', keys: ['updated_at', 'modified_at', 'created_at'], type: 'date' }
+    ],
+    fields: [
+        { id: 'adTitle', name: 'title', label: 'Title', required: true, payloadNames: ['title', 'name'] },
+        { id: 'adPlacement', name: 'placement', label: 'Placement' },
+        { id: 'adImage', name: 'image', label: 'Image URL', payloadNames: ['image', 'image_url'] },
+        { id: 'adLink', name: 'target_url', label: 'Target URL', payloadNames: ['target_url', 'url', 'link'] },
+        { id: 'adDescription', name: 'description', label: 'Description' },
+        { id: 'adActive', name: 'is_active', label: 'Active', type: 'checkbox', default: true, payloadNames: ['is_active', 'active'] },
+        { id: 'adFeatured', name: 'is_featured', label: 'Featured', type: 'checkbox', payloadNames: ['is_featured', 'featured'] }
+    ]
+};
+</script>
+<script src="{% static 'admin/js/simple_crud.js' %}"></script>
+{% endblock %}

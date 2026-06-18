@@ -4,6 +4,7 @@
 {% block title %}Articles - Admin Panel{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
 {% endblock %}
 
 {% block breadcrumb %}Articles{% endblock %}
@@ -85,25 +86,59 @@
 
 <div id="articleModal" class="modal hidden">
     <div class="modal-content">
-        <h3>Create New Article</h3>
+        <h3 id="articleModalTitle">Create New Article</h3>
+        <input type="hidden" id="articleId">
 
-        <div class="form-group">
-            <label for="articleTitle">Title</label>
-            <input type="text" id="articleTitle" placeholder="Article title">
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label for="articleTitle">Title</label>
+                <input type="text" id="articleTitle" placeholder="Article title">
+            </div>
+
+            <div class="form-group">
+                <label for="articleCategory">Category</label>
+                <input type="text" id="articleCategory" placeholder="Category id or name">
+            </div>
+
+            <div class="form-group">
+                <label for="articleStatus">Status</label>
+                <select id="articleStatus">
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
+                </select>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="articleImage">Image URL</label>
+                <input type="url" id="articleImage" placeholder="https://example.com/image.jpg">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="articleDescription">Description</label>
+                <textarea id="articleDescription" placeholder="Short summary"></textarea>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="articleBody">Body</label>
+                <textarea id="articleBody" placeholder="Full article body"></textarea>
+            </div>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="articleFeatured">
+                Featured article
+            </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="articlePublished">
+                Published
+            </label>
         </div>
 
-        <div class="form-group">
-            <label for="articleCategory">Category</label>
-            <input type="text" id="articleCategory" placeholder="Category">
-        </div>
-
-        <div class="form-group">
-            <label for="articleStatus">Status</label>
-            <input type="text" id="articleStatus" placeholder="Draft or published">
-        </div>
+        <p class="modal-status" id="articleFormStatus"></p>
 
         <div class="modal-actions">
-            <button class="btn-primary" id="createArticleBtn" type="button">
+            <button class="btn-primary" id="saveArticleBtn" type="button">
                 Create Article
             </button>
             <button class="btn-secondary" id="closeArticleModalBtn" type="button">

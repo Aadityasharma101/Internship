@@ -240,3 +240,33 @@ def media(request):
     """
     context = {}
     return render(request, 'admin/pages/media.html', context)
+
+
+def roles(request):
+    context = {}
+    return render(request, 'admin/pages/roles.html', context)
+
+
+def advertise(request):
+    context = {}
+    return render(request, 'admin/pages/advertise.html', context)
+
+
+def tags(request):
+    context = {}
+    return render(request, 'admin/pages/tags.html', context)
+
+
+def bookmarks(request):
+    context = {}
+    return render(request, 'admin/pages/bookmarks.html', context)
+
+
+def comments(request):
+    context = {}
+    return render(request, 'admin/pages/comments.html', context)
+
+
+def reacts(request):
+    context = {}
+    return render(request, 'admin/pages/reacts.html', context)

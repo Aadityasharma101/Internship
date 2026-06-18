@@ -77,12 +77,50 @@
                 </li>
 
                 <li class="menu-item {% if request.resolver_match.url_name == 'comments' %}active{% endif %}">
-                    <a href="#">
+                    <a href="{% url 'frontend:comments' %}">
                         <i class="fa-regular fa-comment-dots"></i> Comments
                     </a>
                     <span class="badge badge-orange">12</span>
                 </li>
 
+            </ul>
+
+            <div class="menu-section">MANAGEMENT</div>
+
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'roles' %}active{% endif %}">
+                    <a href="{% url 'frontend:roles' %}">
+                        <i class="fa-solid fa-user-shield"></i> Roles
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'advertise' %}active{% endif %}">
+                    <a href="{% url 'frontend:advertise' %}">
+                        <i class="fa-solid fa-rectangle-ad"></i> Advertise
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'tags' %}active{% endif %}">
+                    <a href="{% url 'frontend:tags' %}">
+                        <i class="fa-solid fa-tags"></i> Tags
+                    </a>
+                </li>
+            </ul>
+
+            <div class="menu-section">CUSTOMER PREFERENCES</div>
+
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'bookmarks' %}active{% endif %}">
+                    <a href="{% url 'frontend:bookmarks' %}">
+                        <i class="fa-regular fa-bookmark"></i> Bookmarks
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'reacts' %}active{% endif %}">
+                    <a href="{% url 'frontend:reacts' %}">
+                        <i class="fa-regular fa-face-smile"></i> Reacts
+                    </a>
+                </li>
             </ul>
 
         </div>
@@ -159,6 +197,7 @@
 <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="{% static 'js/axios.js' %}"></script>
+<script src="{% static 'admin/js/resource_helpers.js' %}"></script>
 <script src="{% static 'admin/js/main.js' %}"></script>
 {% block extra_js %}{% endblock %}
 

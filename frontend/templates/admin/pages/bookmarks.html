@@ -1,0 +1,59 @@
+{% extends 'admin/components/base.html' %}
+{% load static %}
+
+{% block title %}Bookmarks - Admin Panel{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">{% endblock %}
+{% block breadcrumb %}Bookmarks{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Bookmarks</h2>
+        <p class="text-muted">View articles saved by regular users to understand reading intent.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshPreferenceBtn" type="button"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total bookmarks</span><strong id="totalPreferences">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Users</span><strong id="preferenceUsers">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Articles</span><strong id="preferenceArticles">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Latest</span><strong id="latestPreference">None</strong></div>
+</div>
+
+<div class="resource-toolbar">
+    <div class="resource-search"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="preferenceSearchInput" placeholder="Search bookmarks by user, article, or category"></div>
+    <span class="toolbar-count" id="visiblePreferenceCount">0 bookmarks shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="resource-table">
+        <thead><tr><th>User</th><th>Article</th><th>Saved</th><th>Source</th></tr></thead>
+        <tbody id="preferenceTableBody"><tr class="loading-row"><td colspan="4">Loading bookmarks...</td></tr></tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <button id="prevPreferenceBtn" type="button">Previous</button>
+    <span id="preferencePageInfo">Page 1</span>
+    <button id="nextPreferenceBtn" type="button">Next</button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.preferenceConfig = {
+    itemPlural: 'bookmarks',
+    endpoints: ['/bookmarks/', 'bookmarks/', '/articles/bookmarks/', 'articles/bookmarks/', '/users/bookmarks/', 'users/bookmarks/'],
+    columns: [
+        { type: 'user', keys: ['user.email', 'email'] },
+        { type: 'article', keys: ['article.title', 'article_title'] },
+        { type: 'date', keys: ['created_at', 'bookmarked_at', 'saved_at'] },
+        { type: 'pill', keys: ['source', 'device', 'platform'], fallback: 'Web', className: 'pill-blue' }
+    ]
+};
+</script>
+<script src="{% static 'admin/js/preference_view.js' %}"></script>
+{% endblock %}

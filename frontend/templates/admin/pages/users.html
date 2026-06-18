@@ -4,6 +4,7 @@
 {% block title %}Users - Admin Panel{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/users.css' %}">
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
 {% endblock %}
 
 
@@ -103,26 +104,56 @@
 
     <div class="modal-content">
 
-        <h3>Create New User</h3>
+        <h3 id="userModalTitle">Create New User</h3>
+        <input type="hidden" id="userId">
 
-        <div class="form-group">
-            <label for="first_name">First name</label>
-            <input type="text" id="first_name" placeholder="First Name">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="first_name">First name</label>
+                <input type="text" id="first_name" placeholder="First Name">
+            </div>
+
+            <div class="form-group">
+                <label for="last_name">Last name</label>
+                <input type="text" id="last_name" placeholder="Last Name">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="Email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Required for new users">
+            </div>
+
+            <div class="form-group">
+                <label for="role">Role</label>
+                <input type="text" id="role" placeholder="Role id or name">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="bio">Bio</label>
+                <textarea id="bio" placeholder="Short user bio"></textarea>
+            </div>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="is_active" checked>
+                Active user
+            </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="is_verified">
+                Verified account
+            </label>
         </div>
 
-        <div class="form-group">
-            <label for="last_name">Last name</label>
-            <input type="text" id="last_name" placeholder="Last Name">
-        </div>
-
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="Email">
-        </div>
+        <p class="modal-status" id="userFormStatus"></p>
 
         <div class="modal-actions">
 
-            <button class="btn-primary" id="createUserBtn" type="button">
+            <button class="btn-primary" id="saveUserBtn" type="button">
                 Create User
             </button>
 

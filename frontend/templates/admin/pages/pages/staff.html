@@ -1,0 +1,33 @@
+{% extends 'admin/components/base.html' %}
+
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block breadcrumb %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Staff Dashboard</h2>
+    <p class="text-muted">Tools and quick actions for staff users.</p>
+</div>
+
+<div class="cards">
+    <div class="card">
+        <h3>Pending Moderation</h3>
+        <p>Placeholder for moderation tasks and quick links.</p>
+    </div>
+    <div class="card">
+        <h3>Assigned Articles</h3>
+        <p>Placeholder for articles assigned to staff.</p>
+    </div>
+</div>
+<!-- Staff-specific create form removed from admin page. Staff should use the Staff Articles page. -->
+
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'staff/js/staff_articles.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'staff/css/staff.css' %}">
+{% endblock %}

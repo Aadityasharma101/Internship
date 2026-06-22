@@ -1,0 +1,91 @@
+{% extends 'staff/components/base.html' %}
+{% load static %}
+
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block breadcrumb %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Staff Dashboard</h2>
+    <p class="text-muted">Tools and quick actions for staff users.</p>
+</div>
+
+<div class="cards">
+    <div class="card">
+        <h3>Pending Moderation</h3>
+        <p>Recent comments awaiting review and quick moderation actions.</p>
+    </div>
+    <div class="card">
+        <h3>Assigned Articles</h3>
+        <p>Articles assigned to you or recently submitted.</p>
+    </div>
+</div>
+
+<section class="articles-list">
+    <h3>Recent Articles</h3>
+    <div class="table-wrapper">
+        <table class="articles-table">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>Category</th>
+                    <th>Author</th>
+                    <th>Status</th>
+                    <th>Published</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for a in articles %}
+                <tr>
+                    <td class="article-cell">
+                        {% if a.image %}
+                            <img class="article-thumb" src="{{ a.image }}" alt="{{ a.title }}" title="{{ a.image }}">
+                        {% else %}
+                            <span class="article-thumb-fallback">No</span>
+                        {% endif %}
+                        <div class="article-title-wrap">
+                            <strong><a href="/news/{{ a.id }}/">{{ a.title }}</a></strong>
+                            <span class="article-meta-muted">{{ a.description|truncatechars:80 }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if a.category_name %}{{ a.category_name }}{% elif a.category %}{{ a.category }}{% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if a.author_name %}{{ a.author_name }}{% elif a.author %}{{ a.author }}{% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if a.status %}
+                            <span class="status-pill status-{{ a.status }}">{{ a.status }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if a.published_at %}{{ a.published_at }}{% elif a.created_at %}{{ a.created_at }}{% else %}-{% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr class="loading-row"><td colspan="5">No articles found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="staff-area">
+    <h3>Create and Manage Articles</h3>
+    <p>Use the dedicated Articles page for creating and managing articles with the full admin UI.</p>
+    <p>
+        <a class="btn-add" href="{% url 'frontend:staff_articles' %}">Open Articles</a>
+    </p>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'staff/js/staff_articles.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'staff/css/staff.css' %}">
+{% endblock %}

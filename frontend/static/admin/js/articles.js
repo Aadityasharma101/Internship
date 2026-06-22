@@ -3,8 +3,9 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = '/articles/feed/';
 
-const ARTICLE_ENDPOINTS = ['/articles/feed/', 'articles/feed/', '/articles/', 'articles/'];
-const ARTICLE_MUTATION_ENDPOINTS = ['/articles/create/'];
+// Try API-mounted endpoints and proxy routes first, then fall back to root paths
+const ARTICLE_ENDPOINTS = ['/api/articles/feed/', '/remote/articles/feed/', '/articles/feed/', 'articles/feed/', '/api/articles/', '/remote/articles/', '/articles/', 'articles/'];
+const ARTICLE_MUTATION_ENDPOINTS = ['/api/articles/create/', '/remote/articles/create/', '/articles/create/'];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');

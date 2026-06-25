@@ -8,6 +8,9 @@ urlpatterns = [
 
     path('register/', views.register, name='register'),
     path('login/', views.login, name='login'),
+    # Server-side auth endpoints (login forwards credentials to remote API and stores tokens in session)
+    path('auth/login/', views.auth_login, name='auth_login'),
+    path('auth/logout/', views.auth_logout, name='auth_logout'),
    
     path('newsletter/', views.newsletter, name='newsletter'),
     path('news/<int:article_id>/', views.news_detail, name='news_detail'),

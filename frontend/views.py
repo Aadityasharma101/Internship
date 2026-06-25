@@ -1,9 +1,11 @@
+# standard imports
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 # authentication removed for public staff pages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.conf import settings
 import json
 import urllib.request
 import urllib.error
@@ -15,7 +17,7 @@ try:
 except ImportError:
     requests = None
 
-NEWS_API_BASE = "https://news-portal-hvgs.onrender.com"
+NEWS_API_BASE = "https://news-portal-hvgs.onrender.com/api"
 HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -216,16 +218,176 @@ def login(request):
     context = {}
     return render(request, 'frontend/pages/login.html', context)
 
+
+def _decode_jwt_payload(token):
+    """Decode JWT payload without verification to extract claims (useful for role)."""
+    try:
+        parts = token.split('.')
+        if len(parts) < 2:
+            return {}
+        payload_b64 = parts[1]
+        # Add padding
+        padding = '=' * (-len(payload_b64) % 4)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64 + padding)
+        return json.loads(payload_bytes.decode())
+    except Exception:
+        return {}
+
+
+def get_remote_user_info(access_token):
+    """Attempt to fetch the current user from the remote API using common endpoints.
+    Falls back to decoding the JWT token when no user endpoint exists.
+    Returns a dict with at least 'role' or 'is_staff' keys when available.
+    """
+    if not access_token:
+        return None
+
+    headers = {'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'}
+    candidates = [
+        '/users/me/',
+        '/auth/users/me/',
+        '/accounts/me/',
+        '/me/',
+    ]
+    for path in candidates:
+        try:
+            url = f"{NEWS_API_BASE}{path}"
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                try:
+                    return resp.json()
+                except Exception:
+                    return None
+        except Exception:
+            continue
+
+    # Fallback: decode JWT payload
+    payload = _decode_jwt_payload(access_token)
+    user = {}
+    # common claim names
+    user['email'] = payload.get('email') or payload.get('username')
+    user['role'] = payload.get('role') or payload.get('user_role')
+    user['is_staff'] = payload.get('is_staff') or payload.get('staff') or False
+    user['is_superuser'] = payload.get('is_superuser') or payload.get('admin') or False
+    return user
+
+
+@csrf_exempt
+def auth_login(request):
+    """Server-side login endpoint. Accepts POST with JSON {email,password}.
+    Forwards credentials to remote API token endpoint, stores tokens in session,
+    fetches remote user info, and returns JSON with a `next` URL for redirection.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode()) if request.body else request.POST.dict()
+    except Exception:
+        data = request.POST.dict()
+
+    email = data.get('email') or data.get('username')
+    password = data.get('password')
+    if not email or not password:
+        return JsonResponse({'detail': 'Email and password are required.'}, status=400)
+
+    if requests is None:
+        return JsonResponse({'detail': 'requests library not installed on server.'}, status=500)
+
+    # Try common token endpoints used by the remote API
+    token_paths = ['/token/', '/auth/token/', '/auth/login/', '/api/token/']
+    token_response = None
+    for path in token_paths:
+        try:
+            url = f"{NEWS_API_BASE}{path}"
+            resp = requests.post(url, json={'email': email, 'username': email, 'password': password}, timeout=15)
+            if resp.status_code in (200, 201):
+                token_response = resp
+                break
+        except requests.RequestException:
+            continue
+
+    if not token_response:
+        return JsonResponse({'detail': 'Authentication failed. Unable to reach auth endpoint.'}, status=502)
+
+    try:
+        token_json = token_response.json()
+    except Exception:
+        return JsonResponse({'detail': 'Invalid response from auth endpoint.'}, status=502)
+
+    access = token_json.get('access') or token_json.get('token') or token_json.get('access_token')
+    refresh = token_json.get('refresh') or token_json.get('refresh_token')
+    if not access:
+        # Authentication failed - forward error message
+        return JsonResponse(token_json, status=token_response.status_code)
+
+    # Save tokens in session (server-side). Avoid exposing tokens to client JS.
+    request.session['access_token'] = access
+    if refresh:
+        request.session['refresh_token'] = refresh
+
+    # Fetch user info and store minimal profile
+    user = get_remote_user_info(access) or {}
+    request.session['user'] = user
+
+    # Determine redirect based on role
+    role = (user.get('role') or 'reader').lower() if isinstance(user.get('role'), str) else None
+    if user.get('is_superuser') or user.get('is_staff') or role == 'admin':
+        next_url = reverse('frontend:users')  # admin area
+    elif role == 'staff' or user.get('is_staff'):
+        next_url = reverse('frontend:staff')
+    else:
+        next_url = reverse('frontend:index')
+
+    return JsonResponse({'detail': 'Login successful', 'next': next_url, 'role': role})
+
+
+@csrf_exempt
+def auth_logout(request):
+    """Clear server-side session tokens and redirect to login."""
+    try:
+        request.session.pop('access_token', None)
+        request.session.pop('refresh_token', None)
+        request.session.pop('user', None)
+    except Exception:
+        pass
+    return JsonResponse({'detail': 'Logged out', 'next': reverse('frontend:login')})
+
+
+def require_remote_login(view_func):
+    """Decorator to protect views that require a logged-in remote user.
+    Checks for `access_token` in session and returns 302 to login when missing.
+    """
+    from functools import wraps
+
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        token = request.session.get('access_token')
+        if not token:
+            # Not logged in -> redirect to login page
+            if request.is_ajax() or request.headers.get('Accept') == 'application/json':
+                return JsonResponse({'detail': 'Authentication required'}, status=401)
+            return redirect(reverse('frontend:login'))
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
 def dashboard(request):
     """
     Newsletter page view.
     """
-    context = {}
-    return render(request, 'admin/components/base.html', context)
+    # Render the staff dashboard for overview instead of the admin base
+    return staff_dashboard(request)
 
 
 def staff_dashboard(request):
     """Staff dashboard view (restricted to staff users)."""
+    # require login
+    token = request.session.get('access_token')
+    user = request.session.get('user') or {}
+    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
+    if not token or not (role == 'staff' or user.get('is_staff')):
+        return redirect(reverse('frontend:login'))
     context = {}
     articles = []
     try:
@@ -248,6 +410,13 @@ def staff_add_article(request):
 
     Expects JSON body or form data with at least `title` and `body`.
     """
+    # Require server-side login
+    token = request.session.get('access_token')
+    user = request.session.get('user') or {}
+    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
+    if not token or not (role == 'staff' or user.get('is_staff')):
+        return JsonResponse({'detail': 'Authentication required'}, status=401)
+
     try:
         # prefer JSON
         data = json.loads(request.body.decode()) if request.body else request.POST.dict()
@@ -260,21 +429,24 @@ def staff_add_article(request):
         'description': data.get('description', ''),
     }
 
-    url = f"{NEWS_API_BASE}/articles/"
+    # Use the remote API's create endpoint for article creation
+    url = f"{NEWS_API_BASE}/articles/create/"
 
     if requests is None:
         return JsonResponse({'detail': 'requests library not installed on server. Install it in your virtualenv (pip install requests).'}, status=500)
 
-    # Prepare headers and authorization. Prefer client-provided auth but fall back to a known admin token
-    FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNzUwNjM5LCJpYXQiOjE3ODE3NTAzMzksImp0aSI6ImViN2EwMjA2OWE2ZTRlMjg4YTliN2UyNTZkMGRmNmM4IiwidXNlcl9pZCI6IjEifQ.IaV1-0TqrLY6TFBHB6g6VdbWW1g3N_BvyIKDfrKUfig'
 
     try:
-        headers = {'Accept': 'application/json'}
-        auth = request.headers.get('Authorization')
-        if auth:
-            headers['Authorization'] = auth
-        else:
-            headers['Authorization'] = f'Bearer {FALLBACK_ADMIN_ACCESS_TOKEN}'
+        headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
+        # Prefer client-provided Authorization header. If missing, allow a dev-only
+        # fallback token when running in DEBUG and an environment token is configured.
+        # token already added to headers above; allow fallback for debug
+        if not headers.get('Authorization'):
+            fallback = getattr(settings, 'ADMIN_FALLBACK_ACCESS_TOKEN', '')
+            if settings.DEBUG and fallback:
+                headers['Authorization'] = f'Bearer {fallback}'
+            else:
+                return JsonResponse({'detail': 'Missing Authorization header'}, status=401)
 
         # If the client sent multipart/form-data (file upload), forward as multipart
         content_type = request.META.get('CONTENT_TYPE', '')
@@ -312,7 +484,9 @@ def staff_add_article(request):
     try:
         return JsonResponse(resp.json(), status=resp.status_code)
     except Exception:
-        return HttpResponse(resp.content, status=resp.status_code, content_type=resp.headers.get('Content-Type', 'application/octet-stream'))
+        # Return remote response content and status to help debugging when non-JSON
+        content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+        return HttpResponse(resp.content, status=resp.status_code, content_type=content_type)
 
 def users(request):
     """
@@ -341,7 +515,7 @@ def categories(request):
     Categories page view.
     """
     context = {}
-    return render(request, 'admin/pages/categories.html', context)
+    return render(request, 'staff/pages/categories.html', context)
 
 
 def media(request):
@@ -374,7 +548,7 @@ def bookmarks(request):
 
 def comments(request):
     context = {}
-    return render(request, 'admin/pages/comments.html', context)
+    return render(request, 'staff/pages/comments.html', context)
 
 
 def reacts(request):

@@ -64,9 +64,14 @@ function renderComments(comments, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    const count = comments?.length || 0;
+    const header = container.closest('.comments-section')?.querySelector('.comments-header');
+    if (header) {
+        header.textContent = `Comments (${count})`;
+    }
+
     if (!comments || comments.length === 0) {
         container.innerHTML = `
-            <div class="comments-header">Comments (0)</div>
             <div class="comments-list">
                 <p class="comments-empty">No comments yet. Be the first to comment!</p>
             </div>
@@ -75,7 +80,6 @@ function renderComments(comments, containerId) {
     }
 
     container.innerHTML = `
-        <div class="comments-header">Comments (${comments.length})</div>
         <div class="comments-list">
             ${comments.map(renderCommentCard).join('')}
         </div>

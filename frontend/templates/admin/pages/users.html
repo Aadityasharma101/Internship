@@ -1,3 +1,4 @@
+```django
 {% extends 'admin/components/base.html' %}
 {% load static %}
 
@@ -6,7 +7,6 @@
 <link rel="stylesheet" href="{% static 'admin/css/users.css' %}">
 <link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
 {% endblock %}
-
 
 {% block breadcrumb %}Users{% endblock %}
 
@@ -76,8 +76,6 @@
 
         <tbody id="usersTableBody">
 
-            <!-- JS will inject rows here -->
-
             <tr class="loading-row">
                 <td colspan="8">Loading users...</td>
             </tr>
@@ -128,9 +126,16 @@
                 <input type="password" id="password" placeholder="Required for new users">
             </div>
 
+            <!-- UPDATED ROLE DROPDOWN -->
             <div class="form-group">
                 <label for="role">Role</label>
-                <input type="text" id="role" placeholder="Role id or name">
+                <select id="role">
+                    <option value="">Select Role</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="staff">Staff</option>
+                    <option value="editor">Editor</option>
+                </select>
             </div>
 
             <div class="form-group full-width">
@@ -170,5 +175,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'admin/js/users.js' %}"></script>
+<script src="{% static 'admin/js/users.js' %}?v=2"></script>
 {% endblock %}
+```

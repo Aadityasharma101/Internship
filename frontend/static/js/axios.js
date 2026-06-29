@@ -2,8 +2,10 @@
 
 const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
 const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
-const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNzUwNjM5LCJpYXQiOjE3ODE3NTAzMzksImp0aSI6ImViN2EwMjA2OWE2ZTRlMjg4YTliN2UyNTZkMGRmNmM4IiwidXNlcl9pZCI6IjEifQ.IaV1-0TqrLY6TFBHB6g6VdbWW1g3N_BvyIKDfrKUfig';
-const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTgzNjczOSwiaWF0IjoxNzgxNzUwMzM5LCJqdGkiOiIwZGRjNjI3M2U0NWM0M2UwODNhMGM2YjExNTNhODUxMyIsInVzZXJfaWQiOiIxIn0.omYvbEFaDw7ygEUgdYAL98kYzSuxcht5IMfx5NVQf7E';
+const LOGIN_URL = '/login/';
+const AUTH_INVALID_KEY = 'news_portal_auth_invalid';
+
+let refreshPromise = null;
 
 function apiUrl(path = '') {
     if (/^https?:\/\//i.test(path)) {
@@ -27,6 +29,10 @@ function decodeJwtPayload(token) {
 }
 
 function isTokenExpired(token) {
+    if (!token) {
+        return true;
+    }
+
     const payload = decodeJwtPayload(token);
     const expiresAt = payload?.exp;
 
@@ -34,7 +40,19 @@ function isTokenExpired(token) {
         return true;
     }
 
-    return Date.now() >= expiresAt * 1000;
+    return Date.now() >= (expiresAt - 30) * 1000;
+}
+
+function isAuthInvalid() {
+    return localStorage.getItem(AUTH_INVALID_KEY) === '1';
+}
+
+function markAuthInvalid() {
+    localStorage.setItem(AUTH_INVALID_KEY, '1');
+}
+
+function clearAuthInvalid() {
+    localStorage.removeItem(AUTH_INVALID_KEY);
 }
 
 function getAccessToken() {
@@ -46,12 +64,85 @@ function getAccessToken() {
         return storedToken;
     }
 
-    localStorage.setItem('access_token', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('accessToken', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('refresh_token', FALLBACK_ADMIN_REFRESH_TOKEN);
-    localStorage.setItem('refreshToken', FALLBACK_ADMIN_REFRESH_TOKEN);
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
 
-    return FALLBACK_ADMIN_ACCESS_TOKEN;
+    return null;
+}
+
+function getRefreshToken() {
+    if (isAuthInvalid()) {
+        return null;
+    }
+
+    const storedToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
+
+    if (storedToken && !isTokenExpired(storedToken)) {
+        localStorage.setItem('refresh_token', storedToken);
+        localStorage.setItem('refreshToken', storedToken);
+        return storedToken;
+    }
+
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+
+    return null;
+}
+
+function clearAuthTokens() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+}
+
+function redirectToLogin() {
+    if (window.location.pathname !== LOGIN_URL) {
+        window.location.href = LOGIN_URL;
+    }
+}
+
+function isAuthEndpoint(config = {}) {
+    const url = apiUrl(config.url || '');
+    return url.includes('/api/token/');
+}
+
+function hasStoredAuthToken() {
+    return Boolean(getAccessToken() || getRefreshToken());
+}
+
+async function refreshAccessToken() {
+    const storedRefreshToken = getRefreshToken();
+
+    if (!storedRefreshToken) {
+        clearAuthTokens();
+        markAuthInvalid();
+        redirectToLogin();
+        throw new Error('Authentication required');
+    }
+
+    if (!refreshPromise) {
+        refreshPromise = axios.post(apiUrl('/api/token/refresh/'), {
+            refresh: storedRefreshToken
+        }).then((response) => {
+            const newAccessToken = response.data.access;
+            localStorage.setItem('access_token', newAccessToken);
+            localStorage.setItem('accessToken', newAccessToken);
+            localStorage.setItem('refresh_token', storedRefreshToken);
+            localStorage.setItem('refreshToken', storedRefreshToken);
+            clearAuthInvalid();
+            return newAccessToken;
+        }).catch((error) => {
+            clearAuthTokens();
+            markAuthInvalid();
+            redirectToLogin();
+            throw error;
+        }).finally(() => {
+            refreshPromise = null;
+        });
+    }
+
+    return refreshPromise;
 }
 
 const api = axios.create({
@@ -62,92 +153,64 @@ const api = axios.create({
     }
 });
 
-/*
-|--------------------------------------------------------------------------
-| Request Interceptor
-|--------------------------------------------------------------------------
-| Runs before every request
-|--------------------------------------------------------------------------
-*/
-
 api.interceptors.request.use(
-    (config) => {
-
-        const token = getAccessToken();
-
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+    async (config) => {
+        if (isAuthEndpoint(config)) {
+            return config;
         }
 
+        let token = getAccessToken();
+
+        if (!token && getRefreshToken()) {
+            token = await refreshAccessToken();
+        }
+
+        if (!token) {
+            clearAuthTokens();
+            markAuthInvalid();
+            redirectToLogin();
+            throw new Error('Authentication required');
+        }
+
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-
-/*
-|--------------------------------------------------------------------------
-| Response Interceptor
-|--------------------------------------------------------------------------
-| Runs after every response
-|--------------------------------------------------------------------------
-*/
-
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
+        const originalRequest = error.config || {};
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint(originalRequest)) {
+            originalRequest._retry = true;
+
+            try {
+                const newAccessToken = await refreshAccessToken();
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                return api(originalRequest);
+            } catch (refreshError) {
+                console.error('Authentication failed', refreshError);
+            }
+        }
 
         if (error.response) {
-            const originalRequest = error.config;
-
-            if (error.response.status === 401 && !originalRequest._retry) {
-                originalRequest._retry = true;
-
-                try {
-                    const storedRefreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
-                    let refreshResponse;
-
-                    try {
-                    refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                        refresh: storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN
-                    });
-                } catch (storedRefreshError) {
-                        refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                            refresh: FALLBACK_ADMIN_REFRESH_TOKEN
-                        });
-                    }
-
-                    const newAccessToken = refreshResponse.data.access;
-                    localStorage.setItem('access_token', newAccessToken);
-                    localStorage.setItem('accessToken', newAccessToken);
-                    localStorage.setItem('refresh_token', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
-                    localStorage.setItem('refreshToken', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
-                    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-                    return api(originalRequest);
-                } catch (refreshError) {
-                    console.error('Token refresh failed', refreshError);
-                }
-            }
-
             switch (error.response.status) {
-
                 case 401:
                     console.error('Unauthorized');
                     break;
-
                 case 403:
                     console.error('Forbidden');
                     break;
-
                 case 404:
                     console.error('Not Found');
                     break;
-
                 case 500:
                     console.error('Server Error');
                     break;
-
                 default:
                     console.error(error.response.data);
             }
@@ -156,3 +219,10 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+window.NewsPortalAuth = {
+    clearAuthInvalid,
+    clearAuthTokens,
+    hasStoredAuthToken,
+    redirectToLogin
+};

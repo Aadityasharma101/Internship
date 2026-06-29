@@ -1,5 +1,5 @@
 const LOGIN_API_URL = "https://news-portal-hvgs.onrender.com/api/token/";
-const LOGIN_SUCCESS_REDIRECT = "/";
+const DEFAULT_LOGIN_SUCCESS_REDIRECT = "/profile/";
 const REDIRECT_DELAY = 1500;
 
 const form = document.getElementById("loginForm");
@@ -118,18 +118,30 @@ form.addEventListener("submit", async (event) => {
             showFormMessage(getBackendMessage(data), "error");
             return;
         }
+        if (window.NewsPortalSession) {
+            window.NewsPortalSession.storeTokens(data);
+        } else {
+            localStorage.removeItem("news_portal_auth_invalid");
+            localStorage.setItem("accessToken", data.access);
+            localStorage.setItem("refreshToken", data.refresh);
+            localStorage.setItem("access_token", data.access);
+            localStorage.setItem("refresh_token", data.refresh);
+        }
 
-        localStorage.setItem("accessToken", data.access);
-        localStorage.setItem("refreshToken", data.refresh);
-        localStorage.setItem("access_token", data.access);
-        localStorage.setItem("refresh_token", data.refresh);
+        let redirectTo = DEFAULT_LOGIN_SUCCESS_REDIRECT;
+        try {
+            const user = window.NewsPortalSession ? await window.NewsPortalSession.fetchCurrentUser() : null;
+            redirectTo = window.NewsPortalSession?.getDashboardPath(user) || DEFAULT_LOGIN_SUCCESS_REDIRECT;
+        } catch {
+            redirectTo = DEFAULT_LOGIN_SUCCESS_REDIRECT;
+        }
 
         form.reset();
         clearErrors();
         showFormMessage("Login successful. Redirecting...", "success");
 
         window.setTimeout(() => {
-            window.location.href = LOGIN_SUCCESS_REDIRECT;
+            window.location.href = redirectTo;
         }, REDIRECT_DELAY);
     } catch (error) {
         showFormMessage("Unable to connect to the server. Please try again later.", "error");

@@ -119,7 +119,7 @@
 </div>
 {% endblock %}
 {% block extra_js %}
-<script src="{% static 'js/comments.js' %}"></script>
+<script src="{% static 'js/comments.js' %}?v=2"></script>
 <script>
 (function() {
     const articleId = {{ article.id|default:0 }};
@@ -138,46 +138,106 @@
 
     const API_BASE = document.body?.dataset?.apiBase || '/api';
 
-    function loadComments() {
-        fetch(`${API_BASE}/articles/${articleId}/comment/`)
+    function normalizeCommentsPayload(data) {
+        if (Array.isArray(data)) {
+            return data;
+        }
+
+        if (Array.isArray(data?.results)) {
+            return data.results;
+        }
+
+        if (Array.isArray(data?.comments)) {
+            return data.comments;
+        }
+
+        if (typeof data?.comments === 'string' && data.comments.trim()) {
+            try {
+                const parsed = JSON.parse(data.comments);
+                return Array.isArray(parsed) ? parsed : Object.values(parsed);
+            } catch {
+                return [];
+            }
+        }
+
+        if (data?.comments && typeof data.comments === 'object') {
+            return Object.values(data.comments);
+        }
+
+        return [];
+    }
+
+    async function loadComments() {
+        fetch(`${API_BASE}/articles/${articleId}/`)
             .then(res => res.json())
             .then(data => {
-                let comments = [];
-                if (Array.isArray(data)) {
-                    comments = data;
-                } else if (data.results) {
-                    comments = data.results;
-                } else if (data.comments && Array.isArray(data.comments)) {
-                    comments = data.comments;
-                }
-                renderComments(comments, 'comments-list');
+                renderComments(normalizeCommentsPayload(data), 'comments-list');
             })
             .catch(() => {
                 renderComments([], 'comments-list');
             });
     }
 
-    function postComment() {
+    function getErrorMessage(data, fallback) {
+        if (!data) return fallback;
+        if (typeof data === 'string') return data;
+        if (data.detail) return Array.isArray(data.detail) ? data.detail.join(' ') : data.detail;
+        return Object.entries(data)
+            .map(([field, value]) => `${field.replace(/_/g, ' ')}: ${Array.isArray(value) ? value.join(' ') : value}`)
+            .join(' ') || fallback;
+    }
+
+    async function postComment() {
         const textarea = document.getElementById('comment-text');
         const text = textarea.value.trim();
         if (!text) {
             alert('Please enter a comment.');
             return;
         }
-        fetch(`${API_BASE}/articles/${articleId}/comment/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: text })
-        })
-        .then(res => res.json())
-        .then(data => {
+
+        const session = window.NewsPortalSession;
+        let token = null;
+        try {
+            token = session ? await session.getAccessToken() : null;
+        } catch {
+            token = null;
+        }
+
+        if (!token) {
+            alert('Please sign in before posting a comment.');
+            window.location.href = '/login/';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/articles/${articleId}/comment/`, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ content: text })
+            });
+            const data = await response.json().catch(() => null);
+
+            if (response.status === 401) {
+                window.NewsPortalSession?.clear();
+                alert('Your session has expired. Please sign in again.');
+                window.location.href = '/login/';
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(getErrorMessage(data, 'Could not post comment.'));
+            }
+
             textarea.value = '';
             loadComments();
-        })
-        .catch(err => {
+        } catch (err) {
             console.error('Failed to post comment:', err);
-            alert('Could not post comment.');
-        });
+            alert(err.message || 'Could not post comment.');
+        }
     }
 
     document.getElementById('post-comment-btn').addEventListener('click', postComment);

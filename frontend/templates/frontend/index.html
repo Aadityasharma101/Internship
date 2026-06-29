@@ -1,52 +1,102 @@
 {% extends 'frontend/base.html' %}
 {% load static %}
 
-{% block title %}Home - News Portal{% endblock %}
+{% block title %}Home — News Portal | Breaking News & Live Updates{% endblock %}
+{% block meta_description %}Stay informed with the latest breaking news, live updates, and in-depth analysis from around the world.{% endblock %}
 
 {% block content %}
 <div class="page-shell" data-api-base="{{ API_BASE }}">
-    <section class="breaking-news-banner">
-        <div class="container">
-            <span class="breaking-badge">BREAKING</span>
-            <h2 id="breaking-headline">Loading latest headline...</h2>
+
+    <!-- BREAKING NEWS TICKER -->
+    <section class="breaking-news-banner" aria-live="polite" aria-label="Breaking news">
+        <div class="container breaking-news-inner">
+            <span class="breaking-badge">Live</span>
+            <div class="breaking-ticker-wrap">
+                <h2 id="breaking-headline">Loading latest headline...</h2>
+            </div>
         </div>
     </section>
 
+    <!-- TOP BANNER AD (hidden until ad loaded) -->
+    <section class="ad-band" aria-label="Sponsored">
+        <div class="container" style="display:flex;justify-content:center;">
+            <div class="ad-slot ad-slot--top" data-ad-slot="top_banner" aria-label="Advertisement"></div>
+        </div>
+    </section>
+
+    <!-- BROWSE / CATEGORY FILTER -->
     <section class="browse-section">
-        <div class="container">
-            <h3 class="browse-label">BROWSE</h3>
-            <div id="category-filter" class="category-filter" aria-live="polite">
-                <span class="category-btn active">All</span>
+        <div class="container browse-inner">
+            <div class="browse-label-group">
+                <p class="browse-label">Browse Desk</p>
+                <p class="browse-copy">Follow the sections that matter most right now.</p>
+            </div>
+            <div id="category-filter" class="category-filter" aria-label="Filter by category" aria-live="polite">
+                <button class="category-btn active" type="button" data-category="all">All</button>
             </div>
         </div>
     </section>
 
+    <!-- MAIN PAGE CONTENT -->
     <div class="container page-sections">
-        <section class="featured-section">
-            <h2 class="section-title">Featured Story</h2>
-            <div id="featured-hero" class="featured-hero loading-state">
-                <p>Loading featured story...</p>
-            </div>
-        </section>
 
-        <div class="main-grid">
-            <section class="articles-section">
-                <h2 class="section-title">Top Stories — Live</h2>
-                <div id="latest-news-grid" class="articles-grid loading-state">
-                    <div class="loading-spinner">Loading articles...</div>
+        <!-- FEATURED + SIDEBAR -->
+        <section class="lead-layout">
+            <!-- Featured Story -->
+            <div class="featured-section">
+                <div class="section-heading">
+                    <span class="section-kicker">Editor's Pick</span>
+                    <h2 class="section-title">Featured Story</h2>
                 </div>
-            </section>
+                <div id="featured-hero" class="featured-hero loading-state">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
 
-            <aside class="sidebar">
+            <!-- Right Sidebar -->
+            <aside class="lead-sidebar" aria-label="Sidebar">
+                <!-- Sidebar ad (hidden until loaded) -->
+                <div class="ad-slot ad-slot--sidebar" data-ad-slot="sidebar" aria-label="Advertisement"></div>
+
+                <!-- Trending widget -->
                 <div class="sidebar-widget">
-                    <h3 class="sidebar-title">Trending Now</h3>
+                    <h3 class="sidebar-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--brand)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        Trending Now
+                    </h3>
                     <div id="trending-news-grid" class="top-stories-list loading-state">
-                        <p class="loading-text">Loading trending stories...</p>
+                        <div class="loading-spinner" style="width:20px;height:20px;border-width:2px;"></div>
                     </div>
                 </div>
             </aside>
-        </div>
+        </section>
+
+        <!-- INLINE AD (hidden until loaded) -->
+        <section class="ad-band ad-band--inline">
+            <div style="display:flex;justify-content:center;">
+                <div class="ad-slot ad-slot--inline" data-ad-slot="in_article" aria-label="Advertisement"></div>
+            </div>
+        </section>
+
+        <!-- LATEST ARTICLES GRID -->
+        <section class="articles-section" aria-label="Latest news">
+            <div class="section-heading section-heading--row">
+                <div>
+                    <span class="section-kicker">Latest Wire</span>
+                    <h2 class="section-title">Top Stories Live</h2>
+                </div>
+                <span class="section-meta">Refreshes automatically</span>
+            </div>
+            <div id="latest-news-grid" class="articles-grid loading-state">
+                <div class="loading-spinner"></div>
+            </div>
+        </section>
+
     </div>
+
+    <!-- POPUP AD (hidden until loaded) -->
+    <div class="ad-popup" data-ad-slot="popup" aria-live="polite"></div>
+
 </div>
 {% endblock %}
 

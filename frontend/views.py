@@ -187,6 +187,10 @@ def newsletter(request):
     context = {}
     return render(request, "frontend/newsletter.html", context)
 
+
+def profile(request):
+    context = {}
+    return render(request, "frontend/pages/profile.html", context)
 def register(request):
     """
     User registration page.

@@ -309,4 +309,12 @@ userModal.addEventListener('click', (event) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => loadUsers());
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.NewsPortalAuth && !window.NewsPortalAuth.hasStoredAuthToken()) {
+        setMessage(tableBody, 8, 'Please log in again to view users. Redirecting...', 'muted');
+        window.NewsPortalAuth.redirectToLogin();
+        return;
+    }
+
+    loadUsers();
+});

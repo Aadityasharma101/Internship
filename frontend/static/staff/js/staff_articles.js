@@ -20,7 +20,8 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     try {
-      const resp = await axios.post('/staff/add_article/', payload);
+      const endpoint = (window.location.origin || '') + '/staff/add_article/';
+      const resp = await axios.post(endpoint, payload);
       if (resp.status >= 200 && resp.status < 300) {
         statusEl.textContent = 'Article submitted successfully.';
         form.reset();

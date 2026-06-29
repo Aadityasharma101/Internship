@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,3 +132,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # External API base used by the frontend. Change if you want a different backend.
 API_BASE_URL = 'https://news-portal-hvgs.onrender.com'
+
+# Optional dev-only fallback admin tokens. Set these in your environment for local testing only.
+# Example (Windows CMD):
+# set ADMIN_FALLBACK_ACCESS_TOKEN=eyJ... && set ADMIN_FALLBACK_REFRESH_TOKEN=eyJ...
+ADMIN_FALLBACK_ACCESS_TOKEN = os.environ.get('ADMIN_FALLBACK_ACCESS_TOKEN', '')
+ADMIN_FALLBACK_REFRESH_TOKEN = os.environ.get('ADMIN_FALLBACK_REFRESH_TOKEN', '')

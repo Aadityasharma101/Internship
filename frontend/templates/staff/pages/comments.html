@@ -1,0 +1,36 @@
+{% extends 'staff/components/base.html' %}
+{% load static %}
+
+{% block title %}Comments - Staff Panel{% endblock %}
+{% block breadcrumb %}Comments{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Comments</h2>
+    <p class="text-muted">Moderate and review recent comments from users.</p>
+</div>
+
+<div class="table-wrapper">
+    <table class="articles-table">
+        <thead>
+            <tr>
+                <th>Comment</th>
+                <th>Author</th>
+                <th>Article</th>
+                <th>Posted</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="commentsTableBody">
+            <tr class="loading-row"><td colspan="5">No comments found.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Placeholder: load comments via API when ready.
+</script>
+{% endblock %}

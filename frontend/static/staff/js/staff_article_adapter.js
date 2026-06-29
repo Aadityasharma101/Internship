@@ -61,7 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const headers = { 'X-CSRFToken': csrf };
             if (localToken) headers['Authorization'] = `Bearer ${localToken}`;
 
-            const resp = await axios.post('/staff/add_article/', formData, {
+            const endpoint = (window.location.origin || '') + '/staff/add_article/';
+            const resp = await axios.post(endpoint, formData, {
                 headers
             });
 

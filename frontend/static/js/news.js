@@ -463,12 +463,14 @@ function renderFeaturedHero(container, article) {
         return;
     }
     const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
-    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image" loading="eager" decoding="async" width="1280" height="720" onerror="this.onerror=null;this.src='/static/images/placeholder.svg'">`;
     container.innerHTML = `
         <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
             ${img}
-            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
-            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+            <div class="featured-meta">
+                <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+                <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+            </div>
         </a>
     `;
 }
@@ -484,10 +486,12 @@ function renderNewsGrid(container, articles, opts = {}) {
         const thumb = a.imageUrl || '/static/images/placeholder.svg';
         return `
         <article class="news-card">
-            <a href="/news/${escapeHtml(a.id)}/">
-                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
-                <h4>${escapeHtml(a.title)}</h4>
-                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+            <a href="/news/${escapeHtml(a.id)}/" class="news-link">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="lazy" decoding="async" width="320" height="180" onerror="this.onerror=null;this.src='/static/images/placeholder.svg'"></div>
+                <div class="news-card-content">
+                    <h4>${escapeHtml(a.title)}</h4>
+                    <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+                </div>
             </a>
         </article>
     `}).join('');

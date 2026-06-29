@@ -1,0 +1,29 @@
+{% extends 'staff/components/base.html' %}
+{% load static %}
+
+{% block title %}Categories - Staff Panel{% endblock %}
+{% block breadcrumb %}Categories{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Categories</h2>
+    <p class="text-muted">Manage content categories.</p>
+</div>
+
+<div class="table-wrapper">
+    <table class="articles-table">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Slug</th>
+                <th>Articles</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="categoriesTableBody">
+            <tr class="loading-row"><td colspan="4">No categories found.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

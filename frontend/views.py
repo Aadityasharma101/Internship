@@ -6,12 +6,15 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.conf import settings
+from django.contrib.auth import authenticate
+from django.urls import reverse
 import json
 import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime
 import re
+import base64
 try:
     import requests
 except ImportError:
@@ -275,8 +278,7 @@ def get_remote_user_info(access_token):
 @csrf_exempt
 def auth_login(request):
     """Server-side login endpoint. Accepts POST with JSON {email,password}.
-    Forwards credentials to remote API token endpoint, stores tokens in session,
-    fetches remote user info, and returns JSON with a `next` URL for redirection.
+    Authentication is performed against the remote API (no local DB lookup).
     """
     if request.method != 'POST':
         return JsonResponse({'detail': 'Method not allowed'}, status=405)
@@ -291,24 +293,39 @@ def auth_login(request):
     if not email or not password:
         return JsonResponse({'detail': 'Email and password are required.'}, status=400)
 
+    # Authenticate using the remote API only (do not consult local DB)
     if requests is None:
         return JsonResponse({'detail': 'requests library not installed on server.'}, status=500)
 
     # Try common token endpoints used by the remote API
     token_paths = ['/token/', '/auth/token/', '/auth/login/', '/api/token/']
     token_response = None
+    last_error_resp = None
     for path in token_paths:
         try:
             url = f"{NEWS_API_BASE}{path}"
             resp = requests.post(url, json={'email': email, 'username': email, 'password': password}, timeout=15)
+            # accept 200/201 as success; otherwise capture last non-2xx for forwarding
             if resp.status_code in (200, 201):
                 token_response = resp
                 break
+            else:
+                last_error_resp = (url, resp)
         except requests.RequestException:
             continue
 
     if not token_response:
-        return JsonResponse({'detail': 'Authentication failed. Unable to reach auth endpoint.'}, status=502)
+        # If remote API returned an error response, forward its JSON/text to help debugging
+        if last_error_resp:
+            url, resp = last_error_resp
+            try:
+                body = resp.json()
+            except Exception:
+                body = resp.text or {'detail': 'Authentication failed'}
+            # Log remote auth failure for server-side debugging
+            print(f"Remote auth failed: {url} -> {resp.status_code}: {body}")
+            return JsonResponse(body, status=resp.status_code)
+        return JsonResponse({'detail': 'Authentication failed. Invalid credentials or unable to reach auth endpoint.'}, status=401)
 
     try:
         token_json = token_response.json()

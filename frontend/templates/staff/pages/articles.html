@@ -156,6 +156,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>window.API_BASE = "{{ API_BASE }}";</script>
 <script src="{% static 'admin/js/articles.js' %}"></script>
 <script src="{% static 'staff/js/staff_article_adapter.js' %}"></script>
 {% endblock %}

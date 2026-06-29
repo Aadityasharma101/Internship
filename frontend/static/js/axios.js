@@ -2,8 +2,6 @@
 
 const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
 const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
-const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNzUwNjM5LCJpYXQiOjE3ODE3NTAzMzksImp0aSI6ImViN2EwMjA2OWE2ZTRlMjg4YTliN2UyNTZkMGRmNmM4IiwidXNlcl9pZCI6IjEifQ.IaV1-0TqrLY6TFBHB6g6VdbWW1g3N_BvyIKDfrKUfig';
-const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTgzNjczOSwiaWF0IjoxNzgxNzUwMzM5LCJqdGkiOiIwZGRjNjI3M2U0NWM0M2UwODNhMGM2YjExNTNhODUxMyIsInVzZXJfaWQiOiIxIn0.omYvbEFaDw7ygEUgdYAL98kYzSuxcht5IMfx5NVQf7E';
 
 function apiUrl(path = '') {
     if (/^https?:\/\//i.test(path)) {
@@ -41,17 +39,10 @@ function getAccessToken() {
     const storedToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
     if (storedToken && !isTokenExpired(storedToken)) {
-        localStorage.setItem('access_token', storedToken);
-        localStorage.setItem('accessToken', storedToken);
         return storedToken;
     }
 
-    localStorage.setItem('access_token', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('accessToken', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('refresh_token', FALLBACK_ADMIN_REFRESH_TOKEN);
-    localStorage.setItem('refreshToken', FALLBACK_ADMIN_REFRESH_TOKEN);
-
-    return FALLBACK_ADMIN_ACCESS_TOKEN;
+    return null;
 }
 
 const api = axios.create({
@@ -105,28 +96,26 @@ api.interceptors.response.use(
 
                 try {
                     const storedRefreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
-                    let refreshResponse;
+                    if (!storedRefreshToken) throw new Error('No refresh token available');
 
-                    try {
-                    refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                        refresh: storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN
+                    const refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
+                        refresh: storedRefreshToken
                     });
-                } catch (storedRefreshError) {
-                        refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                            refresh: FALLBACK_ADMIN_REFRESH_TOKEN
-                        });
-                    }
 
                     const newAccessToken = refreshResponse.data.access;
                     localStorage.setItem('access_token', newAccessToken);
                     localStorage.setItem('accessToken', newAccessToken);
-                    localStorage.setItem('refresh_token', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
-                    localStorage.setItem('refreshToken', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
+                    // keep the existing refresh token
                     originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
                     return api(originalRequest);
                 } catch (refreshError) {
                     console.error('Token refresh failed', refreshError);
+                    // Clear tokens if refresh fails
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refresh_token');
+                    localStorage.removeItem('refreshToken');
                 }
             }
 

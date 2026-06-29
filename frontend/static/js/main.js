@@ -197,6 +197,10 @@ function normalizeAdsPayload(payload) {
 
     if (Array.isArray(payload)) {
         payload.forEach((ad) => {
+            if (!isVisibleAdvertisement(ad)) {
+                return;
+            }
+
             const position = normalizeAdPosition(ad?.position);
             if (position && grouped[position] === null) grouped[position] = ad;
         });
@@ -207,10 +211,38 @@ function normalizeAdsPayload(payload) {
 
     positions.forEach((p) => {
         const v = payload[p];
-        grouped[p] = Array.isArray(v) ? (v[0] || null) : (v || null);
+        const ad = Array.isArray(v) ? (v.find(isVisibleAdvertisement) || null) : (isVisibleAdvertisement(v) ? v : null);
+        grouped[p] = ad;
     });
 
     return grouped;
+}
+
+function isVisibleAdvertisement(ad) {
+    if (!ad) {
+        return false;
+    }
+
+    const active = ad.is_active ?? ad.active;
+    const status = String(ad.status || '').toLowerCase();
+
+    if (active === false || ['inactive', 'disabled', 'draft', 'archived'].includes(status)) {
+        return false;
+    }
+
+    const now = new Date();
+    const startDate = ad.start_date ? new Date(ad.start_date) : null;
+    const endDate = ad.end_date ? new Date(ad.end_date) : null;
+
+    if (startDate && !Number.isNaN(startDate.getTime()) && now < startDate) {
+        return false;
+    }
+
+    if (endDate && !Number.isNaN(endDate.getTime()) && now > endDate) {
+        return false;
+    }
+
+    return true;
 }
 
 function normalizeAdPosition(value) {

@@ -18,6 +18,7 @@
     };
 
     let cachedUser = null;
+    const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
 
     function renderEmpty(tbody, colspan, message) {
         Utils.setTableMessage(tbody, colspan, message);
@@ -70,34 +71,60 @@
         renderEmpty(els.recentComments, 4, 'Loading recent comments...');
 
         try {
-            cachedUser = await window.NewsPortalSession.fetchCurrentUser();
+            if (hasAuth) {
+                try {
+                    cachedUser = await window.NewsPortalSession.fetchCurrentUser();
+                } catch {
+                    cachedUser = null;
+                }
+            } else {
+                cachedUser = null;
+            }
+
+            const requestOptions = hasAuth ? {
+                params: {
+                    ordering: '-id'
+                }
+            } : {
+                auth: false,
+                params: {
+                    ordering: '-id'
+                }
+            };
 
             const [articlesResponse, commentsResponse, adsResponse] = await Promise.all([
                 Utils.loadAllPages((page, options) => ArticleService.loadArticles(page, {
+                    ...requestOptions,
                     ...options,
                     params: {
-                        ...(options.params || {}),
-                        ordering: '-id'
+                        ...(requestOptions.params || {}),
+                        ...(options.params || {})
                     }
                 })),
                 Utils.loadAllPages((page, options) => CommentService.loadComments(page, {
+                    ...requestOptions,
                     ...options,
                     params: {
-                        ...(options.params || {}),
-                        ordering: '-id'
+                        ...(requestOptions.params || {}),
+                        ...(options.params || {})
                     }
                 })),
                 Utils.loadAllPages((page, options) => AdService.loadAdvertisements(page, {
+                    ...requestOptions,
                     ...options,
                     params: {
-                        ...(options.params || {}),
-                        ordering: '-id'
+                        ...(requestOptions.params || {}),
+                        ...(options.params || {})
                     }
                 }))
             ]);
 
-            const ownArticles = Utils.sortByNewest(articlesResponse.data.results.filter((article) => ArticleService.articleMatchesUser(article, cachedUser)));
-            const ownComments = Utils.sortByNewest(commentsResponse.data.results.filter((comment) => CommentService.commentMatchesUser(comment, cachedUser)), ['created_at', 'updated_at']);
+            const ownArticles = Utils.sortByNewest(cachedUser
+                ? articlesResponse.data.results.filter((article) => ArticleService.articleMatchesUser(article, cachedUser))
+                : articlesResponse.data.results);
+            const ownComments = Utils.sortByNewest(cachedUser
+                ? commentsResponse.data.results.filter((comment) => CommentService.commentMatchesUser(comment, cachedUser))
+                : commentsResponse.data.results, ['created_at', 'updated_at']);
             const activeAds = adsResponse.data.results.filter((ad) => AdService.isActiveAdvertisement(ad));
 
             els.totalArticles.textContent = ownArticles.length;

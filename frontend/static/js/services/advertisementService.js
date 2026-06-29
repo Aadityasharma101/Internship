@@ -32,6 +32,20 @@
         return 'between_articles';
     }
 
+    function toApiPosition(value) {
+        const normalized = normalizePosition(value);
+
+        if (normalized === 'between_articles') {
+            return 'in_article';
+        }
+
+        if (normalized === 'footer_banner') {
+            return 'footer';
+        }
+
+        return normalized;
+    }
+
     function positionLabel(value) {
         return POSITION_MAP[normalizePosition(value)] || 'Between Articles';
     }
@@ -95,7 +109,7 @@
             position,
             position_label: positionLabel(position),
             title: Api.getValue(ad, ['title', 'name', 'campaign_name'], 'Untitled advertisement'),
-            description: Api.getValue(ad, ['description', 'summary', 'notes'], ''),
+            description: Api.getValue(ad, ['description', 'summary', 'notes', 'client_name'], ''),
             image_url: Api.resolveMediaUrl(Api.getValue(ad, ['image', 'image_url', 'banner', 'media'], '')),
             target_url: Api.getValue(ad, ['target_url', 'redirect_url', 'url', 'link'], ''),
             start_date: Api.getValue(ad, ['start_date', 'starts_at', 'start_at'], ''),
@@ -185,10 +199,22 @@
     }
 
     async function toggleAdvertisementStatus(id, isActive, options = {}) {
+        const now = new Date();
+        const nextYear = new Date(now);
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+
+        if (isActive) {
+            return updateAdvertisement(id, {
+                start_date: now.toISOString(),
+                end_date: nextYear.toISOString()
+            }, options);
+        }
+
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+
         return updateAdvertisement(id, {
-            is_active: Boolean(isActive),
-            active: Boolean(isActive),
-            status: isActive ? 'active' : 'inactive'
+            end_date: yesterday.toISOString()
         }, options);
     }
 
@@ -197,14 +223,18 @@
             return null;
         }
 
-        const eventPath = `/api/ads/${ad.id}/${type}/`;
+        const eventPath = type === 'click' ? '/api/ads/click/' : '/api/ads/impressions/';
         const countKey = type === 'click' ? 'click_count' : 'impression_count';
 
         try {
             return await Api.request('POST', eventPath, {
                 ...options,
                 auth: false,
-                data: {}
+                data: {
+                    id: ad.id,
+                    ad_id: ad.id,
+                    advertisement: ad.id
+                }
             });
         } catch {
             try {
@@ -297,6 +327,7 @@
         renderAdSlots,
         toggleAdvertisementStatus,
         trackAdvertisementEvent,
+        toApiPosition,
         updateAdvertisement
     };
 })(window);

@@ -20,6 +20,44 @@
         };
     }
 
+    function normalizeArticleComments(article, comments) {
+        const items = Array.isArray(comments) ? comments : [];
+
+        return items.map((comment, index) => normalizeComment({
+            ...comment,
+            id: Api.getValue(comment, ['id'], `${article.id || 'article'}-${index}`),
+            article,
+            article_id: article.id || '',
+            article_title: article.title || 'Untitled article',
+            article_author_id: Api.getValue(article, ['author.id', 'user.id', 'created_by.id', 'author_id', 'user_id'], ''),
+            article_author_username: Api.getValue(article, ['author.username', 'user.username', 'created_by.username', 'author_name'], ''),
+            article_author_email: Api.getValue(article, ['author.email', 'user.email', 'created_by.email', 'author_email'], '')
+        }));
+    }
+
+    function extractArticleComments(article) {
+        const comments = Api.getValue(article, ['comments'], []);
+
+        if (Array.isArray(comments)) {
+            return comments;
+        }
+
+        if (typeof comments === 'string' && comments.trim()) {
+            try {
+                const parsed = JSON.parse(comments);
+                return Array.isArray(parsed) ? parsed : Object.values(parsed || {});
+            } catch {
+                return [];
+            }
+        }
+
+        if (comments && typeof comments === 'object') {
+            return Object.values(comments);
+        }
+
+        return [];
+    }
+
     function commentMatchesUser(comment, user) {
         if (!user) {
             return true;
@@ -48,14 +86,36 @@
     }
 
     async function loadComments(page = 1, options = {}) {
-        const result = await Api.loadList(LIST_ENDPOINTS, page, options);
-        return {
-            endpoint: result.endpoint,
-            data: {
-                ...result.data,
-                results: result.data.results.map(normalizeComment)
-            }
-        };
+        try {
+            const result = await Api.loadList(LIST_ENDPOINTS, page, options);
+            return {
+                endpoint: result.endpoint,
+                data: {
+                    ...result.data,
+                    results: result.data.results.map(normalizeComment)
+                }
+            };
+        } catch (error) {
+            const articleResult = await Api.loadList(['/articles/feed/'], page, options);
+            const details = await Promise.all(articleResult.data.results.map(async (article) => {
+                try {
+                    return await Api.request('GET', `/articles/${article.id}/`, options);
+                } catch {
+                    return article;
+                }
+            }));
+            const comments = details.flatMap((article) => normalizeArticleComments(article, extractArticleComments(article)));
+
+            return {
+                endpoint: '/articles/feed/',
+                data: {
+                    count: comments.length,
+                    next: articleResult.data.next,
+                    previous: articleResult.data.previous,
+                    results: comments
+                }
+            };
+        }
     }
 
     async function updateCommentStatus(id, status, options = {}) {

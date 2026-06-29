@@ -7,6 +7,7 @@
         user: null,
         comments: []
     };
+    const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
 
     const els = {
         tbody: document.getElementById('commentsTableBody'),
@@ -91,16 +92,37 @@
         Utils.setTableMessage(els.tbody, 6, 'Loading comments...');
 
         try {
-            state.user = await window.NewsPortalSession.fetchCurrentUser();
+            if (hasAuth) {
+                try {
+                    state.user = await window.NewsPortalSession.fetchCurrentUser();
+                } catch {
+                    state.user = null;
+                }
+            } else {
+                state.user = null;
+            }
+
+            const requestOptions = hasAuth ? {
+                params: {
+                    ordering: '-id'
+                }
+            } : {
+                auth: false,
+                params: {
+                    ordering: '-id'
+                }
+            };
+
             const result = await Utils.loadAllPages((page, options) => CommentService.loadComments(page, {
+                ...requestOptions,
                 ...options,
                 params: {
-                    ...(options.params || {}),
-                    ordering: '-id'
+                    ...(requestOptions.params || {}),
+                    ...(options.params || {})
                 }
             }));
 
-            state.comments = Utils.sortByNewest(result.data.results.filter((comment) => CommentService.commentMatchesUser(comment, state.user)), ['created_at', 'updated_at']);
+            state.comments = Utils.sortByNewest(state.user ? result.data.results.filter((comment) => CommentService.commentMatchesUser(comment, state.user)) : result.data.results, ['created_at', 'updated_at']);
             renderSummary(state.comments);
             renderComments();
         } catch (error) {

@@ -4,6 +4,7 @@
 {% block title %}Advertisements - Staff Panel{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
+<link rel="stylesheet" href="{% static 'staff/css/articles.css' %}">
 {% endblock %}
 
 {% block breadcrumb %}Advertisements{% endblock %}
@@ -74,6 +75,16 @@
             </div>
 
             <div class="form-group full-width">
+                <label for="adImageFile">Upload Image</label>
+                <div class="upload-row">
+                    <input type="file" id="adImageFile" accept="image/*">
+                    <button type="button" id="clearAdImageBtn" class="btn-secondary-outline upload-clear-btn">Clear Image</button>
+                </div>
+                <div id="adImagePreview" class="article-image-preview hidden" aria-live="polite"></div>
+                <p class="upload-hint">Choose an image file to upload through the remote API.</p>
+            </div>
+
+            <div class="form-group full-width">
                 <label for="adRedirectUrl">Redirect URL</label>
                 <input type="url" id="adRedirectUrl" placeholder="https://sponsor.example.com">
             </div>
@@ -88,8 +99,8 @@
                 <select id="adPosition">
                     <option value="top_banner">Top Banner</option>
                     <option value="sidebar">Sidebar</option>
-                    <option value="between_articles">Between Articles</option>
-                    <option value="footer_banner">Footer Banner</option>
+                    <option value="in_article">Between Articles</option>
+                    <option value="footer">Footer Banner</option>
                 </select>
             </div>
 

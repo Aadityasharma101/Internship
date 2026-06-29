@@ -5,8 +5,11 @@
 
     const state = {
         user: null,
-        ads: []
+        ads: [],
+        imageFile: null,
+        imagePreviewUrl: ''
     };
+    const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
 
     const els = {
         tbody: document.getElementById('adsTableBody'),
@@ -27,6 +30,9 @@
         id: document.getElementById('adId'),
         title: document.getElementById('adTitle'),
         image: document.getElementById('adImage'),
+        imageFile: document.getElementById('adImageFile'),
+        clearImage: document.getElementById('clearAdImageBtn'),
+        imagePreview: document.getElementById('adImagePreview'),
         redirectUrl: document.getElementById('adRedirectUrl'),
         description: document.getElementById('adDescription'),
         position: document.getElementById('adPosition'),
@@ -48,6 +54,36 @@
 
         const pad = (num) => String(num).padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function revokePreviewUrl() {
+        if (state.imagePreviewUrl && state.imagePreviewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(state.imagePreviewUrl);
+        }
+        state.imagePreviewUrl = '';
+    }
+
+    function setPreview(url, emptyLabel = 'No image selected') {
+        if (!els.imagePreview) {
+            return;
+        }
+
+        if (!url) {
+            els.imagePreview.innerHTML = `<div class="preview-empty">${Api.escapeHtml(emptyLabel)}</div>`;
+            els.imagePreview.classList.remove('hidden');
+            return;
+        }
+
+        els.imagePreview.innerHTML = `<img src="${Api.escapeHtml(url)}" alt="Advertisement image preview" loading="lazy">`;
+        els.imagePreview.classList.remove('hidden');
+    }
+
+    function resetImageState() {
+        revokePreviewUrl();
+        state.imageFile = null;
+        els.imageFile.value = '';
+        els.image.value = '';
+        setPreview('', 'No image selected');
     }
 
     function renderSummary(items) {
@@ -107,12 +143,33 @@
         Utils.setTableMessage(els.tbody, 6, 'Loading advertisements...');
 
         try {
-            state.user = await window.NewsPortalSession.fetchCurrentUser();
+            if (hasAuth) {
+                try {
+                    state.user = await window.NewsPortalSession.fetchCurrentUser();
+                } catch {
+                    state.user = null;
+                }
+            } else {
+                state.user = null;
+            }
+
+            const requestOptions = hasAuth ? {
+                params: {
+                    ordering: '-id'
+                }
+            } : {
+                auth: false,
+                params: {
+                    ordering: '-id'
+                }
+            };
+
             const result = await Utils.loadAllPages((page, options) => AdService.loadAdvertisements(page, {
+                ...requestOptions,
                 ...options,
                 params: {
-                    ...(options.params || {}),
-                    ordering: '-id'
+                    ...(requestOptions.params || {}),
+                    ...(options.params || {})
                 }
             }));
 
@@ -138,6 +195,7 @@
         els.startDate.value = '';
         els.endDate.value = '';
         els.status.textContent = '';
+        resetImageState();
     }
 
     function fillForm(ad) {
@@ -146,10 +204,13 @@
         els.image.value = ad.image_url || Api.getValue(ad, ['image', 'image_url'], '');
         els.redirectUrl.value = ad.target_url || '';
         els.description.value = ad.description || '';
-        els.position.value = AdService.normalizePosition(ad.position);
+        els.position.value = AdService.toApiPosition ? AdService.toApiPosition(ad.position) : ad.position;
         els.adStatus.value = AdService.isActiveAdvertisement(ad) ? 'active' : 'inactive';
         els.startDate.value = toDateInput(ad.start_date);
         els.endDate.value = toDateInput(ad.end_date);
+        state.imageFile = null;
+        els.imageFile.value = '';
+        setPreview(els.image.value, 'No image selected');
     }
 
     function openCreateModal() {
@@ -170,41 +231,95 @@
     }
 
     function buildPayload() {
-        const payload = {
-            title: els.title.value.trim(),
-            image: els.image.value.trim(),
-            image_url: els.image.value.trim(),
-            target_url: els.redirectUrl.value.trim(),
-            redirect_url: els.redirectUrl.value.trim(),
-            description: els.description.value.trim(),
-            position: els.position.value,
-            placement: els.position.value,
-            status: els.adStatus.value,
-            is_active: els.adStatus.value === 'active',
-            active: els.adStatus.value === 'active',
-            start_date: els.startDate.value ? new Date(els.startDate.value).toISOString() : '',
-            end_date: els.endDate.value ? new Date(els.endDate.value).toISOString() : ''
-        };
+        const payload = new FormData();
+        const title = els.title.value.trim();
+        const description = els.description.value.trim();
+        const imageUrl = els.image.value.trim();
+        const startDate = els.startDate.value ? new Date(els.startDate.value).toISOString() : '';
+        const endDate = els.endDate.value ? new Date(els.endDate.value).toISOString() : '';
+        const position = AdService.toApiPosition ? AdService.toApiPosition(els.position.value) : els.position.value;
 
-        if (!payload.image) {
-            delete payload.image;
-            delete payload.image_url;
+        payload.append('title', title);
+        payload.append('client_name', description || title);
+        payload.append('target_url', els.redirectUrl.value.trim());
+        payload.append('position', position);
+
+        if (state.imageFile) {
+            payload.append('image', state.imageFile);
+        } else if (imageUrl) {
+            payload.append('image', imageUrl);
         }
 
-        if (!payload.target_url) {
-            delete payload.target_url;
-            delete payload.redirect_url;
-        }
+        payload.append('start_date', startDate || new Date().toISOString());
 
-        if (!payload.start_date) {
-            delete payload.start_date;
-        }
-
-        if (!payload.end_date) {
-            delete payload.end_date;
+        if (els.adStatus.value === 'inactive') {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            payload.append('end_date', yesterday.toISOString());
+        } else if (endDate) {
+            payload.append('end_date', endDate);
+        } else {
+            const nextYear = new Date();
+            nextYear.setFullYear(nextYear.getFullYear() + 1);
+            payload.append('end_date', nextYear.toISOString());
         }
 
         return payload;
+    }
+
+    function payloadValue(payload, key) {
+        return payload instanceof FormData ? payload.get(key) : payload[key];
+    }
+
+    function validatePayload(payload, id) {
+        if (!payloadValue(payload, 'title')) {
+            return 'Title is required.';
+        }
+
+        if (!payloadValue(payload, 'target_url')) {
+            return 'Redirect URL is required.';
+        }
+
+        if (!id && !payloadValue(payload, 'image')) {
+            return 'Image is required.';
+        }
+
+        try {
+            new URL(payloadValue(payload, 'target_url'));
+        } catch {
+            return 'Enter a valid redirect URL.';
+        }
+
+        const image = payloadValue(payload, 'image');
+        if (typeof image === 'string' && image) {
+            try {
+                new URL(image);
+            } catch {
+                return 'Enter a valid image URL or upload an image file.';
+            }
+        }
+
+        if (state.imageFile && !state.imageFile.type.startsWith('image/')) {
+            return 'Upload a valid image file.';
+        }
+
+        const startDate = new Date(payloadValue(payload, 'start_date'));
+        const endDate = new Date(payloadValue(payload, 'end_date'));
+
+        if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime()) && endDate <= startDate) {
+            return 'End date must be after start date.';
+        }
+
+        return '';
+    }
+
+    function showStatus(message) {
+        els.status.textContent = message;
+        window.setTimeout(() => {
+            if (els.status.textContent === message) {
+                els.status.textContent = '';
+            }
+        }, 2500);
     }
 
     function getCurrentAd() {
@@ -215,9 +330,10 @@
     async function saveAd() {
         const id = els.id.value;
         const payload = buildPayload();
+        const validationMessage = validatePayload(payload, id);
 
-        if (!payload.title) {
-            els.status.textContent = 'Title is required.';
+        if (validationMessage) {
+            els.status.textContent = validationMessage;
             return;
         }
 
@@ -232,11 +348,12 @@
                 await AdService.createAdvertisement(payload);
             }
 
+            showStatus(id ? 'Advertisement saved successfully.' : 'Advertisement created successfully.');
             closeModal();
             await loadAds();
         } catch (error) {
             console.error('Unable to save advertisement:', error);
-            els.status.textContent = 'Unable to save advertisement. Check required fields and permissions.';
+            els.status.textContent = 'Unable to save advertisement. Check required fields, login, and permissions.';
         } finally {
             els.save.disabled = false;
             els.toggle.disabled = false;
@@ -246,6 +363,7 @@
     async function toggleAd(ad) {
         try {
             await AdService.toggleAdvertisementStatus(ad.id, !AdService.isActiveAdvertisement(ad));
+            showStatus('Advertisement status updated.');
             await loadAds();
         } catch (error) {
             console.error('Unable to toggle advertisement:', error);
@@ -308,6 +426,28 @@
         toggleAd(ad);
     });
     els.search.addEventListener('input', renderAds);
+    els.image.addEventListener('input', () => {
+        if (state.imageFile) {
+            return;
+        }
+
+        setPreview(els.image.value.trim(), 'No image selected');
+    });
+    els.imageFile.addEventListener('change', () => {
+        const file = els.imageFile.files?.[0] || null;
+        state.imageFile = file;
+
+        if (file) {
+            revokePreviewUrl();
+            const objectUrl = URL.createObjectURL(file);
+            state.imagePreviewUrl = objectUrl;
+            els.image.value = '';
+            setPreview(objectUrl, 'No image selected');
+        } else {
+            setPreview(els.image.value.trim(), 'No image selected');
+        }
+    });
+    els.clearImage.addEventListener('click', resetImageState);
     els.modal.addEventListener('click', (event) => {
         if (event.target === els.modal) {
             closeModal();

@@ -5,37 +5,54 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
 <link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
+<link rel="stylesheet" href="{% static 'staff/css/articles.css' %}">
 {% endblock %}
 
 {% block breadcrumb %}Articles{% endblock %}
 
 {% block content %}
+
 <div class="page-header">
     <div>
         <h2>Articles</h2>
-        <p class="text-muted">Create, edit, publish, or draft the articles assigned to your account.</p>
+        <p class="text-muted">Review your articles, categories, status, and recent updates.</p>
     </div>
+
     <div class="page-actions">
         <button class="btn-secondary-outline" id="refreshArticlesBtn" type="button">
-            <i class="fa-solid fa-rotate-right"></i> Refresh
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
         </button>
         <button class="btn-add" id="openArticleModalBtn" type="button">
-            <i class="fa-solid fa-plus"></i> Add Article
+            <i class="fa-solid fa-plus"></i>
+            Add Article
         </button>
     </div>
 </div>
 
 <div class="articles-summary">
-    <div class="summary-card"><span class="summary-label">Total Articles</span><strong id="totalArticles">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Published</span><strong id="publishedArticles">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Drafts</span><strong id="draftArticles">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Featured</span><strong id="featuredArticles">0</strong></div>
+    <div class="summary-card">
+        <span class="summary-label">Total articles</span>
+        <strong id="totalArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Published</span>
+        <strong id="publishedArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Drafts</span>
+        <strong id="draftArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Featured</span>
+        <strong id="featuredArticles">0</strong>
+    </div>
 </div>
 
 <div class="articles-toolbar">
     <div class="articles-search">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" id="articleSearchInput" placeholder="Search articles by title, subtitle, category, tag, or status">
+        <input type="search" id="articleSearchInput" placeholder="Search articles by title, author, category, or status">
     </div>
     <span class="toolbar-count" id="visibleArticlesCount">0 articles shown</span>
 </div>
@@ -46,23 +63,31 @@
             <tr>
                 <th>Article</th>
                 <th>Category</th>
+                <th>Author</th>
                 <th>Status</th>
-                <th>Publish Date</th>
+                <th>Featured</th>
+                <th>Published</th>
                 <th>Updated</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="articlesTableBody">
             <tr class="loading-row">
-                <td colspan="6">Loading articles...</td>
+                <td colspan="8">Loading articles...</td>
             </tr>
         </tbody>
     </table>
 </div>
 
+<div class="pagination">
+    <button id="prevArticleBtn" type="button">Previous</button>
+    <span id="articlePageInfo">Page 1</span>
+    <button id="nextArticleBtn" type="button">Next</button>
+</div>
+
 <div id="articleModal" class="modal hidden">
-    <div class="modal-content article-modal-content">
-        <h3 id="articleModalTitle">Create Article</h3>
+    <div class="modal-content article-modal">
+        <h3 id="articleModalTitle">Create New Article</h3>
         <input type="hidden" id="articleId">
 
         <div class="form-grid">
@@ -71,14 +96,9 @@
                 <input type="text" id="articleTitle" placeholder="Article title">
             </div>
 
-            <div class="form-group full-width">
-                <label for="articleSubtitle">Subtitle</label>
-                <input type="text" id="articleSubtitle" placeholder="Short subtitle or strapline">
-            </div>
-
             <div class="form-group">
                 <label for="articleCategory">Category</label>
-                <input type="text" id="articleCategory" placeholder="Category name or id">
+                <input type="text" id="articleCategory" placeholder="Category id or name">
             </div>
 
             <div class="form-group">
@@ -86,43 +106,51 @@
                 <select id="articleStatus">
                     <option value="draft">Draft</option>
                     <option value="published">Published</option>
+                    <option value="archived">Archived</option>
                 </select>
             </div>
 
             <div class="form-group full-width">
-                <label for="articleThumbnail">Thumbnail</label>
-                <input type="url" id="articleThumbnail" placeholder="https://example.com/thumb.jpg">
+                <label for="articleImage">Image URL</label>
+                <input type="url" id="articleImage" placeholder="https://example.com/image.jpg">
             </div>
 
             <div class="form-group full-width">
-                <label for="articleFeaturedImage">Featured Image</label>
-                <input type="url" id="articleFeaturedImage" placeholder="https://example.com/featured.jpg">
+                <label for="articleImageFile">Upload Image</label>
+                <div class="upload-row">
+                    <input type="file" id="articleImageFile" accept="image/*">
+                    <button type="button" id="clearArticleImageBtn" class="btn-secondary-outline upload-clear-btn">Remove Image</button>
+                </div>
+                <div id="articleImagePreview" class="article-image-preview hidden" aria-live="polite"></div>
+                <p class="upload-hint">Choose a file to upload to the remote API or keep the image URL.</p>
             </div>
 
             <div class="form-group full-width">
-                <label for="articleTags">Tags</label>
-                <input type="text" id="articleTags" placeholder="Breaking, Politics, World">
+                <label for="articleDescription">Description</label>
+                <textarea id="articleDescription" placeholder="Short summary"></textarea>
             </div>
 
             <div class="form-group full-width">
-                <label for="articlePublishDate">Publish Date</label>
-                <input type="datetime-local" id="articlePublishDate">
+                <label for="articleBody">Body</label>
+                <textarea id="articleBody" placeholder="Full article body"></textarea>
             </div>
 
-            <div class="form-group full-width">
-                <label for="articleContent">Content</label>
-                <textarea id="articleContent" placeholder="Write the article body here"></textarea>
-            </div>
+            <label class="checkbox-row">
+                <input type="checkbox" id="articleFeatured">
+                Featured article
+            </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="articlePublished">
+                Published
+            </label>
         </div>
 
         <p class="modal-status" id="articleFormStatus"></p>
 
         <div class="modal-actions">
-            <button class="btn-secondary-outline" id="saveDraftArticleBtn" type="button">
-                Save Draft
-            </button>
-            <button class="btn-primary" id="publishArticleBtn" type="button">
-                Publish
+            <button class="btn-primary" id="saveArticleBtn" type="button">
+                Create Article
             </button>
             <button class="btn-secondary" id="closeArticleModalBtn" type="button">
                 Cancel
@@ -130,8 +158,9 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'staff/js/articles.js' %}?v=1"></script>
+<script src="{% static 'staff/js/articles.js' %}?v=2"></script>
 {% endblock %}

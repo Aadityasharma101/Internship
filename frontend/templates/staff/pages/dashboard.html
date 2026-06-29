@@ -1,0 +1,92 @@
+{% extends 'staff/components/base.html' %}
+{% load static %}
+
+{% block title %}Staff Dashboard - NewsPortal{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
+<link rel="stylesheet" href="{% static 'staff/css/dashboard.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Dashboard</h2>
+        <p class="text-muted">Track your articles, comments, and advertisements from one place.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshDashboardBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+        <a class="btn-add" href="{% url 'frontend:staff_articles' %}?new=1">
+            <i class="fa-solid fa-plus"></i> Add Article
+        </a>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total Articles</span><strong id="totalArticles">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Published Articles</span><strong id="publishedArticles">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Draft Articles</span><strong id="draftArticles">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Total Advertisements</span><strong id="totalAds">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Active Advertisements</span><strong id="activeAds">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Total Comments</span><strong id="totalComments">0</strong></div>
+</div>
+
+<div class="dashboard-grid">
+    <section class="dashboard-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Recent Articles</h3>
+                <p>Latest work from your account.</p>
+            </div>
+            <a href="{% url 'frontend:staff_articles' %}">View all</a>
+        </div>
+        <div class="table-wrapper">
+            <table class="resource-table dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Publish Date</th>
+                    </tr>
+                </thead>
+                <tbody id="recentArticlesBody">
+                    <tr class="loading-row"><td colspan="4">Loading recent articles...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="dashboard-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Recent Comments</h3>
+                <p>Feedback left on your articles.</p>
+            </div>
+            <a href="{% url 'frontend:staff_comments' %}">View all</a>
+        </div>
+        <div class="table-wrapper">
+            <table class="resource-table dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Comment</th>
+                        <th>Article</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody id="recentCommentsBody">
+                    <tr class="loading-row"><td colspan="4">Loading recent comments...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'staff/js/dashboard.js' %}?v=1"></script>
+{% endblock %}

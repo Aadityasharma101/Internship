@@ -23,5 +23,10 @@ urlpatterns = [
     path('bookmarks/', views.bookmarks, name='bookmarks'),
     path('comments/', views.comments, name='comments'),
     path('reacts/', views.reacts, name='reacts'),
+    path('staff/', views.staff_dashboard, name='staff_dashboard'),
+    path('staff/articles/', views.staff_articles, name='staff_articles'),
+    path('staff/comments/', views.staff_comments, name='staff_comments'),
+    path('staff/advertisements/', views.staff_advertisements, name='staff_advertisements'),
+    path('staff/profile/', views.staff_profile, name='staff_profile'),
     path('remote/<path:path>', views.api_proxy, name='api_proxy'),
 ]

@@ -20,7 +20,7 @@
     <!-- TOP BANNER AD (hidden until ad loaded) -->
     <section class="ad-band" aria-label="Sponsored">
         <div class="container" style="display:flex;justify-content:center;">
-            <div class="ad-slot ad-slot--top" data-ad-slot="top_banner" aria-label="Advertisement"></div>
+            {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
         </div>
     </section>
 
@@ -56,7 +56,7 @@
             <!-- Right Sidebar -->
             <aside class="lead-sidebar" aria-label="Sidebar">
                 <!-- Sidebar ad (hidden until loaded) -->
-                <div class="ad-slot ad-slot--sidebar" data-ad-slot="sidebar" aria-label="Advertisement"></div>
+                {% include 'frontend/components/advertisement_slot.html' with position='sidebar' class_name='ad-slot--sidebar' %}
 
                 <!-- Trending widget -->
                 <div class="sidebar-widget">
@@ -74,7 +74,7 @@
         <!-- INLINE AD (hidden until loaded) -->
         <section class="ad-band ad-band--inline">
             <div style="display:flex;justify-content:center;">
-                <div class="ad-slot ad-slot--inline" data-ad-slot="in_article" aria-label="Advertisement"></div>
+                {% include 'frontend/components/advertisement_slot.html' with position='between_articles' class_name='ad-slot--inline' %}
             </div>
         </section>
 

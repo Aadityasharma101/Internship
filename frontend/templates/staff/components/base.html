@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{% block title %}NewsPortal Staff Panel{% endblock %}</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'admin/css/style.css' %}">
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body data-api-base="{{ API_BASE }}">
+
+<div class="admin-container">
+
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-logo">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div class="brand-text">
+                <h1>NewsPortal</h1>
+                <span>STAFF PANEL</span>
+            </div>
+        </div>
+
+        <div class="sidebar-menu">
+            <div class="menu-section">OVERVIEW</div>
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_dashboard' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_dashboard' %}">
+                        <i class="fa-solid fa-table-columns"></i> Dashboard
+                    </a>
+                </li>
+            </ul>
+
+            <div class="menu-section">CONTENT</div>
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_articles' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_articles' %}">
+                        <i class="fa-solid fa-newspaper"></i> Articles
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="{% url 'frontend:staff_articles' %}?new=1">
+                        <i class="fa-solid fa-plus"></i> Add Article
+                    </a>
+                </li>
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_advertisements' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_advertisements' %}">
+                        <i class="fa-solid fa-rectangle-ad"></i> Advertisements
+                    </a>
+                </li>
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_comments' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_comments' %}">
+                        <i class="fa-regular fa-comment-dots"></i> Comments
+                    </a>
+                </li>
+            </ul>
+
+            <div class="menu-section">ACCOUNT</div>
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_profile' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_profile' %}">
+                        <i class="fa-regular fa-user"></i> Profile
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="#" id="staffLogoutLink">
+                        <i class="fa-solid fa-power-off"></i> Logout
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div class="sidebar-user">
+            <div class="user-avatar">
+                {{ user.username|default:"ST"|slice:":2"|upper }}
+            </div>
+            <div class="user-info">
+                <span class="user-name">
+                    {% if user.is_authenticated %}
+                        {{ user.username }}
+                    {% else %}
+                        Staff User
+                    {% endif %}
+                </span>
+                <span class="user-role">Staff Editor</span>
+            </div>
+        </div>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="navbar">
+            <div class="nav-breadcrumbs">
+                <span class="crumb-parent">Staff</span>
+                <span class="crumb-divider">/</span>
+                <span class="crumb-current">{% block breadcrumb %}Dashboard{% endblock %}</span>
+            </div>
+
+            <div class="nav-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" placeholder="Search...">
+                </div>
+
+                <button class="nav-icon-btn" type="button">
+                    <i class="fa-regular fa-bell"></i>
+                    <span class="notification-dot"></span>
+                </button>
+
+                <button class="nav-icon-btn" type="button">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+
+                <button class="nav-icon-btn" type="button" id="staffLogoutButton">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="{% static 'js/auth.js' %}?v=1"></script>
+<script src="{% static 'js/axios.js' %}?v=3"></script>
+<script src="{% static 'js/services/portal-api.js' %}?v=1"></script>
+<script src="{% static 'js/services/articleService.js' %}?v=1"></script>
+<script src="{% static 'js/services/commentService.js' %}?v=1"></script>
+<script src="{% static 'js/services/advertisementService.js' %}?v=1"></script>
+<script src="{% static 'staff/js/staff-utils.js' %}?v=1"></script>
+<script src="{% static 'staff/js/main.js' %}?v=1"></script>
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

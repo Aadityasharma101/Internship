@@ -82,6 +82,9 @@
 {% block content %}
 <div class="container detail-container">
     <a href="{% url 'frontend:index' %}" style="color:#2c3e50; text-decoration:none; font-weight:600;">&larr; Back to News</a>
+    <div class="ad-slot-wrap" style="display:flex;justify-content:center;margin:1rem 0 1.5rem;">
+        {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
+    </div>
     <div class="article-full" id="article-detail">
         <h1 class="article-title">{{ article.title|default:"Loading..." }}</h1>
         <div class="article-meta">
@@ -97,6 +100,9 @@
 
     <div class="comments-section" id="comments-section">
         <div class="comments-header">Comments ({{ comments|length }})</div>
+        <div class="ad-slot-wrap" style="display:flex;justify-content:center;margin:0 0 1rem;">
+            {% include 'frontend/components/advertisement_slot.html' with position='between_articles' class_name='ad-slot--inline' %}
+        </div>
         <div id="comments-list">
             {% if comments %}
             <div class="comments-list">

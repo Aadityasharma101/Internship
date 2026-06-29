@@ -190,14 +190,15 @@ async function initAdvertisements() {
 }
 
 function normalizeAdsPayload(payload) {
-    const positions = ['top_banner', 'sidebar', 'in_article', 'footer', 'popup'];
+    const positions = ['top_banner', 'sidebar', 'between_articles', 'in_article', 'footer_banner', 'footer', 'popup'];
     const grouped = Object.fromEntries(positions.map((p) => [p, null]));
 
     if (!payload) return grouped;
 
     if (Array.isArray(payload)) {
         payload.forEach((ad) => {
-            if (ad?.position && grouped[ad.position] === null) grouped[ad.position] = ad;
+            const position = normalizeAdPosition(ad?.position);
+            if (position && grouped[position] === null) grouped[position] = ad;
         });
         return grouped;
     }
@@ -210,6 +211,36 @@ function normalizeAdsPayload(payload) {
     });
 
     return grouped;
+}
+
+function normalizeAdPosition(value) {
+    const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+
+    if (raw === 'in_article') {
+        return 'between_articles';
+    }
+
+    if (raw === 'footer') {
+        return 'footer_banner';
+    }
+
+    if (['top_banner', 'sidebar', 'between_articles', 'footer_banner', 'popup'].includes(raw)) {
+        return raw;
+    }
+
+    if (raw.includes('top')) {
+        return 'top_banner';
+    }
+
+    if (raw.includes('side')) {
+        return 'sidebar';
+    }
+
+    if (raw.includes('footer')) {
+        return 'footer_banner';
+    }
+
+    return 'between_articles';
 }
 
 function renderAdSlot(slot, ad, position) {
@@ -239,6 +270,8 @@ function renderAdSlot(slot, ad, position) {
     } else {
         slot.appendChild(card);
     }
+
+    trackAdEvent(ad, 'impression');
 }
 
 function buildAdCard(ad) {
@@ -248,6 +281,7 @@ function buildAdCard(ad) {
     link.target = '_blank';
     link.rel = 'noopener sponsored';
     link.setAttribute('aria-label', `${ad.title || 'Advertisement'} — sponsored`);
+    link.addEventListener('click', () => trackAdEvent(ad, 'click'));
 
     const imageUrl = resolveAdMediaUrl(ad.image || ad.image_url || ad.banner || ad.media);
     if (imageUrl) {
@@ -270,6 +304,16 @@ function buildAdCard(ad) {
     `;
     link.appendChild(fallback);
     return link;
+}
+
+function trackAdEvent(ad, type) {
+    const tracker = window.NewsPortalAdvertisementService?.trackAdvertisementEvent;
+
+    if (typeof tracker !== 'function') {
+        return;
+    }
+
+    Promise.resolve(tracker(ad, type)).catch(() => { });
 }
 
 function resolveAdMediaUrl(value) {

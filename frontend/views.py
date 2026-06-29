@@ -274,3 +274,28 @@ def comments(request):
 def reacts(request):
     context = {}
     return render(request, 'admin/pages/reacts.html', context)
+
+
+def staff_dashboard(request):
+    context = {}
+    return render(request, 'staff/pages/dashboard.html', context)
+
+
+def staff_articles(request):
+    context = {}
+    return render(request, 'staff/pages/articles.html', context)
+
+
+def staff_comments(request):
+    context = {}
+    return render(request, 'staff/pages/comments.html', context)
+
+
+def staff_advertisements(request):
+    context = {}
+    return render(request, 'staff/pages/ads.html', context)
+
+
+def staff_profile(request):
+    context = {}
+    return render(request, 'staff/pages/profile.html', context)

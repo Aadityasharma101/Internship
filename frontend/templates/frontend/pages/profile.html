@@ -7,6 +7,9 @@
 {% block content %}
 <section class="profile-page">
     <div class="container profile-shell">
+        <div class="ad-slot-wrap" style="display:flex;justify-content:center;margin-bottom:1rem;">
+            {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
+        </div>
         <div class="profile-header">
             <div class="profile-avatar" id="profileAvatar">NP</div>
             <div>

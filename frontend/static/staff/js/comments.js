@@ -141,6 +141,7 @@
                 await CommentService.rejectComment(comment.id);
             }
 
+            Api.notifyDataChanged?.('comments', { action: status, id: comment.id });
             await loadComments();
         } catch (error) {
             console.error('Unable to moderate comment:', error);
@@ -155,6 +156,7 @@
 
         try {
             await CommentService.deleteComment(comment.id);
+            Api.notifyDataChanged?.('comments', { action: 'delete', id: comment.id });
             await loadComments();
         } catch (error) {
             console.error('Unable to delete comment:', error);
@@ -192,4 +194,10 @@
     els.search.addEventListener('input', renderComments);
 
     document.addEventListener('DOMContentLoaded', loadComments);
+    window.addEventListener('pageshow', loadComments);
+    Api.onDataChanged?.((event) => {
+        if (event?.type === 'comments' || event?.type === 'articles') {
+            loadComments();
+        }
+    });
 })();

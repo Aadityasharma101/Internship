@@ -1,7 +1,8 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/articles/', '/articles/feed/'];
-    const CREATE_ENDPOINTS = ['/articles/', '/articles/create/'];
+    const LIST_ENDPOINTS = ['/articles/feed/'];
+    const AUTH_LIST_ENDPOINTS = ['/articles/reporter/articles/', '/articles/feed/'];
+    const CREATE_ENDPOINTS = ['/articles/create/'];
 
     function normalizeStatus(article) {
         const rawStatus = Api.getValue(article, ['status', 'state', 'publication_status'], '');
@@ -73,7 +74,8 @@
     }
 
     async function loadArticles(page = 1, options = {}) {
-        const result = await Api.loadList(LIST_ENDPOINTS, page, options);
+        const endpoints = options.auth === false ? LIST_ENDPOINTS : AUTH_LIST_ENDPOINTS;
+        const result = await Api.loadList(endpoints, page, options);
         return {
             endpoint: result.endpoint,
             data: {

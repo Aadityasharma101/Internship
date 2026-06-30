@@ -35,6 +35,12 @@
         return target.toString();
     }
 
+    function withFreshParam(url) {
+        const target = new URL(url);
+        target.searchParams.set('_', String(Date.now()));
+        return target.toString();
+    }
+
     function buildUrl(path = '', params = null) {
         if (!path) {
             return appendParams(getApiOrigin(), params);
@@ -179,12 +185,15 @@
     async function fetchWithTimeout(url, options = {}) {
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), options.timeoutMs || 15000);
+        const requestUrl = options.fresh === false ? url : withFreshParam(url);
 
         try {
-            const response = await fetch(url, {
+            const response = await fetch(requestUrl, {
                 method: options.method || 'GET',
+                cache: 'no-store',
                 headers: {
                     Accept: 'application/json',
+                    'Cache-Control': 'no-cache',
                     ...(options.headers || {})
                 },
                 body: options.body,
@@ -249,6 +258,7 @@
             method,
             headers: requestHeaders,
             body,
+            fresh: method === 'GET' || method === 'HEAD',
             timeoutMs: options.timeoutMs
         });
     }
@@ -322,6 +332,31 @@
         return firstSuccessful(detailEndpoints, (endpoint) => request('DELETE', endpoint, options));
     }
 
+    function notifyDataChanged(type, detail = {}) {
+        const payload = {
+            type,
+            detail,
+            timestamp: Date.now()
+        };
+
+        window.dispatchEvent(new CustomEvent('newsportal:data-changed', { detail: payload }));
+
+        if ('BroadcastChannel' in window) {
+            const channel = new BroadcastChannel('newsportal-data-sync');
+            channel.postMessage(payload);
+            channel.close();
+        }
+    }
+
+    function onDataChanged(callback) {
+        window.addEventListener('newsportal:data-changed', (event) => callback(event.detail));
+
+        if ('BroadcastChannel' in window) {
+            const channel = new BroadcastChannel('newsportal-data-sync');
+            channel.addEventListener('message', (event) => callback(event.data));
+        }
+    }
+
     window.NewsPortalApi = {
         buildUrl,
         createItem,
@@ -332,6 +367,8 @@
         getValue,
         loadList,
         normalizeList,
+        notifyDataChanged,
+        onDataChanged,
         request,
         resolveMediaUrl,
         updateItem

@@ -146,4 +146,10 @@
     els.refresh.addEventListener('click', loadDashboard);
 
     document.addEventListener('DOMContentLoaded', loadDashboard);
+    window.addEventListener('pageshow', loadDashboard);
+    Api.onDataChanged?.((event) => {
+        if (['articles', 'advertisements', 'comments'].includes(event?.type)) {
+            loadDashboard();
+        }
+    });
 })();

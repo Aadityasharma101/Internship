@@ -4,7 +4,7 @@
     const Utils = window.StaffUtils;
 
     const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
-    const listEndpoints = hasAuth ? ['/articles/', '/articles/feed/'] : ['/articles/feed/'];
+    const listEndpoints = hasAuth ? ['/articles/reporter/articles/', '/articles/feed/'] : ['/articles/feed/'];
     const createEndpoints = ['/articles/create/'];
 
     const state = {
@@ -337,14 +337,16 @@
         els.status.textContent = id ? 'Saving article...' : 'Creating article...';
 
         try {
+            let savedArticle = null;
             if (id) {
-                await Api.request('PATCH', `/articles/${id}/update/`, { data: payload, auth: hasAuth });
+                savedArticle = await Api.request('PATCH', `/articles/${id}/update/`, { data: payload, auth: hasAuth });
             } else {
-                await Api.request('POST', createEndpoints[0], { data: payload, auth: hasAuth });
+                savedArticle = await Api.request('POST', createEndpoints[0], { data: payload, auth: hasAuth });
             }
 
             closeModal();
-            await loadArticles();
+            Api.notifyDataChanged?.('articles', { action: id ? 'update' : 'create', id: savedArticle?.id || id || null });
+            await loadArticles(1);
         } catch (error) {
             console.error('Unable to save article:', error);
             els.status.textContent = 'Unable to save article. Check required fields and permissions.';
@@ -360,7 +362,8 @@
 
         try {
             await Api.request('DELETE', `/articles/${article.id}/delete/`, { auth: hasAuth });
-            await loadArticles();
+            Api.notifyDataChanged?.('articles', { action: 'delete', id: article.id });
+            await loadArticles(1);
         } catch (error) {
             console.error('Unable to delete article:', error);
             window.alert('Unable to delete this article. Check your permissions and try again.');
@@ -510,5 +513,12 @@
     document.addEventListener('DOMContentLoaded', async () => {
         await loadArticles();
         openFromQuery();
+    });
+
+    window.addEventListener('pageshow', () => loadArticles(state.page));
+    Api.onDataChanged?.((event) => {
+        if (event?.type === 'articles') {
+            loadArticles(1);
+        }
     });
 })();

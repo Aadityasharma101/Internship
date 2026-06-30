@@ -342,14 +342,16 @@
         els.status.textContent = id ? 'Saving advertisement...' : 'Creating advertisement...';
 
         try {
+            let savedAd = null;
             if (id) {
-                await AdService.updateAdvertisement(id, payload);
+                savedAd = await AdService.updateAdvertisement(id, payload);
             } else {
-                await AdService.createAdvertisement(payload);
+                savedAd = await AdService.createAdvertisement(payload);
             }
 
             showStatus(id ? 'Advertisement saved successfully.' : 'Advertisement created successfully.');
             closeModal();
+            Api.notifyDataChanged?.('advertisements', { action: id ? 'update' : 'create', id: savedAd?.id || id || null });
             await loadAds();
         } catch (error) {
             console.error('Unable to save advertisement:', error);
@@ -364,6 +366,7 @@
         try {
             await AdService.toggleAdvertisementStatus(ad.id, !AdService.isActiveAdvertisement(ad));
             showStatus('Advertisement status updated.');
+            Api.notifyDataChanged?.('advertisements', { action: 'toggle', id: ad.id });
             await loadAds();
         } catch (error) {
             console.error('Unable to toggle advertisement:', error);
@@ -378,6 +381,7 @@
 
         try {
             await AdService.deleteAdvertisement(ad.id);
+            Api.notifyDataChanged?.('advertisements', { action: 'delete', id: ad.id });
             await loadAds();
         } catch (error) {
             console.error('Unable to delete advertisement:', error);
@@ -455,4 +459,10 @@
     });
 
     document.addEventListener('DOMContentLoaded', loadAds);
+    window.addEventListener('pageshow', loadAds);
+    Api.onDataChanged?.((event) => {
+        if (event?.type === 'advertisements') {
+            loadAds();
+        }
+    });
 })();

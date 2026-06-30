@@ -9,14 +9,26 @@ const DETAIL_TIMEOUT_MS  = 10000;
 const MAX_PARALLEL_DETAIL = 3;
 
 let CURRENT_FEED = [];
+let HOME_API_BASE = DEFAULT_MEDIA_BASE;
 
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.querySelector('.page-shell');
     if (!root) return;
 
     const apiBase = root.dataset.apiBase || document.body?.dataset?.apiBase || DEFAULT_MEDIA_BASE;
+    HOME_API_BASE = apiBase;
     initializeHomepage(apiBase);
     startFeedPolling(apiBase, 20000);
+});
+
+window.addEventListener('pageshow', () => {
+    initializeHomepage(HOME_API_BASE);
+});
+
+window.NewsPortalApi?.onDataChanged?.((event) => {
+    if (event?.type === 'articles') {
+        initializeHomepage(HOME_API_BASE);
+    }
 });
 
 // ============================================================
@@ -106,9 +118,14 @@ function startFeedPolling(apiBase, intervalMs = 20000) {
 async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
     const ctrl = new AbortController();
     const tid  = window.setTimeout(() => ctrl.abort(), timeoutMs);
+    const freshUrl = addFreshParam(url);
     try {
-        const res = await fetch(url, {
-            headers: { Accept: 'application/json' },
+        const res = await fetch(freshUrl, {
+            cache: 'no-store',
+            headers: {
+                Accept: 'application/json',
+                'Cache-Control': 'no-cache'
+            },
             signal: ctrl.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -116,6 +133,12 @@ async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
     } finally {
         window.clearTimeout(tid);
     }
+}
+
+function addFreshParam(url) {
+    const target = new URL(url, window.location.origin);
+    target.searchParams.set('_', String(Date.now()));
+    return target.toString();
 }
 
 function extractArticles(payload) {

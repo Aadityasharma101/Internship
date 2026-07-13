@@ -190,7 +190,6 @@
         try {
             const response = await fetch(requestUrl, {
                 method: options.method || 'GET',
-                cache: 'no-store',
                 headers: {
                     Accept: 'application/json',
                     ...(options.headers || {})

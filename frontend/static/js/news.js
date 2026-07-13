@@ -121,7 +121,6 @@ async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
     const freshUrl = addFreshParam(url);
     try {
         const res = await fetch(freshUrl, {
-            cache: 'no-store',
             headers: {
                 Accept: 'application/json'
             },

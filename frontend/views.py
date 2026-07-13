@@ -73,6 +73,14 @@ def api_proxy(request, path):
             content_type="application/json",
         )
 
+    # Debug logging to help trace proxy issues during development
+    try:
+        print(f"[api_proxy] {request.method} {path} -> {url} (status={remote_response.status_code})")
+        if remote_response.status_code >= 400:
+            print("[api_proxy] remote response body:", remote_response.text[:1000])
+    except Exception:
+        pass
+
     django_response = HttpResponse(
         remote_response.content,
         status=remote_response.status_code,

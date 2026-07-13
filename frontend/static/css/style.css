@@ -789,7 +789,8 @@ button, input, textarea, select { font: inherit; }
 .featured-section { min-width: 0; }
 
 .featured-hero {
-    min-height: 480px;
+    /* Slightly smaller featured hero for better visual balance */
+    min-height: 360px;
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -805,8 +806,9 @@ button, input, textarea, select { font: inherit; }
 
 .featured-link {
     display: grid;
-    grid-template-rows: minmax(280px, 1fr) auto;
-    min-height: 480px;
+    /* reduce the visual height of the image row */
+    grid-template-rows: minmax(220px, 1fr) auto;
+    min-height: 360px;
     text-decoration: none;
     color: inherit;
     position: relative;
@@ -815,7 +817,8 @@ button, input, textarea, select { font: inherit; }
 .featured-image {
     width: 100%;
     height: 100%;
-    min-height: 280px;
+    /* keep image visually smaller while preserving cropping */
+    min-height: 220px;
     object-fit: cover;
     object-position: center;
     display: block;
@@ -857,16 +860,17 @@ button, input, textarea, select { font: inherit; }
 
 .featured-title {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 28px;
+    /* slightly reduced title size for balance */
+    font-size: 22px;
     line-height: 1.15;
     font-weight: 800;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: var(--ink);
 }
 
 .featured-summary {
     color: var(--muted);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.6;
 }
 

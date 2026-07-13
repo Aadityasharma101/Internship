@@ -12,6 +12,26 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+# Make django-cors-headers optional so the server can still start
+try:
+    import corsheaders  # noqa: F401
+    from corsheaders.defaults import default_headers
+    HAS_CORSHEADERS = True
+except Exception:
+    # Minimal fallback header list when corsheaders isn't installed
+    HAS_CORSHEADERS = False
+    default_headers = (
+        'accept',
+        'accept-encoding',
+        'authorization',
+        'content-type',
+        'dnt',
+        'origin',
+        'user-agent',
+        'x-csrftoken',
+        'x-requested-with',
+    )
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -41,6 +61,10 @@ INSTALLED_APPS = [
 
 ]
 
+# Add corsheaders app only if available
+if HAS_CORSHEADERS:
+    INSTALLED_APPS.insert(0, 'corsheaders')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -50,6 +74,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Prepend CORS middleware if available
+if HAS_CORSHEADERS:
+    MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -131,3 +159,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # External API base used by the frontend. Change if you want a different backend.
 API_BASE_URL = 'https://news-portal-hvgs.onrender.com'
+
+# CORS settings - allow local dev origin and permit cache-control header used by some requests
+CORS_ALLOWED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
+
+# Allow the Cache-Control request header in preflight
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'cache-control',
+]

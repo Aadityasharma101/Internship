@@ -193,7 +193,6 @@
                 cache: 'no-store',
                 headers: {
                     Accept: 'application/json',
-                    'Cache-Control': 'no-cache',
                     ...(options.headers || {})
                 },
                 body: options.body,

@@ -123,8 +123,7 @@ async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
         const res = await fetch(freshUrl, {
             cache: 'no-store',
             headers: {
-                Accept: 'application/json',
-                'Cache-Control': 'no-cache'
+                Accept: 'application/json'
             },
             signal: ctrl.signal,
         });

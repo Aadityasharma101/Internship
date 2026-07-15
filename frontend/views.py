@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -8,6 +8,9 @@ import urllib.parse
 from datetime import datetime
 import re
 import requests
+from django.utils import timezone
+
+from .models import Advertisement
 
 NEWS_API_BASE = "https://news-portal-hvgs.onrender.com"
 HOP_BY_HOP_HEADERS = {
@@ -34,6 +37,177 @@ def fetch_json(path):
         return json.loads(resp.read().decode())
 
 
+def _normalize_position(value):
+    raw = str(value or '').strip().lower().replace(' ', '_')
+    if raw in {'top_banner', 'sidebar', 'between_articles', 'footer_banner'}:
+        return raw
+    if raw in {'in_article', 'between_articles'}:
+        return 'between_articles'
+    if raw in {'footer', 'footer_banner'}:
+        return 'footer_banner'
+    return 'between_articles'
+
+
+def _normalize_status(value, is_active=None):
+    if is_active is not None:
+        return 'active' if is_active else 'inactive'
+
+    raw = str(value or '').strip().lower()
+    if raw in {'inactive', 'disabled', 'draft', 'archived'}:
+        return 'inactive'
+    return 'active'
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+
+def _coerce_payload(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body.decode() or '{}') or {}
+        except json.JSONDecodeError:
+            return {}
+
+    payload = {}
+    for key, value in request.POST.items():
+        payload[key] = value
+    return payload
+
+
+@csrf_exempt
+def ads_api(request):
+    if request.method == 'GET':
+        ads = Advertisement.objects.all().order_by('-created_at')
+        return JsonResponse({
+            'count': ads.count(),
+            'next': None,
+            'previous': None,
+            'results': [ad.to_api_dict() for ad in ads],
+        })
+
+    if request.method == 'POST':
+        payload = _coerce_payload(request)
+        title = (payload.get('title') or request.POST.get('title') or '').strip()
+        if not title:
+            return JsonResponse({'detail': 'Title is required.'}, status=400)
+
+        description = (payload.get('description') or payload.get('client_name') or request.POST.get('description') or request.POST.get('client_name') or '').strip()
+        target_url = (payload.get('target_url') or payload.get('redirect_url') or request.POST.get('target_url') or request.POST.get('redirect_url') or '').strip()
+        image_value = payload.get('image') or request.POST.get('image') or ''
+        image_url_value = (payload.get('image_url') or request.POST.get('image_url') or '').strip()
+        position = _normalize_position(payload.get('position') or request.POST.get('position') or 'between_articles')
+        start_date = _parse_datetime(payload.get('start_date') or request.POST.get('start_date')) or timezone.now()
+        end_date = _parse_datetime(payload.get('end_date') or request.POST.get('end_date'))
+        status_value = payload.get('status') or request.POST.get('status') or payload.get('state') or request.POST.get('state') or 'active'
+        is_active = payload.get('is_active') if 'is_active' in payload else request.POST.get('is_active')
+        if is_active is None:
+            is_active = _normalize_status(status_value) == 'active'
+        else:
+            is_active = str(is_active).lower() in {'1', 'true', 'yes', 'on'}
+
+        ad = Advertisement(
+            title=title,
+            description=description,
+            target_url=target_url,
+            position=position,
+            image_url=image_url_value,
+            start_date=start_date,
+            end_date=end_date,
+            is_active=is_active,
+        )
+
+        uploaded_image = request.FILES.get('image')
+        if uploaded_image:
+            ad.image = uploaded_image
+        elif isinstance(image_value, str) and image_value and (image_value.startswith('http://') or image_value.startswith('https://') or image_value.startswith('/')):
+            ad.image_url = image_value
+
+        ad.save()
+        return JsonResponse(ad.to_api_dict(), status=201)
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+def ads_detail(request, ad_id):
+    try:
+        ad = Advertisement.objects.get(pk=ad_id)
+    except Advertisement.DoesNotExist:
+        return JsonResponse({'detail': 'Advertisement not found.'}, status=404)
+
+    if request.method == 'GET':
+        return JsonResponse(ad.to_api_dict())
+
+    if request.method in {'PATCH', 'PUT'}:
+        payload = _coerce_payload(request)
+        if 'title' in payload and payload['title'] is not None:
+            ad.title = str(payload['title']).strip()
+        if 'description' in payload and payload['description'] is not None:
+            ad.description = str(payload['description']).strip()
+        if 'client_name' in payload and payload['client_name'] is not None:
+            ad.description = str(payload['client_name']).strip()
+        if 'target_url' in payload and payload['target_url'] is not None:
+            ad.target_url = str(payload['target_url']).strip()
+        if 'redirect_url' in payload and payload['redirect_url'] is not None:
+            ad.target_url = str(payload['redirect_url']).strip()
+        if 'position' in payload:
+            ad.position = _normalize_position(payload['position'])
+        if 'image' in payload and payload['image'] is not None:
+            image_value = str(payload['image']).strip()
+            if image_value.startswith('http://') or image_value.startswith('https://') or image_value.startswith('/'):
+                ad.image_url = image_value
+            else:
+                ad.image_url = ''
+        if 'image_url' in payload and payload['image_url'] is not None:
+            ad.image_url = str(payload['image_url']).strip()
+        if 'start_date' in payload and payload['start_date'] is not None:
+            parsed_start = _parse_datetime(payload['start_date'])
+            if parsed_start:
+                ad.start_date = parsed_start
+        if 'end_date' in payload and payload['end_date'] is not None:
+            parsed_end = _parse_datetime(payload['end_date'])
+            if parsed_end:
+                ad.end_date = parsed_end
+        if 'status' in payload or 'state' in payload:
+            ad.is_active = _normalize_status(payload.get('status') or payload.get('state') or 'active') == 'active'
+        if 'is_active' in payload:
+            value = payload['is_active']
+            ad.is_active = str(value).lower() in {'1', 'true', 'yes', 'on'}
+
+        ad.save()
+        return JsonResponse(ad.to_api_dict())
+
+    if request.method == 'DELETE':
+        ad.delete()
+        return HttpResponse(status=204)
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+def ads_tracking(request, action):
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    ad_id = request.POST.get('ad_id') or request.POST.get('advertisement') or request.POST.get('id')
+    try:
+        ad = Advertisement.objects.get(pk=ad_id)
+    except (Advertisement.DoesNotExist, TypeError, ValueError):
+        return JsonResponse({'detail': 'Advertisement not found.'}, status=404)
+
+    if action == 'click':
+        ad.target_url = ad.target_url or '#'
+    ad.save()
+    return JsonResponse(ad.to_api_dict())
+
+
 @csrf_exempt
 def api_proxy(request, path):
     query = request.META.get("QUERY_STRING")
@@ -41,6 +215,19 @@ def api_proxy(request, path):
 
     if query:
         url = f"{url}?{query}"
+
+    if path in {'api/ads', 'api/ads/'}:
+        return ads_api(request)
+
+    if re.match(r'^api/ads/(?P<ad_id>\d+)/?$', path):
+        ad_id = int(re.match(r'^api/ads/(?P<ad_id>\d+)/?$', path).group('ad_id'))
+        return ads_detail(request, ad_id)
+
+    if path in {'api/ads/click', 'api/ads/click/'}:
+        return ads_tracking(request, 'click')
+
+    if path in {'api/ads/impressions', 'api/ads/impressions/'}:
+        return ads_tracking(request, 'impression')
 
     headers = {
         "Accept": request.headers.get("Accept", "application/json"),

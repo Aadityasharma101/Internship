@@ -807,8 +807,8 @@ button, input, textarea, select { font: inherit; }
 .featured-link {
     display: grid;
     /* reduce the visual height of the image row */
-    grid-template-rows: minmax(220px, 1fr) auto;
-    min-height: 360px;
+    grid-template-rows: 180px auto;
+    min-height: 180px;
     text-decoration: none;
     color: inherit;
     position: relative;
@@ -816,9 +816,8 @@ button, input, textarea, select { font: inherit; }
 
 .featured-image {
     width: 100%;
-    height: 100%;
-    /* keep image visually smaller while preserving cropping */
-    min-height: 220px;
+    height: 220px;
+    min-height: 200px;
     object-fit: cover;
     object-position: center;
     display: block;
@@ -1332,7 +1331,7 @@ button, input, textarea, select { font: inherit; }
     .ad-slot--top, .ad-slot--footer, .ad-slot--inline { max-width: 100%; }
     .featured-hero, .featured-link { min-height: 0; }
     .featured-link { display: block; }
-    .featured-image { height: 240px; min-height: 240px; }
+    .featured-image { height: 180px; min-height: 180px; }
     .featured-title { font-size: 22px; }
 
     /* Grid */
@@ -1350,6 +1349,7 @@ button, input, textarea, select { font: inherit; }
 @media (max-width: 480px) {
     .logo-image { height: 36px; }
     .section-title { font-size: 20px; }
+    .featured-image { height: 180px; min-height: 180px; }
     .featured-title { font-size: 18px; }
     .article-image { height: 170px; }
 }

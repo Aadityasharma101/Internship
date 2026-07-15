@@ -28,5 +28,9 @@ urlpatterns = [
     path('staff/comments/', views.staff_comments, name='staff_comments'),
     path('staff/advertisements/', views.staff_advertisements, name='staff_advertisements'),
     path('staff/profile/', views.staff_profile, name='staff_profile'),
+    path('api/ads/', views.ads_api, name='ads_api'),
+    path('api/ads/<int:ad_id>/', views.ads_detail, name='ads_detail'),
+    path('api/ads/click/', views.ads_tracking, {'action': 'click'}, name='ads_click'),
+    path('api/ads/impressions/', views.ads_tracking, {'action': 'impression'}, name='ads_impression'),
     path('remote/<path:path>', views.api_proxy, name='api_proxy'),
 ]

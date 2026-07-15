@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Make django-cors-headers optional so the server can still start
 try:
@@ -159,14 +160,3 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # External API base used by the frontend. Change if you want a different backend.
 API_BASE_URL = 'https://news-portal-hvgs.onrender.com'
-
-# CORS settings - allow local dev origin and permit cache-control header used by some requests
-CORS_ALLOWED_ORIGINS = [
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-]
-
-# Allow the Cache-Control request header in preflight
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    'cache-control',
-]

@@ -2,59 +2,35 @@
 {% load static %}
 
 {% block title %}Comments - Staff Panel{% endblock %}
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
-{% endblock %}
-
 {% block breadcrumb %}Comments{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <div>
-        <h2>Comments</h2>
-        <p class="text-muted">Moderate comments left on your articles.</p>
-    </div>
-    <div class="page-actions">
-        <button class="btn-secondary-outline" id="refreshCommentsBtn" type="button">
-            <i class="fa-solid fa-rotate-right"></i> Refresh
-        </button>
-    </div>
-</div>
-
-<div class="resource-summary">
-    <div class="summary-card"><span class="summary-label">Total Comments</span><strong id="totalComments">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Approved</span><strong id="approvedComments">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Pending</span><strong id="pendingComments">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Rejected</span><strong id="rejectedComments">0</strong></div>
-</div>
-
-<div class="resource-toolbar">
-    <div class="resource-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" id="commentSearchInput" placeholder="Search comments by author, article, text, or status">
-    </div>
-    <span class="toolbar-count" id="visibleCommentsCount">0 comments shown</span>
+    <h2>Comments</h2>
+    <p class="text-muted">Moderate and review recent comments from users.</p>
 </div>
 
 <div class="table-wrapper">
-    <table class="resource-table">
+    <table class="articles-table">
         <thead>
             <tr>
+                <th>Comment</th>
                 <th>Author</th>
                 <th>Article</th>
-                <th>Comment</th>
-                <th>Status</th>
-                <th>Created</th>
+                <th>Posted</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="commentsTableBody">
-            <tr class="loading-row"><td colspan="6">Loading comments...</td></tr>
+            <tr class="loading-row"><td colspan="5">No comments found.</td></tr>
         </tbody>
     </table>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'staff/js/comments.js' %}?v=1"></script>
+<script>
+// Placeholder: load comments via API when ready.
+</script>
 {% endblock %}

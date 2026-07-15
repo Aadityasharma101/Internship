@@ -1,10 +1,14 @@
 const LOGIN_API_URL = "https://news-portal-hvgs.onrender.com/api/token/";
-const DEFAULT_LOGIN_SUCCESS_REDIRECT = "/profile/";
+const LOGIN_SUCCESS_REDIRECT = "/";
 const REDIRECT_DELAY = 1500;
 
 const form = document.getElementById("loginForm");
 const submitBtn = document.getElementById("submitBtn");
 const formMessage = document.getElementById("formMessage");
+
+if (!form) {
+    console.warn('Login form not found — login.js will not attach handlers.');
+}
 
 const fields = {
     email: document.getElementById("email"),
@@ -88,7 +92,8 @@ function getBackendMessage(data) {
         .join(" ") || "Login failed. Please try again.";
 }
 
-form.addEventListener("submit", async (event) => {
+if (form) {
+    form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     if (!validateForm()) {
@@ -118,41 +123,38 @@ form.addEventListener("submit", async (event) => {
             showFormMessage(getBackendMessage(data), "error");
             return;
         }
-        if (window.NewsPortalSession) {
-            window.NewsPortalSession.storeTokens(data);
-        } else {
-            localStorage.removeItem("news_portal_auth_invalid");
-            localStorage.setItem("accessToken", data.access);
-            localStorage.setItem("refreshToken", data.refresh);
-            localStorage.setItem("access_token", data.access);
-            localStorage.setItem("refresh_token", data.refresh);
-        }
 
-        let redirectTo = DEFAULT_LOGIN_SUCCESS_REDIRECT;
-        try {
-            const user = window.NewsPortalSession ? await window.NewsPortalSession.fetchCurrentUser() : null;
-            redirectTo = window.NewsPortalSession?.getDashboardPath(user) || DEFAULT_LOGIN_SUCCESS_REDIRECT;
-        } catch {
-            redirectTo = DEFAULT_LOGIN_SUCCESS_REDIRECT;
-        }
+        localStorage.setItem("accessToken", data.access);
+        localStorage.setItem("refreshToken", data.refresh);
+        localStorage.setItem("access_token", data.access);
+        localStorage.setItem("refresh_token", data.refresh);
 
         form.reset();
         clearErrors();
         showFormMessage("Login successful. Redirecting...", "success");
 
+        const nextUrl = (data && data.next) ? data.next : LOGIN_SUCCESS_REDIRECT;
         window.setTimeout(() => {
-            window.location.href = redirectTo;
+            window.location.href = LOGIN_SUCCESS_REDIRECT;
         }, REDIRECT_DELAY);
     } catch (error) {
         showFormMessage("Unable to connect to the server. Please try again later.", "error");
     } finally {
         setLoading(false);
     }
-});
-
-Object.values(fields).forEach((field) => {
-    field.addEventListener("input", () => {
-        setFieldError(field.name, "");
-        showFormMessage("", "");
     });
-});
+
+    Object.values(fields).forEach((field) => {
+        field.addEventListener("input", () => {
+            setFieldError(field.name, "");
+            showFormMessage("", "");
+        });
+    });
+} else {
+    // If form element not present, attempt to find the submit button and allow native submit
+    if (submitBtn) {
+        submitBtn.addEventListener('click', () => {
+            console.warn('Submit clicked but login form not initialized by JS. Falling back to native POST.');
+        });
+    }
+}

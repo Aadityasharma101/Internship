@@ -250,28 +250,13 @@ function renderFeaturedHero(container, article) {
         container.innerHTML = '<p style="padding:24px;color:var(--muted)">No featured story available.</p>';
         return;
     }
-
-    const imgUrl = article.imageUrl || '';
-    const imgHtml = imgUrl
-        ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image" loading="lazy" onerror="this.style.display='none'">`
-        : `<div class="featured-image featured-image-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.25"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
-
+    const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
     container.innerHTML = `
-        <a href="/news/${escapeHtml(String(article.id))}/" class="featured-link">
-            <div style="overflow:hidden;background:var(--surface-3);">
-                ${imgHtml}
-            </div>
-            <div class="featured-text">
-                <div class="featured-meta">
-                    <span class="featured-category">${escapeHtml(article.categoryLabel)}</span>
-                    <span class="featured-time">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        &nbsp;${escapeHtml(article.displayDate)}
-                    </span>
-                </div>
-                <h3 class="featured-title">${escapeHtml(article.title || 'Untitled Story')}</h3>
-                <p class="featured-summary">${escapeHtml(article.summary || '')}</p>
-            </div>
+        <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
+            ${img}
+            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
         </a>
     `;
 }
@@ -291,26 +276,14 @@ function renderNewsGrid(container, articles) {
             ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="${i < 3 ? 'eager' : 'lazy'}" onerror="this.parentElement.classList.add('no-img')">`
             : '';
         return `
-        <article class="article-card">
-            <a href="/news/${escapeHtml(String(a.id))}/">
-                <div class="article-image${!thumb ? ' no-img' : ''}">
-                    ${imgHtml}
-                    <span class="article-category-badge">${escapeHtml(a.categoryLabel)}</span>
-                </div>
-                <div class="article-content">
-                    <h4 class="article-title">${escapeHtml(a.title || 'Untitled')}</h4>
-                    <p class="article-excerpt">${escapeHtml(a.summary || '')}</p>
-                    <div class="article-footer">
-                        <span class="article-time">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            ${escapeHtml(a.displayDate)}
-                        </span>
-                        <span class="article-read-more">Read more →</span>
-                    </div>
-                </div>
+        <article class="news-card">
+            <a href="/news/${escapeHtml(a.id)}/">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
+                <h4>${escapeHtml(a.title)}</h4>
+                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
             </a>
-        </article>`;
-    }).join('');
+        </article>
+    `}).join('');
 }
 
 function renderTrendingGrid(container, cards) {

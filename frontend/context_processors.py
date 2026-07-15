@@ -7,6 +7,6 @@ def api_settings(_request):
     return {
         # Media base should point to the remote API origin so image URLs resolve correctly
         'API_MEDIA_BASE': api_root,
-        # Use a local proxy prefix for API calls to avoid CORS issues when developing locally
-        'API_BASE': '/remote',
+        # Use the raw API root so frontend fetches match backend paths (no extra /api)
+        'API_BASE': api_root,
     }

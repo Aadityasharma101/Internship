@@ -16,11 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from frontend import views as frontend_views
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Ensure direct access to staff add_article endpoint (avoid 404 from malformed includes)
+    path('staff/add_article/', frontend_views.staff_add_article),
     path('', include('frontend.urls', namespace='frontend')),
 ]
 

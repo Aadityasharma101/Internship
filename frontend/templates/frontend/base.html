@@ -30,29 +30,19 @@
 
     <!-- HEADER -->
     <header class="header">
-        <div class="header-main">
-            <div class="container header-inner">
-                <!-- Logo -->
-                <a href="{% url 'frontend:index' %}" class="logo-link" aria-label="News Portal Home">
-                    <img src="{% static 'images/logo.png' %}" alt="News Portal" class="logo-image">
-                    <span class="logo-text">NewsPortal</span>
-                </a>
-
-                <!-- Search -->
-                <div class="header-search">
-                    <form class="search-form" id="searchForm" role="search" onsubmit="handleSearch(event)">
-                        <span class="search-icon" aria-hidden="true">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                            </svg>
-                        </span>
-                        <input type="search" id="searchInput" class="search-box" placeholder="Search news..." aria-label="Search news">
-                    </form>
-                </div>
-
-                <!-- Header Actions -->
-                <div class="header-actions" id="header-auth-buttons">
-                    <!-- Filled by JS -->
+        <div class="header-top">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo-section">
+                        <a href="{% url 'frontend:index' %}" class="logo-link" aria-label="Go to homepage">
+                            <img src="{% static 'images/logo.png' %}" alt="Company logo" class="logo-image">
+                        </a>
+                        <span class="tagline">Updated continuously from trusted newsrooms</span>
+                    </div>
+                    <div class="header-actions">
+                        <input type="search" class="search-box" placeholder="Search news..." aria-label="Search news">
+                        <button class="btn-signin" type="button">Sign in</button>
+                    </div>
                 </div>
 
                 <!-- Hamburger -->

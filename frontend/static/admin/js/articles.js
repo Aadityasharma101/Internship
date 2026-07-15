@@ -3,8 +3,34 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = '/articles/feed/';
 
-const ARTICLE_ENDPOINTS = ['/articles/feed/', 'articles/feed/', '/articles/', 'articles/'];
-const ARTICLE_MUTATION_ENDPOINTS = ['/articles/create/'];
+// Try API-mounted endpoints and proxy routes first, then fall back to root paths.
+// If a global `API_BASE` is set by templates, try absolute remote endpoints first.
+const REMOTE_BASE = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE.replace(/\/$/, '') : '';
+const ARTICLE_ENDPOINTS = REMOTE_BASE ? [
+    `${REMOTE_BASE}/api/articles/feed/`,
+    `${REMOTE_BASE}/remote/articles/feed/`,
+    `${REMOTE_BASE}/articles/feed/`,
+    '/api/articles/feed/',
+    '/remote/articles/feed/',
+    '/articles/feed/',
+    'articles/feed/',
+    `${REMOTE_BASE}/api/articles/`,
+    `${REMOTE_BASE}/remote/articles/`,
+    `${REMOTE_BASE}/articles/`,
+    '/api/articles/',
+    '/remote/articles/',
+    '/articles/',
+    'articles/'
+] : ['/api/articles/feed/', '/remote/articles/feed/', '/articles/feed/', 'articles/feed/', '/api/articles/', '/remote/articles/', '/articles/', 'articles/'];
+
+const ARTICLE_MUTATION_ENDPOINTS = REMOTE_BASE ? [
+    `${REMOTE_BASE}/api/articles/create/`,
+    `${REMOTE_BASE}/remote/articles/create/`,
+    `${REMOTE_BASE}/articles/create/`,
+    '/api/articles/create/',
+    '/remote/articles/create/',
+    '/articles/create/'
+] : ['/api/articles/create/', '/remote/articles/create/', '/articles/create/'];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');

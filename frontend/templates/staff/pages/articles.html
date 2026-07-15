@@ -5,7 +5,6 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
 <link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
-<link rel="stylesheet" href="{% static 'staff/css/articles.css' %}">
 {% endblock %}
 
 {% block breadcrumb %}Articles{% endblock %}
@@ -15,7 +14,7 @@
 <div class="page-header">
     <div>
         <h2>Articles</h2>
-        <p class="text-muted">Review your articles, categories, status, and recent updates.</p>
+        <p class="text-muted">Review published stories, drafts, categories, authors, and recent updates.</p>
     </div>
 
     <div class="page-actions">
@@ -86,7 +85,7 @@
 </div>
 
 <div id="articleModal" class="modal hidden">
-    <div class="modal-content article-modal">
+    <div class="modal-content">
         <h3 id="articleModalTitle">Create New Article</h3>
         <input type="hidden" id="articleId">
 
@@ -111,18 +110,13 @@
             </div>
 
             <div class="form-group full-width">
-                <label for="articleImage">Image URL</label>
+                <label for="articleImage">Image URL (optional)</label>
                 <input type="url" id="articleImage" placeholder="https://example.com/image.jpg">
             </div>
 
             <div class="form-group full-width">
                 <label for="articleImageFile">Upload Image</label>
-                <div class="upload-row">
-                    <input type="file" id="articleImageFile" accept="image/*">
-                    <button type="button" id="clearArticleImageBtn" class="btn-secondary-outline upload-clear-btn">Remove Image</button>
-                </div>
-                <div id="articleImagePreview" class="article-image-preview hidden" aria-live="polite"></div>
-                <p class="upload-hint">Choose a file to upload to the remote API or keep the image URL.</p>
+                <input type="file" id="articleImageFile" accept="image/*">
             </div>
 
             <div class="form-group full-width">
@@ -162,5 +156,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'staff/js/articles.js' %}?v=2"></script>
+<script>window.API_BASE = "{{ API_BASE }}";</script>
+<script src="{% static 'admin/js/articles.js' %}"></script>
+<script src="{% static 'staff/js/staff_article_adapter.js' %}"></script>
 {% endblock %}

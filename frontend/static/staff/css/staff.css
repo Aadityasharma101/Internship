@@ -1,0 +1,17 @@
+/* Basic staff dashboard styles */
+.page-header h2{margin:0 0 8px}
+.cards{display:flex;gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--border-color);padding:12px;border-radius:6px;flex:1;color:var(--text-main)}
+.staff-form{max-width:700px}
+.staff-form .form-row{margin-bottom:10px}
+.staff-form label{display:block;font-weight:600;margin-bottom:6px}
+.staff-form input, .staff-form textarea{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px}
+#staff-form-status{margin-top:8px;color:green}
+
+/* Articles table */
+.articles-list{margin-top:20px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group.full-width{grid-column:1/-1}
+.form-actions{margin-top:12px}

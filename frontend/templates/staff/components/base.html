@@ -10,16 +10,21 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <!-- CSS -->
     <link rel="stylesheet" href="{% static 'admin/css/style.css' %}">
+    
 
     {% block extra_css %}{% endblock %}
 </head>
 
-<body data-api-base="{{ API_BASE }}">
+<body>
 
 <div class="admin-container">
 
+    <!-- ================= SIDEBAR ================= -->
     <aside class="sidebar">
+
         <div class="sidebar-brand">
             <div class="brand-logo">
                 <i class="fa-solid fa-satellite-dish"></i>
@@ -31,53 +36,50 @@
         </div>
 
         <div class="sidebar-menu">
+
             <div class="menu-section">OVERVIEW</div>
+
             <ul class="menu-list">
-                <li class="menu-item {% if request.resolver_match.url_name == 'staff_dashboard' %}active{% endif %}">
-                    <a href="{% url 'frontend:staff_dashboard' %}">
+                <li class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <a href="{% url 'frontend:dashboard' %}">
                         <i class="fa-solid fa-table-columns"></i> Dashboard
                     </a>
                 </li>
             </ul>
 
             <div class="menu-section">CONTENT</div>
+
             <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'categories' %}active{% endif %}">
+                    <a href="{% url 'frontend:categories' %}">
+                        <i class="fa-solid fa-layer-group"></i> Categories
+                    </a>
+                </li>
+
+                <li class="menu-item {% if request.resolver_match.url_name == 'comments' %}active{% endif %}">
+                    <a href="{% url 'frontend:comments' %}">
+                        <i class="fa-regular fa-comment-dots"></i> Comments
+                    </a>
+                </li>
+
                 <li class="menu-item {% if request.resolver_match.url_name == 'staff_articles' %}active{% endif %}">
                     <a href="{% url 'frontend:staff_articles' %}">
                         <i class="fa-solid fa-newspaper"></i> Articles
                     </a>
                 </li>
-                <li class="menu-item">
-                    <a href="{% url 'frontend:staff_articles' %}?new=1">
-                        <i class="fa-solid fa-plus"></i> Add Article
-                    </a>
-                </li>
-                <li class="menu-item {% if request.resolver_match.url_name == 'staff_advertisements' %}active{% endif %}">
-                    <a href="{% url 'frontend:staff_advertisements' %}">
-                        <i class="fa-solid fa-rectangle-ad"></i> Advertisements
-                    </a>
-                </li>
-                <li class="menu-item {% if request.resolver_match.url_name == 'staff_comments' %}active{% endif %}">
-                    <a href="{% url 'frontend:staff_comments' %}">
-                        <i class="fa-regular fa-comment-dots"></i> Comments
-                    </a>
-                </li>
+
+                {# Create Article link removed per request #}
             </ul>
 
-            <div class="menu-section">ACCOUNT</div>
-            <ul class="menu-list">
-                <li class="menu-item {% if request.resolver_match.url_name == 'staff_profile' %}active{% endif %}">
-                    <a href="{% url 'frontend:staff_profile' %}">
-                        <i class="fa-regular fa-user"></i> Profile
-                    </a>
-                </li>
-            </ul>
         </div>
 
+        <!-- USER INFO -->
         <div class="sidebar-user">
+
             <div class="user-avatar">
-                {{ user.username|default:"ST"|slice:":2"|upper }}
+                {{ user.username|default:"AD"|slice:":2"|upper }}
             </div>
+
             <div class="user-info">
                 <span class="user-name">
                     {% if user.is_authenticated %}
@@ -86,56 +88,76 @@
                         Staff User
                     {% endif %}
                 </span>
-                <span class="user-role">Staff Editor</span>
+                <span class="user-role">Staff</span>
             </div>
+
         </div>
+
     </aside>
 
+    <!-- ================= MAIN AREA ================= -->
     <div class="main-wrapper">
+
+        <!-- NAVBAR -->
         <header class="navbar">
+
             <div class="nav-breadcrumbs">
                 <span class="crumb-parent">Staff</span>
                 <span class="crumb-divider">/</span>
-                <span class="crumb-current">{% block breadcrumb %}Dashboard{% endblock %}</span>
+                <span class="crumb-current">
+                    {% block breadcrumb %}Dashboard{% endblock %}
+                </span>
             </div>
 
             <div class="nav-actions">
+
                 <div class="search-box">
                     <i class="fa-solid fa-magnifying-glass search-icon"></i>
                     <input type="text" placeholder="Search...">
                 </div>
 
-                <button class="nav-icon-btn" type="button">
+                <button class="nav-icon-btn">
                     <i class="fa-regular fa-bell"></i>
                     <span class="notification-dot"></span>
                 </button>
 
-                <button class="nav-icon-btn" type="button">
+                <button class="nav-icon-btn">
                     <i class="fa-solid fa-plus"></i>
                 </button>
 
-                <button class="nav-icon-btn" type="button" id="staffLogoutButton" onclick="if (!window.confirm('Do you want to logout?')) { return false; } window.NewsPortalSession?.clear(); window.location.href='/login/';">
+                <button class="nav-icon-btn">
                     <i class="fa-solid fa-power-off"></i>
                 </button>
+
             </div>
+
         </header>
 
+        <!-- PAGE CONTENT -->
         <main class="main-content">
             {% block content %}{% endblock %}
         </main>
+
     </div>
 
 </div>
 
+<!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="{% static 'js/auth.js' %}?v=1"></script>
-<script src="{% static 'js/axios.js' %}?v=3"></script>
-<script src="{% static 'js/services/portal-api.js' %}?v=1"></script>
-<script src="{% static 'js/services/articleService.js' %}?v=1"></script>
-<script src="{% static 'js/services/commentService.js' %}?v=1"></script>
-<script src="{% static 'js/services/advertisementService.js' %}?v=1"></script>
-<script src="{% static 'staff/js/staff-utils.js' %}?v=1"></script>
-<script src="{% static 'staff/js/main.js' %}?v=1"></script>
+<script src="{% static 'js/axios.js' %}"></script>
+<script src="{% static 'admin/js/resource_helpers.js' %}"></script>
+<script src="{% static 'admin/js/main.js' %}"></script>
+{% if DEBUG and ADMIN_FALLBACK_ACCESS_TOKEN %}
+<script>
+    // Dev-only: populate localStorage with fallback tokens for testing
+    try {
+        localStorage.setItem('access_token', '{{ ADMIN_FALLBACK_ACCESS_TOKEN }}');
+        localStorage.setItem('refresh_token', '{{ ADMIN_FALLBACK_REFRESH_TOKEN }}');
+    } catch (e) {
+        console.warn('Unable to set dev fallback tokens in localStorage');
+    }
+</script>
+{% endif %}
 {% block extra_js %}{% endblock %}
 
 </body>

@@ -455,14 +455,27 @@ def get_remote_user_info(access_token):
         except Exception:
             continue
 
-    # Fallback: decode JWT payload
+    # Fallback: decode JWT payload and normalize values
     payload = _decode_jwt_payload(access_token)
     user = {}
     # common claim names
-    user['email'] = payload.get('email') or payload.get('username')
-    user['role'] = payload.get('role') or payload.get('user_role')
-    user['is_staff'] = payload.get('is_staff') or payload.get('staff') or False
-    user['is_superuser'] = payload.get('is_superuser') or payload.get('admin') or False
+    user['email'] = payload.get('email') or payload.get('username') or ''
+    # role: ensure string lowercased when present
+    raw_role = payload.get('role') or payload.get('user_role') or ''
+    user['role'] = str(raw_role).lower() if raw_role is not None else ''
+
+    def _to_bool(val):
+        if isinstance(val, bool):
+            return val
+        if val is None:
+            return False
+        if isinstance(val, (int, float)):
+            return bool(val)
+        s = str(val).strip().lower()
+        return s in ('1', 'true', 'yes', 'y', 't')
+
+    user['is_staff'] = _to_bool(payload.get('is_staff') or payload.get('staff'))
+    user['is_superuser'] = _to_bool(payload.get('is_superuser') or payload.get('admin'))
     return user
 
 

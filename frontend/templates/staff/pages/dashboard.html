@@ -60,30 +60,7 @@
         </div>
     </section>
 
-    <section class="dashboard-panel">
-        <div class="panel-header">
-            <div>
-                <h3>Recent Comments</h3>
-                <p>Feedback left on your articles.</p>
-            </div>
-            <a href="{% url 'frontend:staff_comments' %}">View all</a>
-        </div>
-        <div class="table-wrapper">
-            <table class="resource-table dashboard-table">
-                <thead>
-                    <tr>
-                        <th>Comment</th>
-                        <th>Article</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                    </tr>
-                </thead>
-                <tbody id="recentCommentsBody">
-                    <tr class="loading-row"><td colspan="4">Loading recent comments...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
+    
 </div>
 {% endblock %}
 

@@ -71,11 +71,6 @@
                         <i class="fa-regular fa-user"></i> Profile
                     </a>
                 </li>
-                <li class="menu-item">
-                    <a href="#" id="staffLogoutLink">
-                        <i class="fa-solid fa-power-off"></i> Logout
-                    </a>
-                </li>
             </ul>
         </div>
 
@@ -119,7 +114,7 @@
                     <i class="fa-solid fa-plus"></i>
                 </button>
 
-                <button class="nav-icon-btn" type="button" id="staffLogoutButton">
+                <button class="nav-icon-btn" type="button" id="staffLogoutButton" onclick="if (!window.confirm('Do you want to logout?')) { return false; } window.NewsPortalSession?.clear(); window.location.href='/login/';">
                     <i class="fa-solid fa-power-off"></i>
                 </button>
             </div>

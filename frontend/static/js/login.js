@@ -1,4 +1,4 @@
-const LOGIN_API_URL = "https://news-portal-hvgs.onrender.com/api/token/";
+const LOGIN_API_URL = "/auth/login/";
 const LOGIN_SUCCESS_REDIRECT = "/";
 const REDIRECT_DELAY = 1500;
 
@@ -124,10 +124,19 @@ if (form) {
             return;
         }
 
-        localStorage.setItem("accessToken", data.access);
-        localStorage.setItem("refreshToken", data.refresh);
-        localStorage.setItem("access_token", data.access);
-        localStorage.setItem("refresh_token", data.refresh);
+        if (!data?.access) {
+            showFormMessage("Login succeeded, but the remote server did not return an access token.", "error");
+            return;
+        }
+
+        window.NewsPortalSession?.storeTokens({
+            access: data?.access,
+            refresh: data?.refresh,
+        });
+
+        if (data?.user) {
+            window.NewsPortalSession?.storeUser(data.user);
+        }
 
         form.reset();
         clearErrors();
@@ -135,7 +144,7 @@ if (form) {
 
         const nextUrl = (data && data.next) ? data.next : LOGIN_SUCCESS_REDIRECT;
         window.setTimeout(() => {
-            window.location.href = LOGIN_SUCCESS_REDIRECT;
+            window.location.href = nextUrl;
         }, REDIRECT_DELAY);
     } catch (error) {
         showFormMessage("Unable to connect to the server. Please try again later.", "error");

@@ -34,7 +34,11 @@
         document.getElementById('profileStatus').textContent = user?.is_active === false ? 'Inactive' : 'Active';
         document.getElementById('profileBio').textContent = user?.bio || 'No bio added yet.';
         document.getElementById('profileDashboardLink').href = dashboardPath;
-        document.getElementById('profileDashboardLink').textContent = window.NewsPortalSession?.isAdmin(user) ? 'Admin dashboard' : 'My profile';
+        document.getElementById('profileDashboardLink').textContent = window.NewsPortalSession?.isAdmin(user)
+            ? 'Admin dashboard'
+            : window.NewsPortalSession?.isStaff(user)
+                ? 'Staff dashboard'
+                : 'My profile';
         contentEl.hidden = false;
         setMessage('', '');
     }

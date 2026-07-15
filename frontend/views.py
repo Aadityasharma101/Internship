@@ -1,12 +1,13 @@
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 # authentication removed for public staff pages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.conf import settings
-from django.contrib.auth import authenticate
 from django.urls import reverse
+from django.utils import timezone
+from .models import Advertisement
+import base64
 import json
 import urllib.request
 import urllib.error
@@ -413,6 +414,14 @@ def login(request):
     return render(request, 'frontend/pages/login.html', context)
 
 
+def _get_bearer_token(request):
+    authorization = request.headers.get('Authorization', '')
+    parts = authorization.split()
+    if len(parts) == 2 and parts[0].lower() == 'bearer':
+        return parts[1]
+    return ''
+
+
 def _decode_jwt_payload(token):
     """Decode JWT payload without verification to extract claims (useful for role)."""
     try:
@@ -426,6 +435,46 @@ def _decode_jwt_payload(token):
         return json.loads(payload_bytes.decode())
     except Exception:
         return {}
+
+
+def normalize_user_role(user):
+    """Return a normalized role slug from remote user payload."""
+    if not isinstance(user, dict):
+        return ''
+    role = user.get('role')
+    if isinstance(role, str):
+        return role.strip().lower().replace(' ', '_').replace('-', '_')
+    if isinstance(role, dict):
+        raw = role.get('role_name') or role.get('name') or ''
+        return str(raw).strip().lower().replace(' ', '_').replace('-', '_')
+    return ''
+
+
+def is_admin_user(user):
+    if not isinstance(user, dict):
+        return False
+    if user.get('is_superuser'):
+        return True
+    return normalize_user_role(user) in ('admin', 'super_admin', 'superadmin')
+
+
+def is_staff_portal_user(user):
+    if not isinstance(user, dict):
+        return False
+    if is_admin_user(user):
+        return False
+    role = normalize_user_role(user)
+    if role == 'staff':
+        return True
+    return bool(user.get('is_staff'))
+
+
+def login_redirect_for_user(user):
+    if is_admin_user(user):
+        return reverse('frontend:users')
+    if is_staff_portal_user(user):
+        return reverse('frontend:staff')
+    return reverse('frontend:index')
 
 
 def get_remote_user_info(access_token):
@@ -542,25 +591,20 @@ def auth_login(request):
         # Authentication failed - forward error message
         return JsonResponse(token_json, status=token_response.status_code)
 
-    # Save tokens in session (server-side). Avoid exposing tokens to client JS.
-    request.session['access_token'] = access
-    if refresh:
-        request.session['refresh_token'] = refresh
-
     # Fetch user info and store minimal profile
     user = get_remote_user_info(access) or {}
-    request.session['user'] = user
 
-    # Determine redirect based on role
-    role = (user.get('role') or 'reader').lower() if isinstance(user.get('role'), str) else None
-    if user.get('is_superuser') or user.get('is_staff') or role == 'admin':
-        next_url = reverse('frontend:users')  # admin area
-    elif role == 'staff' or user.get('is_staff'):
-        next_url = reverse('frontend:staff')
-    else:
-        next_url = reverse('frontend:index')
+    role = normalize_user_role(user) or 'reader'
+    next_url = login_redirect_for_user(user)
 
-    return JsonResponse({'detail': 'Login successful', 'next': next_url, 'role': role})
+    return JsonResponse({
+        'detail': 'Login successful',
+        'next': next_url,
+        'role': role,
+        'user': user,
+        'access': access,
+        'refresh': refresh,
+    })
 
 
 @csrf_exempt
@@ -583,7 +627,7 @@ def require_remote_login(view_func):
 
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        token = request.session.get('access_token')
+        token = _get_bearer_token(request)
         if not token:
             # Not logged in -> redirect to login page
             if request.is_ajax() or request.headers.get('Accept') == 'application/json':
@@ -594,34 +638,14 @@ def require_remote_login(view_func):
     return _wrapped
 
 def dashboard(request):
-    """
-    Newsletter page view.
-    """
-    # Render the staff dashboard for overview instead of the admin base
-    return staff_dashboard(request)
+    """Staff dashboard overview page."""
+    context = {}
+    return render(request, 'staff/pages/dashboard.html', context)
 
 
 def staff_dashboard(request):
-    """Staff dashboard view (restricted to staff users)."""
-    # require login
-    token = request.session.get('access_token')
-    user = request.session.get('user') or {}
-    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
-    if not token or not (role == 'staff' or user.get('is_staff')):
-        return redirect(reverse('frontend:login'))
-    context = {}
-    articles = []
-    try:
-        data = fetch_json('/articles/feed/?ordering=-id')
-        if isinstance(data, dict):
-            articles = data.get('results', [])
-        elif isinstance(data, list):
-            articles = data
-    except Exception as e:
-        print('staff_dashboard fetch error:', e)
-
-    context['articles'] = articles
-    return render(request, 'staff/pages/staff.html', context)
+    """Staff dashboard view (alias for /staff/)."""
+    return dashboard(request)
 
 
 @csrf_exempt
@@ -631,11 +655,8 @@ def staff_add_article(request):
 
     Expects JSON body or form data with at least `title` and `body`.
     """
-    # Require server-side login
-    token = request.session.get('access_token')
-    user = request.session.get('user') or {}
-    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
-    if not token or not (role == 'staff' or user.get('is_staff')):
+    token = _get_bearer_token(request)
+    if not token:
         return JsonResponse({'detail': 'Authentication required'}, status=401)
 
     try:
@@ -659,15 +680,6 @@ def staff_add_article(request):
 
     try:
         headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
-        # Prefer client-provided Authorization header. If missing, allow a dev-only
-        # fallback token when running in DEBUG and an environment token is configured.
-        # token already added to headers above; allow fallback for debug
-        if not headers.get('Authorization'):
-            fallback = getattr(settings, 'ADMIN_FALLBACK_ACCESS_TOKEN', '')
-            if settings.DEBUG and fallback:
-                headers['Authorization'] = f'Bearer {fallback}'
-            else:
-                return JsonResponse({'detail': 'Missing Authorization header'}, status=401)
 
         # If the client sent multipart/form-data (file upload), forward as multipart
         content_type = request.META.get('CONTENT_TYPE', '')
@@ -775,16 +787,6 @@ def comments(request):
 def reacts(request):
     context = {}
     return render(request, 'admin/pages/reacts.html', context)
-
-
-def staff_dashboard(request):
-    context = {}
-    return render(request, 'staff/pages/dashboard.html', context)
-
-
-def staff_articles(request):
-    context = {}
-    return render(request, 'staff/pages/articles.html', context)
 
 
 def staff_comments(request):

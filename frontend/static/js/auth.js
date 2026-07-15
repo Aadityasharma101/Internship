@@ -74,7 +74,11 @@ function storePortalTokens(tokens) {
 
 async function refreshPortalAccessToken() {
     const refresh = getStoredRefreshToken();
-    if (!refresh) throw new Error('Authentication required');
+    if (!refresh) {
+        const error = new Error('Authentication required');
+        error.status = 401;
+        throw error;
+    }
 
     const response = await fetch(portalApiUrl('/api/token/refresh/'), {
         method: 'POST',
@@ -85,7 +89,9 @@ async function refreshPortalAccessToken() {
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.access) {
         clearPortalSession();
-        throw new Error(data?.detail || 'Session expired');
+        const error = new Error(data?.detail || 'Session expired');
+        error.status = response.status || 401;
+        throw error;
     }
 
     storePortalTokens({ access: data.access, refresh });
@@ -103,12 +109,35 @@ function roleNameFromUser(user) {
 }
 
 function isPortalAdmin(user) {
+    if (user?.is_superuser) {
+        return true;
+    }
+
     const role = roleNameFromUser(user).replace(/[\s-]+/g, '_');
-    return ['admin', 'super_admin', 'superadmin', 'staff'].includes(role);
+    return ['admin', 'super_admin', 'superadmin'].includes(role);
+}
+
+function isPortalStaff(user) {
+    if (isPortalAdmin(user)) {
+        return false;
+    }
+
+    const role = roleNameFromUser(user).replace(/[\s-]+/g, '_');
+    if (role === 'staff') {
+        return true;
+    }
+
+    return Boolean(user?.is_staff);
 }
 
 function getPortalDashboardPath(user) {
-    return isPortalAdmin(user) ? '/dashboard/' : '/profile/';
+    if (isPortalAdmin(user)) {
+        return '/users/';
+    }
+    if (isPortalStaff(user)) {
+        return '/dashboard/';
+    }
+    return '/profile/';
 }
 
 function storePortalUser(user) {
@@ -123,7 +152,32 @@ function getStoredPortalUser() {
     }
 }
 
-async function fetchCurrentPortalUser() {
+function boolClaim(value) {
+    if (typeof value === 'boolean') return value;
+    if (value === null || value === undefined) return false;
+    return ['1', 'true', 'yes', 'admin'].includes(String(value).toLowerCase());
+}
+
+function getPortalUserFromToken() {
+    const payload = decodePortalJwt(getStoredAccessToken());
+    if (!payload) {
+        return null;
+    }
+
+    return {
+        email: payload.email || payload.username || '',
+        username: payload.username || payload.email || '',
+        role: payload.role || payload.user_role || '',
+        is_staff: boolClaim(payload.is_staff || payload.staff),
+        is_superuser: boolClaim(payload.is_superuser || payload.admin),
+    };
+}
+
+function getKnownPortalUser() {
+    return getStoredPortalUser() || getPortalUserFromToken();
+}
+
+async function fetchCurrentPortalUser(hasRefreshed = false) {
     const token = await getPortalAccessToken();
     const response = await fetch(portalApiUrl('/api/users/me/'), {
         headers: {
@@ -132,13 +186,17 @@ async function fetchCurrentPortalUser() {
         },
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 && !hasRefreshed) {
         await refreshPortalAccessToken();
-        return fetchCurrentPortalUser();
+        return fetchCurrentPortalUser(true);
     }
 
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(data?.detail || 'Unable to load profile');
+    if (!response.ok) {
+        const error = new Error(data?.detail || 'Unable to load profile');
+        error.status = response.status;
+        throw error;
+    }
     storePortalUser(data);
     return data;
 }
@@ -157,7 +215,7 @@ function escapePortalHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
-function renderPortalAuthState(user = getStoredPortalUser()) {
+function renderPortalAuthState(user = getKnownPortalUser()) {
     const signedIn = Boolean(getStoredAccessToken() || getStoredRefreshToken());
     const topbarAuth = document.getElementById('topbar-auth');
     const headerAuth = document.getElementById('header-auth-buttons');
@@ -168,14 +226,14 @@ function renderPortalAuthState(user = getStoredPortalUser()) {
         if (topbarAuth) {
             topbarAuth.innerHTML = `
                 <a class="topbar-user" href="/profile/">${escapePortalHtml(displayName)}</a>
-                <a class="topbar-btn" href="${dashboardPath}">${isPortalAdmin(user) ? 'Dashboard' : 'Profile'}</a>
+                <a class="topbar-btn" href="${dashboardPath}">${isPortalAdmin(user) || isPortalStaff(user) ? 'Dashboard' : 'Profile'}</a>
                 <button class="topbar-btn topbar-btn--logout" type="button" onclick="handleLogout()">Sign Out</button>
             `;
         }
         if (headerAuth) {
             headerAuth.innerHTML = `
                 <a href="/profile/" class="btn-nav btn-nav--ghost">Profile</a>
-                <a href="${dashboardPath}" class="btn-nav btn-nav--primary">${isPortalAdmin(user) ? 'Dashboard' : 'My Account'}</a>
+                <a href="${dashboardPath}" class="btn-nav btn-nav--primary">${isPortalAdmin(user) || isPortalStaff(user) ? 'Dashboard' : 'My Account'}</a>
             `;
         }
         return;
@@ -205,9 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (getStoredAccessToken() || getStoredRefreshToken()) {
         fetchCurrentPortalUser()
             .then(renderPortalAuthState)
-            .catch(() => {
-                clearPortalSession();
-                renderPortalAuthState();
+            .catch((error) => {
+                if (error?.status === 401) {
+                    clearPortalSession();
+                }
+                renderPortalAuthState(getKnownPortalUser());
             });
     }
 });
@@ -215,11 +275,14 @@ document.addEventListener('DOMContentLoaded', () => {
 window.NewsPortalSession = {
     clear: clearPortalSession,
     storeTokens: storePortalTokens,
+    storeUser: storePortalUser,
     getAccessToken: getPortalAccessToken,
     fetchCurrentUser: fetchCurrentPortalUser,
     getStoredUser: getStoredPortalUser,
+    getKnownUser: getKnownPortalUser,
     getDashboardPath: getPortalDashboardPath,
     isAdmin: isPortalAdmin,
+    isStaff: isPortalStaff,
     roleName: roleNameFromUser,
     renderAuthState: renderPortalAuthState,
     displayName: getPortalDisplayName,

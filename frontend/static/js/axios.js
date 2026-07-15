@@ -2,8 +2,7 @@
 
 const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
 const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
-const FALLBACK_ADMIN_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNzUwNjM5LCJpYXQiOjE3ODE3NTAzMzksImp0aSI6ImViN2EwMjA2OWE2ZTRlMjg4YTliN2UyNTZkMGRmNmM4IiwidXNlcl9pZCI6IjEifQ.IaV1-0TqrLY6TFBHB6g6VdbWW1g3N_BvyIKDfrKUfig';
-const FALLBACK_ADMIN_REFRESH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc4MTgzNjczOSwiaWF0IjoxNzgxNzUwMzM5LCJqdGkiOiIwZGRjNjI3M2U0NWM0M2UwODNhMGM2YjExNTNhODUxMyIsInVzZXJfaWQiOiIxIn0.omYvbEFaDw7ygEUgdYAL98kYzSuxcht5IMfx5NVQf7E';
+const AUTH_INVALID_KEY = 'news_portal_auth_invalid';
 
 function apiUrl(path = '') {
     if (/^https?:\/\//i.test(path)) {
@@ -53,6 +52,77 @@ function clearAuthInvalid() {
     localStorage.removeItem(AUTH_INVALID_KEY);
 }
 
+function clearAuthTokens() {
+    if (window.NewsPortalSession?.clear) {
+        window.NewsPortalSession.clear();
+        return;
+    }
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+    clearAuthInvalid();
+}
+
+function getRefreshToken() {
+    if (isAuthInvalid()) {
+        return null;
+    }
+
+    const storedToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
+
+    if (storedToken && !isTokenExpired(storedToken)) {
+        localStorage.setItem('refresh_token', storedToken);
+        localStorage.setItem('refreshToken', storedToken);
+        return storedToken;
+    }
+
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+    return null;
+}
+
+function hasStoredAuthToken() {
+    const accessToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
+    return Boolean((accessToken && !isTokenExpired(accessToken)) || (refreshToken && !isTokenExpired(refreshToken)));
+}
+
+function redirectToLogin() {
+    if (window.location.pathname !== '/login/') {
+        window.location.href = '/login/';
+    }
+}
+
+function isAuthEndpoint(config = {}) {
+    const url = String(config.url || '');
+    return /\/(auth\/login|token|token\/refresh)\//.test(url);
+}
+
+async function refreshAccessToken() {
+    const refresh = getRefreshToken();
+
+    if (!refresh) {
+        return null;
+    }
+
+    const response = await axios.post(apiUrl('/api/token/refresh/'), { refresh });
+    const access = response.data?.access;
+
+    if (!access) {
+        return null;
+    }
+
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refresh_token', refresh);
+    localStorage.setItem('refreshToken', refresh);
+    clearAuthInvalid();
+
+    return access;
+}
+
 function getAccessToken() {
     const storedToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
 
@@ -60,12 +130,9 @@ function getAccessToken() {
         return storedToken;
     }
 
-    localStorage.setItem('access_token', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('accessToken', FALLBACK_ADMIN_ACCESS_TOKEN);
-    localStorage.setItem('refresh_token', FALLBACK_ADMIN_REFRESH_TOKEN);
-    localStorage.setItem('refreshToken', FALLBACK_ADMIN_REFRESH_TOKEN);
-
-    return FALLBACK_ADMIN_ACCESS_TOKEN;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
+    return null;
 }
 
 const api = axios.create({
@@ -75,6 +142,9 @@ const api = axios.create({
         'Content-Type': 'application/json'
     }
 });
+
+window.api = api;
+window.apiUrl = apiUrl;
 
 api.interceptors.request.use(
     async (config) => {
@@ -111,29 +181,18 @@ api.interceptors.response.use(
             originalRequest._retry = true;
 
                 try {
-                    const storedRefreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
-                    let refreshResponse;
-
-                    try {
-                    refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                        refresh: storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN
-                    });
-                } catch (storedRefreshError) {
-                        refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                            refresh: FALLBACK_ADMIN_REFRESH_TOKEN
-                        });
+                    const newAccessToken = await refreshAccessToken();
+                    if (!newAccessToken) {
+                        throw new Error('Authentication required');
                     }
-
-                    const newAccessToken = refreshResponse.data.access;
-                    localStorage.setItem('access_token', newAccessToken);
-                    localStorage.setItem('accessToken', newAccessToken);
-                    localStorage.setItem('refresh_token', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
-                    localStorage.setItem('refreshToken', storedRefreshToken || FALLBACK_ADMIN_REFRESH_TOKEN);
                     originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
                     return api(originalRequest);
                 } catch (refreshError) {
                     console.error('Token refresh failed', refreshError);
+                    clearAuthTokens();
+                    markAuthInvalid();
+                    redirectToLogin();
                 }
             }
 

@@ -13,6 +13,26 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 
+# Make django-cors-headers optional so the server can still start
+try:
+    import corsheaders  # noqa: F401
+    from corsheaders.defaults import default_headers
+    HAS_CORSHEADERS = True
+except Exception:
+    # Minimal fallback header list when corsheaders isn't installed
+    HAS_CORSHEADERS = False
+    default_headers = (
+        'accept',
+        'accept-encoding',
+        'authorization',
+        'content-type',
+        'dnt',
+        'origin',
+        'user-agent',
+        'x-csrftoken',
+        'x-requested-with',
+    )
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -42,6 +62,10 @@ INSTALLED_APPS = [
 
 ]
 
+# Add corsheaders app only if available
+if HAS_CORSHEADERS:
+    INSTALLED_APPS.insert(0, 'corsheaders')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -51,6 +75,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Prepend CORS middleware if available
+if HAS_CORSHEADERS:
+    MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -132,9 +160,3 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # External API base used by the frontend. Change if you want a different backend.
 API_BASE_URL = 'https://news-portal-hvgs.onrender.com'
-
-# Optional dev-only fallback admin tokens. Set these in your environment for local testing only.
-# Example (Windows CMD):
-# set ADMIN_FALLBACK_ACCESS_TOKEN=eyJ... && set ADMIN_FALLBACK_REFRESH_TOKEN=eyJ...
-ADMIN_FALLBACK_ACCESS_TOKEN = os.environ.get('ADMIN_FALLBACK_ACCESS_TOKEN', '')
-ADMIN_FALLBACK_REFRESH_TOKEN = os.environ.get('ADMIN_FALLBACK_REFRESH_TOKEN', '')

@@ -124,7 +124,20 @@ if (form) {
             return;
         }
 
-        // Server saved tokens in session. The response may include a `next` URL.
+        if (!data?.access) {
+            showFormMessage("Login succeeded, but the remote server did not return an access token.", "error");
+            return;
+        }
+
+        window.NewsPortalSession?.storeTokens({
+            access: data?.access,
+            refresh: data?.refresh,
+        });
+
+        if (data?.user) {
+            window.NewsPortalSession?.storeUser(data.user);
+        }
+
         form.reset();
         clearErrors();
         showFormMessage("Login successful. Redirecting...", "success");

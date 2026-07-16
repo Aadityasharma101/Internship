@@ -1,445 +1,232 @@
+// ============================================================
+// News Portal — Homepage News JavaScript
+// Loads feed, trending, featured story from the remote API
+// ============================================================
+
 const DEFAULT_MEDIA_BASE = 'https://news-portal-hvgs.onrender.com';
-const FETCH_TIMEOUT_MS = 15000;
-const DETAIL_FETCH_TIMEOUT_MS = 10000;
-const MAX_DETAIL_REQUESTS = 2;
+const FETCH_TIMEOUT_MS   = 15000;
+const DETAIL_TIMEOUT_MS  = 10000;
+const MAX_PARALLEL_DETAIL = 3;
+
 let CURRENT_FEED = [];
+let HOME_API_BASE = DEFAULT_MEDIA_BASE;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const appRoot = document.querySelector('.page-shell');
-    if (!appRoot) {
-        return;
-    }
+    const root = document.querySelector('.page-shell');
+    if (!root) return;
 
-    const apiBaseFromRoot = appRoot.dataset.apiBase;
-    const apiBaseFromBody = document.body?.dataset?.apiBase;
-    const apiBase = apiBaseFromRoot || apiBaseFromBody || '/api';
-
+    const apiBase = root.dataset.apiBase || document.body?.dataset?.apiBase || DEFAULT_MEDIA_BASE;
+    HOME_API_BASE = apiBase;
     initializeHomepage(apiBase);
-    // start polling for new articles
-    startFeedPolling(apiBase, 15000);
+    startFeedPolling(apiBase, 20000);
 });
 
+window.addEventListener('pageshow', () => {
+    initializeHomepage(HOME_API_BASE);
+});
+
+window.NewsPortalApi?.onDataChanged?.((event) => {
+    if (event?.type === 'articles') {
+        initializeHomepage(HOME_API_BASE);
+    }
+});
+
+// ============================================================
+// MEDIA URL
+// ============================================================
 function getMediaBase() {
-    const mediaBase = document.body?.dataset?.mediaBase || DEFAULT_MEDIA_BASE;
-    return mediaBase.replace(/\/$/, '');
+    return (document.body?.dataset?.mediaBase || DEFAULT_MEDIA_BASE).replace(/\/$/, '');
 }
 
+// ============================================================
+// MAIN INITIALISER
+// ============================================================
 async function initializeHomepage(apiBase) {
-    const featuredHero = document.getElementById('featured-hero');
-    const latestNewsGrid = document.getElementById('latest-news-grid');
-    const trendingNewsGrid = document.getElementById('trending-news-grid');
+    const featuredHero    = document.getElementById('featured-hero');
+    const latestGrid      = document.getElementById('latest-news-grid');
+    const trendingGrid    = document.getElementById('trending-news-grid');
 
     try {
-        const [feedResponse, trendingResponse] = await Promise.allSettled([
-            fetchJson(`${apiBase}/articles/feed/`),
+        const [feedResult, trendingResult] = await Promise.allSettled([
+            fetchJson(`${apiBase}/articles/feed/?ordering=-id`),
             fetchJson(`${apiBase}/articles/trending/`),
         ]);
 
-        const feedArticles = extractArticles(feedResponse.status === 'fulfilled' ? feedResponse.value : null);
-        const trendingArticles = extractArticles(trendingResponse.status === 'fulfilled' ? trendingResponse.value : null);
+        const feedArticles     = extractArticles(feedResult.status     === 'fulfilled' ? feedResult.value     : null);
+        const trendingArticles = extractArticles(trendingResult.status === 'fulfilled' ? trendingResult.value : null);
 
-        // store current feed so polling can detect changes
         CURRENT_FEED = feedArticles.slice();
 
-        const latestArticles = take(feedArticles.length ? feedArticles : trendingArticles, 6).map((article) => mergeArticleData(article));
-        const trendingCards = take(trendingArticles, 4).map((article) => mergeArticleData(article));
+        const latestArticles  = take(feedArticles.length ? feedArticles : trendingArticles, 6).map(mergeArticleData);
+        const trendingCards   = take(trendingArticles, 5).map(mergeArticleData);
         const featuredArticle = mergeArticleData(feedArticles[0] || trendingArticles[0] || null);
 
         renderFeaturedHero(featuredHero, featuredArticle);
-        renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
-        renderTrendingGrid(trendingNewsGrid, trendingCards);
+        renderNewsGrid(latestGrid, latestArticles);
+        renderTrendingGrid(trendingGrid, trendingCards);
         updateBreakingHeadline(featuredArticle);
         updateCategoryFilter(categoriesFromArticles(feedArticles, trendingArticles));
 
         if (!feedArticles.length && !trendingArticles.length) {
-            renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
+            renderError(latestGrid, 'No articles available at the moment. Please check back soon.');
         }
-        if (!trendingArticles.length) {
-            renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
+        if (!trendingArticles.length && !feedArticles.length) {
+            renderError(trendingGrid, 'No trending stories available.');
         }
 
+        // Attempt to load article images (detail endpoint)
         hydrateArticleImages(apiBase, [
-            {
-                articles: [featuredArticle].filter(Boolean),
-                render: () => renderFeaturedHero(featuredHero, featuredArticle),
-            },
-            {
-                articles: latestArticles,
-                render: () => renderNewsGrid(latestNewsGrid, latestArticles, { compact: false }),
-            },
-            {
-                articles: trendingCards,
-                render: () => renderTrendingGrid(trendingNewsGrid, trendingCards),
-            },
+            { articles: [featuredArticle].filter(Boolean), render: () => renderFeaturedHero(featuredHero, featuredArticle) },
+            { articles: latestArticles,                    render: () => renderNewsGrid(latestGrid, latestArticles) },
+            { articles: trendingCards,                     render: () => renderTrendingGrid(trendingGrid, trendingCards) },
         ]);
-    } catch (error) {
-        console.error('Failed to load homepage news:', error);
-        renderError(featuredHero, 'We could not load the featured story right now.');
-        renderError(latestNewsGrid, 'Latest news is unavailable at the moment.');
-        renderError(trendingNewsGrid, 'Trending stories are unavailable at the moment.');
+
+    } catch (err) {
+        console.error('Homepage load error:', err);
+        renderError(featuredHero, 'Could not load the featured story right now.');
+        renderError(latestGrid,   'Latest news is unavailable at the moment.');
+        renderError(trendingGrid, 'Trending stories are unavailable.');
     }
 }
 
-// Poll the feed periodically and insert any new articles at top
-function startFeedPolling(apiBase, intervalMs = 15000) {
+// ============================================================
+// POLLING
+// ============================================================
+function startFeedPolling(apiBase, intervalMs = 20000) {
     setInterval(async () => {
         try {
-            const fresh = await fetchJson(`${apiBase}/articles/feed/`, true);
-            const freshArticles = extractArticles(fresh || null);
-            if (!freshArticles.length) return;
+            const fresh = await fetchJson(`${apiBase}/articles/feed/?ordering=-id`);
+            const articles = extractArticles(fresh);
+            if (!articles.length) return;
 
-            // If the newest article id differs, assume new data available
-            const newestId = freshArticles[0]?.id;
-            const currentNewest = CURRENT_FEED[0]?.id;
-            if (newestId && newestId !== currentNewest) {
-                // update current feed and re-render top sections
-                CURRENT_FEED = freshArticles.slice();
-                const latestArticles = take(CURRENT_FEED, 6).map((article) => mergeArticleData(article));
-                const featuredArticle = mergeArticleData(CURRENT_FEED[0] || null);
-                const featuredHero = document.getElementById('featured-hero');
-                const latestNewsGrid = document.getElementById('latest-news-grid');
-                renderFeaturedHero(featuredHero, featuredArticle);
-                renderNewsGrid(latestNewsGrid, latestArticles, { compact: false });
-                // optionally update breaking headline
-                updateBreakingHeadline(featuredArticle);
+            const newestId = articles[0]?.id;
+            if (newestId && newestId !== CURRENT_FEED[0]?.id) {
+                CURRENT_FEED = articles.slice();
+                const latest    = take(CURRENT_FEED, 6).map(mergeArticleData);
+                const featured  = mergeArticleData(CURRENT_FEED[0]);
+                renderFeaturedHero(document.getElementById('featured-hero'), featured);
+                renderNewsGrid(document.getElementById('latest-news-grid'), latest);
+                updateBreakingHeadline(featured);
             }
-        } catch (e) {
-            console.warn('Feed polling error', e);
-        }
+        } catch { /* silently ignore polling errors */ }
     }, intervalMs);
 }
 
-async function fetchJson(url, allowNotFound = false, timeoutMs = FETCH_TIMEOUT_MS) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-
+// ============================================================
+// FETCH HELPERS
+// ============================================================
+async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
+    const ctrl = new AbortController();
+    const tid  = window.setTimeout(() => ctrl.abort(), timeoutMs);
+    const freshUrl = addFreshParam(url);
     try {
-        const response = await fetch(url, {
+        const res = await fetch(freshUrl, {
             headers: {
-                Accept: 'application/json',
+                Accept: 'application/json'
             },
-            signal: controller.signal,
+            signal: ctrl.signal,
         });
-
-        if (allowNotFound && response.status === 404) {
-            return null;
-        }
-
-        if (!response.ok) {
-            throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        return response.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
     } finally {
-        window.clearTimeout(timeoutId);
+        window.clearTimeout(tid);
     }
+}
+
+function addFreshParam(url) {
+    const target = new URL(url, window.location.origin);
+    target.searchParams.set('_', String(Date.now()));
+    return target.toString();
 }
 
 function extractArticles(payload) {
-    if (!payload) {
-        return [];
-    }
-
-    if (Array.isArray(payload)) {
-        return payload;
-    }
-
-    if (Array.isArray(payload.results)) {
-        return payload.results;
-    }
-
-    if (payload.id || payload.title) {
-        return [payload];
-    }
-
+    if (!payload)                          return [];
+    if (Array.isArray(payload))            return payload;
+    if (Array.isArray(payload.results))    return payload.results;
+    if (payload.id || payload.title)       return [payload];
     return [];
 }
 
-function take(items, count) {
-    return items.slice(0, count);
-}
+function take(arr, n) { return arr.slice(0, n); }
 
-async function hydrateArticleImages(apiBase, sections) {
-    const articleMap = new Map();
-
-    sections.forEach(({ articles }) => {
-        articles.forEach((article) => {
-            if (!article?.id || articleMap.has(article.id)) {
-                return;
-            }
-            articleMap.set(article.id, article);
-        });
-    });
-
-    const articlesNeedingImages = [...articleMap.values()].filter((article) => !article.imageUrl);
-    if (!articlesNeedingImages.length) {
-        return;
-    }
-
-    const detailEntries = await mapConcurrent(
-        articlesNeedingImages.map((article) => article.id),
-        MAX_DETAIL_REQUESTS,
-        async (articleId) => {
-            const detail = await fetchArticleDetail(apiBase, articleId);
-            return detail ? [articleId, detail] : null;
-        }
-    );
-
-    const detailMap = new Map(
-        detailEntries.filter(Boolean).map(([articleId, detail]) => [articleId, detail])
-    );
-
-    if (!detailMap.size) {
-        return;
-    }
-
-    sections.forEach(({ articles, render }) => {
-        let sectionUpdated = false;
-
-        articles.forEach((article) => {
-            const detail = detailMap.get(article.id);
-            if (!detail) {
-                return;
-            }
-
-            const merged = mergeArticleData(article, detail);
-            if (merged.imageUrl && merged.imageUrl !== article.imageUrl) {
-                Object.assign(article, merged);
-                sectionUpdated = true;
-            }
-        });
-
-        if (sectionUpdated) {
-            render();
-        }
-    });
-}
-
-async function mapConcurrent(items, limit, worker) {
-    const results = new Array(items.length);
-    let nextIndex = 0;
-
-    async function runWorker() {
-        while (nextIndex < items.length) {
-            const currentIndex = nextIndex;
-            nextIndex += 1;
-            results[currentIndex] = await worker(items[currentIndex], currentIndex);
-        }
-    }
-
-    const workers = Array.from({ length: Math.min(limit, items.length) }, () => runWorker());
-    await Promise.all(workers);
-    return results;
-}
-
-async function fetchArticleDetail(apiBase, articleId) {
-    if (!articleId) {
-        return null;
-    }
-
-    try {
-        const detail = await fetchJson(
-            `${apiBase}/articles/${articleId}/`,
-            true,
-            DETAIL_FETCH_TIMEOUT_MS
-        );
-
-        if (!detail || typeof detail !== 'object' || !Object.keys(detail).length) {
-            return null;
-        }
-
-        return detail;
-    } catch (error) {
-        console.warn(`Could not load detail for article ${articleId}`, error);
-        return null;
-    }
-}
-
-function mergeArticleData(baseArticle, detailArticle = null) {
-    if (!baseArticle && !detailArticle) {
-        return null;
-    }
-
-    const combined = {
-        ...(baseArticle || {}),
-        ...(detailArticle || {}),
-    };
-
-    combined.summary = getSummary(combined);
-    combined.displayDate = formatDate(combined.published_at);
-    combined.imageUrl = resolveMediaUrl(extractImageSource(combined));
-    combined.categoryLabel = combined.category_name || combined.category || 'Top Story';
-    combined.authorLabel = combined.author_name || 'News Desk';
-
+// ============================================================
+// ARTICLE DATA NORMALISATION
+// ============================================================
+function mergeArticleData(base, detail = null) {
+    if (!base && !detail) return null;
+    const combined = { ...(base || {}), ...(detail || {}) };
+    combined.summary       = getSummary(combined);
+    combined.displayDate   = formatDate(combined.published_at);
+    combined.imageUrl      = resolveMediaUrl(extractImageSource(combined));
+    combined.categoryLabel = combined.category_name || combined.category || 'News';
+    combined.authorLabel   = combined.author_name || 'News Desk';
     return combined;
 }
 
 function extractImageSource(article) {
-    if (!article) {
-        return '';
+    if (!article) return '';
+    const keys = ['image','image_url','thumbnail','thumbnail_url','photo','photo_url',
+                  'cover_image','cover_image_url','featured_image','featured_image_url',
+                  'banner','banner_url','media','media_url','preview','preview_url'];
+    for (const k of keys) {
+        if (article[k]) return article[k];
     }
-
-    const candidates = [
-        article.image,
-        article.image_url,
-        article.thumbnail,
-        article.thumbnail_url,
-        article.photo,
-        article.photo_url,
-        article.cover_image,
-        article.cover_image_url,
-        article.preview,
-        article.preview_url,
-        article.featured_image,
-        article.featured_image_url,
-        article.banner,
-        article.banner_url,
-        article.media,
-        article.media_url,
-    ];
-
-    for (const candidate of candidates) {
-        if (candidate) {
-            return candidate;
-        }
-    }
-
     return '';
 }
 
 function resolveMediaUrl(url) {
-    if (!url) {
-        return '';
-    }
-
+    if (!url) return '';
     if (typeof url === 'object') {
-        return resolveMediaUrl(
-            url.url ||
-            url.src ||
-            url.path ||
-            url.file ||
-            url.image ||
-            url.media ||
-            url.secure_url ||
-            url.absolute_url ||
-            ''
-        );
+        return resolveMediaUrl(url.url || url.src || url.path || url.file || url.image || '');
     }
-
-    const value = String(url).trim();
-    if (!value) {
-        return '';
-    }
-
-    if (/^https?:\/\//i.test(value) || value.startsWith('data:')) {
-        return value;
-    }
-
-    const mediaBase = getMediaBase();
-
-    if (value.startsWith('/media-proxy/')) {
-        return value;
-    }
-
-    if (value.startsWith('/media/')) {
-        return `${mediaBase}${value}`;
-    }
-
-    if (value.startsWith('media/')) {
-        return `${mediaBase}/${value}`;
-    }
-
-    if (value.startsWith('/')) {
-        const resolved = `${mediaBase}${value}`;
-        // debug log when images fail to load in browser console can help
-        // (network tab shows exact request)
-        return resolved;
-    }
-
-    return `${mediaBase}/media/${value}`;
+    const v = String(url).trim();
+    if (!v) return '';
+    if (/^https?:\/\//i.test(v) || v.startsWith('data:')) return v;
+    const base = getMediaBase();
+    if (v.startsWith('/media/')) return `${base}${v}`;
+    if (v.startsWith('media/'))  return `${base}/${v}`;
+    if (v.startsWith('/'))       return `${base}${v}`;
+    return `${base}/media/${v}`;
 }
 
 function getSummary(article) {
-    if (!article) {
-        return '';
-    }
-
-    if (article.summary) {
-        return article.summary;
-    }
-
-    const sourceText = article.body || article.description || '';
-    if (!sourceText) {
-        return 'Read the full article for more details.';
-    }
-
-    return truncateText(sourceText, 140);
+    if (!article) return '';
+    if (article.summary) return article.summary;
+    const src = article.body || article.description || '';
+    if (!src) return 'Read the full story for more details.';
+    return truncate(src, 160);
 }
 
-function truncateText(text, limit) {
-    const cleanText = String(text).replace(/\s+/g, ' ').trim();
-    if (cleanText.length <= limit) {
-        return cleanText;
-    }
-
-    return `${cleanText.slice(0, limit).trimEnd()}...`;
+function truncate(text, limit) {
+    const clean = String(text).replace(/\s+/g, ' ').trim();
+    return clean.length <= limit ? clean : `${clean.slice(0, limit).trimEnd()}...`;
 }
 
-function formatDate(dateString) {
-    if (!dateString) {
-        return 'Updated recently';
-    }
-
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) {
-        return 'Updated recently';
-    }
-
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+function formatDate(dateStr) {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Recently';
+    const now  = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60)    return 'Just now';
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function categoriesFromArticles(...articleLists) {
+function categoriesFromArticles(...lists) {
     const seen = new Set();
-    const categories = [];
-
-    articleLists.flat().forEach((article) => {
-        const label = article.category_name || article.category || article.categoryLabel;
-        if (!label || seen.has(label)) {
-            return;
-        }
-        seen.add(label);
-        categories.push(label);
+    const cats = [];
+    lists.flat().forEach((a) => {
+        const label = a?.category_name || a?.category || a?.categoryLabel;
+        if (label && !seen.has(label)) { seen.add(label); cats.push(label); }
     });
-
-    return categories;
+    return cats;
 }
 
-function updateBreakingHeadline(article) {
-    const headline = document.getElementById('breaking-headline');
-    if (!headline) {
-        return;
-    }
-
-    headline.textContent = article?.title || 'No breaking stories available right now.';
-}
-
-function updateCategoryFilter(categories) {
-    const container = document.getElementById('category-filter');
-    if (!container) {
-        return;
-    }
-
-    const labels = categories.length ? categories : ['All'];
-    container.innerHTML = labels
-        .map((label, index) => `<span class="category-btn${index === 0 ? ' active' : ''}">${escapeHtml(label)}</span>`)
-        .join('');
-}
-
-// --- Minimal rendering helpers (prevent ReferenceError if API data missing) ---
+// ============================================================
+// RENDER FUNCTIONS
+// ============================================================
 function escapeHtml(str) {
     return String(str || '')
         .replace(/&/g, '&amp;')
@@ -452,46 +239,48 @@ function escapeHtml(str) {
 function renderError(container, message) {
     if (!container) return;
     container.classList.remove('loading-state');
-    container.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+    container.innerHTML = `<div class="error-message"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:8px;opacity:.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><br>${escapeHtml(message)}</div>`;
 }
 
 function renderFeaturedHero(container, article) {
     if (!container) return;
     container.classList.remove('loading-state');
+
     if (!article) {
-        container.innerHTML = '<p>No featured story available.</p>';
+        container.innerHTML = '<p style="padding:24px;color:var(--muted)">No featured story available.</p>';
         return;
     }
     const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
-    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image" loading="eager" decoding="async" width="1280" height="720" onerror="this.onerror=null;this.src='/static/images/placeholder.svg'">`;
+    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
     container.innerHTML = `
         <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
             ${img}
-            <div class="featured-meta">
-                <h3 class="featured-title">${escapeHtml(article.title)}</h3>
-                <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
-            </div>
+            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
         </a>
     `;
 }
 
-function renderNewsGrid(container, articles, opts = {}) {
+function renderNewsGrid(container, articles) {
     if (!container) return;
     container.classList.remove('loading-state');
+
     if (!articles || !articles.length) {
-        container.innerHTML = '<p>No articles available.</p>';
+        container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">No articles available.</p>';
         return;
     }
-    container.innerHTML = articles.map((a) => {
-        const thumb = a.imageUrl || '/static/images/placeholder.svg';
+
+    container.innerHTML = articles.map((a, i) => {
+        const thumb   = a.imageUrl || '';
+        const imgHtml = thumb
+            ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="${i < 3 ? 'eager' : 'lazy'}" onerror="this.parentElement.classList.add('no-img')">`
+            : '';
         return `
         <article class="news-card">
-            <a href="/news/${escapeHtml(a.id)}/" class="news-link">
-                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="lazy" decoding="async" width="320" height="180" onerror="this.onerror=null;this.src='/static/images/placeholder.svg'"></div>
-                <div class="news-card-content">
-                    <h4>${escapeHtml(a.title)}</h4>
-                    <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
-                </div>
+            <a href="/news/${escapeHtml(a.id)}/">
+                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
+                <h4>${escapeHtml(a.title)}</h4>
+                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
             </a>
         </article>
     `}).join('');
@@ -500,9 +289,112 @@ function renderNewsGrid(container, articles, opts = {}) {
 function renderTrendingGrid(container, cards) {
     if (!container) return;
     container.classList.remove('loading-state');
+
     if (!cards || !cards.length) {
-        container.innerHTML = '<p>No trending stories.</p>';
+        container.innerHTML = '<p style="color:var(--muted);font-size:13px">No trending stories.</p>';
         return;
     }
-    container.innerHTML = cards.map((c) => `<div class="trending-item"><a href="/news/${escapeHtml(c.id)}/">${escapeHtml(c.title)}</a></div>`).join('');
+
+    container.innerHTML = cards.map((c, i) => `
+        <div class="trending-item">
+            <a href="/news/${escapeHtml(String(c.id))}/">
+                <span class="trending-num">${i + 1}</span>
+                <span>${escapeHtml(c.title || 'Story')}</span>
+            </a>
+        </div>
+    `).join('');
+}
+
+function updateBreakingHeadline(article) {
+    const el = document.getElementById('breaking-headline');
+    if (el) el.textContent = article?.title || 'No breaking stories at this moment.';
+}
+
+function updateCategoryFilter(categories) {
+    const container = document.getElementById('category-filter');
+    if (!container) return;
+
+    const labels = categories.length ? categories : [];
+    const allBtn = `<button class="category-btn active" type="button" data-category="all">All</button>`;
+    const catBtns = labels.map((label) =>
+        `<button class="category-btn" type="button" data-category="${escapeHtml(label)}">${escapeHtml(label)}</button>`
+    ).join('');
+
+    container.innerHTML = allBtn + catBtns;
+
+    container.querySelectorAll('.category-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.category-btn').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Category filtering is visual-only for now; full API filter can be wired here
+        });
+    });
+}
+
+// ============================================================
+// IMAGE HYDRATION (fetch detail to get images not in feed)
+// ============================================================
+async function hydrateArticleImages(apiBase, sections) {
+    const articleMap = new Map();
+    sections.forEach(({ articles }) => {
+        articles.forEach((a) => {
+            if (a?.id && !articleMap.has(a.id)) articleMap.set(a.id, a);
+        });
+    });
+
+    const needingImages = [...articleMap.values()].filter((a) => !a.imageUrl);
+    if (!needingImages.length) return;
+
+    const details = await mapConcurrent(
+        needingImages.map((a) => a.id),
+        MAX_PARALLEL_DETAIL,
+        (id) => fetchArticleDetail(apiBase, id)
+    );
+
+    const detailMap = new Map();
+    needingImages.forEach((a, i) => {
+        if (details[i]) detailMap.set(a.id, details[i]);
+    });
+
+    if (!detailMap.size) return;
+
+    sections.forEach(({ articles, render }) => {
+        let updated = false;
+        articles.forEach((a) => {
+            const d = detailMap.get(a.id);
+            if (!d) return;
+            const merged = mergeArticleData(a, d);
+            if (merged.imageUrl && merged.imageUrl !== a.imageUrl) {
+                Object.assign(a, merged);
+                updated = true;
+            }
+        });
+        if (updated) render();
+    });
+}
+
+async function fetchArticleDetail(apiBase, id) {
+    if (!id) return null;
+    try {
+        const data = await fetchJson(`${apiBase}/articles/${id}/`, DETAIL_TIMEOUT_MS);
+        if (!data || typeof data !== 'object' || !Object.keys(data).length) return null;
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+async function mapConcurrent(items, limit, worker) {
+    const results = new Array(items.length);
+    let next = 0;
+
+    async function run() {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await worker(items[i], i);
+        }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+    return results;
 }

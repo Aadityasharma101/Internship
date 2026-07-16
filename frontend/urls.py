@@ -13,6 +13,7 @@ urlpatterns = [
     path('auth/logout/', views.auth_logout, name='auth_logout'),
    
     path('newsletter/', views.newsletter, name='newsletter'),
+    path('profile/', views.profile, name='profile'),
     path('news/<int:article_id>/', views.news_detail, name='news_detail'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('staff/', views.staff_dashboard, name='staff'),
@@ -28,5 +29,14 @@ urlpatterns = [
     path('bookmarks/', views.bookmarks, name='bookmarks'),
     path('comments/', views.comments, name='comments'),
     path('reacts/', views.reacts, name='reacts'),
+    path('staff/', views.staff_dashboard, name='staff_dashboard'),
+    path('staff/articles/', views.staff_articles, name='staff_articles'),
+    path('staff/comments/', views.staff_comments, name='staff_comments'),
+    path('staff/advertisements/', views.staff_advertisements, name='staff_advertisements'),
+    path('staff/profile/', views.staff_profile, name='staff_profile'),
+    path('api/ads/', views.ads_api, name='ads_api'),
+    path('api/ads/<int:ad_id>/', views.ads_detail, name='ads_detail'),
+    path('api/ads/click/', views.ads_tracking, {'action': 'click'}, name='ads_click'),
+    path('api/ads/impressions/', views.ads_tracking, {'action': 'impression'}, name='ads_impression'),
     path('remote/<path:path>', views.api_proxy, name='api_proxy'),
 ]

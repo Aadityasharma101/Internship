@@ -5,10 +5,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}News Portal{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}Breaking news, live updates, and in-depth reporting. Stay informed with News Portal.{% endblock %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}">
+<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}" data-ads-endpoint="/api/ads/">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="container topbar-inner">
+            <div class="topbar-left">
+                <span class="topbar-date" id="topbar-date"></span>
+                <span class="topbar-sep">|</span>
+                <span class="topbar-tagline">Trusted updates, delivered as the story moves</span>
+            </div>
+            <div class="topbar-right" id="topbar-auth">
+                <!-- Filled by JS based on auth state -->
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER -->
     <header class="header">
         <div class="header-top">
             <div class="container">
@@ -21,23 +41,41 @@
                     </div>
                     <div class="header-actions">
                         <input type="search" class="search-box" placeholder="Search news..." aria-label="Search news">
-                        <a href="{% url 'frontend:login' %}" class="btn-signin">Sign in</a>
+                        <button class="btn-signin" type="button">Sign in</button>
                     </div>
                 </div>
+
+                <!-- Hamburger -->
+                <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                    <span></span><span></span><span></span>
+                </button>
             </div>
         </div>
 
-        <nav class="navbar" aria-label="Main navigation">
+        <!-- NAVBAR -->
+        <nav class="navbar" aria-label="Main navigation" id="main-nav">
             <div class="container navbar-inner">
-                <div class="nav-tabs site-nav__links">
-                    <a href="{% url 'frontend:index' %}" class="nav-tab">Home</a>
-                    <a href="{% url 'frontend:newsletter' %}" class="nav-tab">Newsletter</a>
+                <div class="nav-links">
+                    <a href="{% url 'frontend:index' %}" class="nav-link">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        Home
+                    </a>
+                    <a href="{% url 'frontend:newsletter' %}" class="nav-link">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Newsletter
+                    </a>
                 </div>
                 <div id="nav-categories" class="nav-categories" aria-live="polite"></div>
-                <span id="nav-live-count" class="nav-live-count">Loading live stories...</span>
+                <span id="nav-live-count" class="nav-live-pill">
+                    <span class="live-dot"></span>
+                    <span class="live-text">Loading...</span>
+                </span>
             </div>
         </nav>
     </header>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobile-overlay"></div>
 
     <main class="main-content">
         {% block content %}{% endblock %}
@@ -45,11 +83,87 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 News Portal. All rights reserved.</p>
+            <!-- Ad slot - hidden until ad is present -->
+            {% include 'frontend/components/advertisement_slot.html' with position='footer_banner' class_name='ad-slot--footer' %}
+
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="{% url 'frontend:index' %}" class="footer-logo-link">
+                        <img src="{% static 'images/logo.png' %}" alt="News Portal" class="footer-logo">
+                        <span class="footer-brand-name">NewsPortal</span>
+                    </a>
+                    <p class="footer-tagline">Independent reporting, live updates, and carefully curated stories from around the world.</p>
+                </div>
+                <div class="footer-links">
+                    <h4 class="footer-heading">Navigate</h4>
+                    <a href="{% url 'frontend:index' %}">Home</a>
+                    <a href="{% url 'frontend:newsletter' %}">Newsletter</a>
+                    <a href="{% url 'frontend:login' %}">Sign In</a>
+                    <a href="{% url 'frontend:register' %}">Register</a>
+                </div>
+                <div class="footer-links">
+                    <h4 class="footer-heading">Legal</h4>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Cookie Policy</a>
+                    <a href="#">Advertise</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 News Portal. All rights reserved.</p>
+                <p>Built with passion for journalism.</p>
+            </div>
         </div>
     </footer>
 
-    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/auth.js' %}?v=2"></script>
+    <script src="{% static 'js/services/portal-api.js' %}?v=1"></script>
+    <script src="{% static 'js/services/advertisementService.js' %}?v=1"></script>
+    <script src="{% static 'js/main.js' %}?v=3"></script>
     {% block extra_js %}{% endblock %}
+
+    <script>
+    // Set today's date in topbar
+    (function() {
+        const el = document.getElementById('topbar-date');
+        if (el) {
+            el.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+    })();
+
+    function handleSearch(e) {
+        e.preventDefault();
+        const q = document.getElementById('searchInput').value.trim();
+        if (q) {
+            window.location.href = `/?search=${encodeURIComponent(q)}`;
+        }
+    }
+
+    // Hamburger menu
+    (function() {
+        const hamburger = document.getElementById('hamburger');
+        const nav = document.getElementById('main-nav');
+        const overlay = document.getElementById('mobile-overlay');
+
+        function closeMenu() {
+            hamburger.classList.remove('open');
+            nav.classList.remove('nav-open');
+            overlay.classList.remove('active');
+            hamburger.setAttribute('aria-expanded', 'false');
+        }
+
+        if (hamburger) {
+            hamburger.addEventListener('click', () => {
+                const isOpen = hamburger.classList.toggle('open');
+                nav.classList.toggle('nav-open', isOpen);
+                overlay.classList.toggle('active', isOpen);
+                hamburger.setAttribute('aria-expanded', String(isOpen));
+            });
+        }
+        if (overlay) {
+            overlay.addEventListener('click', closeMenu);
+        }
+    })();
+    </script>
 </body>
 </html>

@@ -144,20 +144,10 @@
 
 <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="{% static 'js/axios.js' %}"></script>
+<script src="{% static 'js/auth.js' %}?v=3"></script>
+<script src="{% static 'js/axios.js' %}?v=4"></script>
 <script src="{% static 'admin/js/resource_helpers.js' %}"></script>
-<script src="{% static 'admin/js/main.js' %}"></script>
-{% if DEBUG and ADMIN_FALLBACK_ACCESS_TOKEN %}
-<script>
-    // Dev-only: populate localStorage with fallback tokens for testing
-    try {
-        localStorage.setItem('access_token', '{{ ADMIN_FALLBACK_ACCESS_TOKEN }}');
-        localStorage.setItem('refresh_token', '{{ ADMIN_FALLBACK_REFRESH_TOKEN }}');
-    } catch (e) {
-        console.warn('Unable to set dev fallback tokens in localStorage');
-    }
-</script>
-{% endif %}
+<script src="{% static 'staff/js/main.js' %}?v=3"></script>
 {% block extra_js %}{% endblock %}
 
 </body>

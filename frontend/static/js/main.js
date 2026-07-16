@@ -1,180 +1,418 @@
-// Main JavaScript for News Portal Frontend
-// This file keeps site-wide utilities and live navbar data in sync with the API.
+// ============================================================
+// News Portal — Main JavaScript
+// Site-wide utilities: navbar, auth, ads
+// ============================================================
 
-const DEFAULT_API_BASE = '/api';
+const DEFAULT_API_BASE = 'https://news-portal-hvgs.onrender.com';
 
 document.addEventListener('DOMContentLoaded', () => {
     initActiveNav();
     initLiveNavbar();
-    // refresh navbar data periodically so counts/categories reflect new backend inserts
-    setInterval(initLiveNavbar, 15000);
+    // Fetch ads only when an endpoint is configured; missing ad routes create noisy console failures.
+    if (getAdsEndpoint()) {
+        initAdvertisements().catch(() => { });
+        setInterval(() => initAdvertisements().catch(() => { }), 90000);
+    }
+    setInterval(initLiveNavbar, 20000);
 });
 
+// ============================================================
+// API BASE
+// ============================================================
 function getApiBase() {
-    return document.body?.dataset?.apiBase || DEFAULT_API_BASE;
+    const base = document.body?.dataset?.apiBase || DEFAULT_API_BASE;
+    return base.replace(/\/$/, '');
 }
 
-// Utility function to fetch data from REST API with mock fallback
-async function fetchFromAPI(endpoint, options = {}) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+function buildApiUrl(endpoint) {
+    const base = getApiBase();
+    const clean = endpoint.replace(/^\//, '');
+    return `${base}/${clean}`;
+}
 
-    const baseUrl = getApiBase().replace(/\/$/, '');
-    const cleanEndpoint = endpoint.replace(/^\//, '');
+// ============================================================
+// GENERIC FETCH WITH TIMEOUT
+// ============================================================
+async function fetchJson(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), options.timeoutMs || 15000);
 
     try {
-        const response = await fetch(`${baseUrl}/${cleanEndpoint}`, {
-            ...options,
+        const res = await fetch(url, {
             signal: controller.signal,
             headers: {
                 Accept: 'application/json',
                 ...(options.headers || {}),
             },
+            ...(options.body ? { method: options.method || 'POST', body: options.body } : {}),
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
         }
-        return await response.json();
-    } catch (error) {
-        console.warn('Error fetching from API, attempting mock fallback:', error);
-        const mock = getMock(cleanEndpoint);
-        if (mock) {
-            return mock;
-        }
-        return null;
+        return await res.json();
     } finally {
         window.clearTimeout(timeoutId);
     }
 }
 
-function extractList(payload) {
-    if (Array.isArray(payload)) {
-        return payload;
+// Legacy alias used by other parts of the codebase
+async function fetchFromAPI(endpoint, options = {}) {
+    try {
+        return await fetchJson(buildApiUrl(endpoint), options);
+    } catch {
+        return getMock(endpoint.replace(/\?.*$/, '').replace(/^\//, ''));
     }
+}
+
+async function fetchJsonEndpoint(endpoint, options = {}) {
+    return fetchJson(buildApiUrl(endpoint), options);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function extractList(payload) {
+    if (Array.isArray(payload)) return payload;
     return payload && Array.isArray(payload.results) ? payload.results : [];
 }
 
 function extractCount(payload) {
-    if (!payload) {
-        return 0;
-    }
-    if (typeof payload.count === 'number') {
-        return payload.count;
-    }
-    if (Array.isArray(payload)) {
-        return payload.length;
-    }
+    if (!payload) return 0;
+    if (typeof payload.count === 'number') return payload.count;
+    if (Array.isArray(payload)) return payload.length;
     return 0;
 }
 
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// ============================================================
+// LIVE NAVBAR
+// ============================================================
 function initLiveNavbar() {
     const categoryContainer = document.getElementById('nav-categories');
-    const statusChipText = document.getElementById('nav-live-count');
+    const liveChip = document.getElementById('nav-live-count');
 
-    if (!categoryContainer && !statusChipText) {
-        return;
-    }
-
+    if (!categoryContainer && !liveChip) return;
 
     Promise.allSettled([
         fetchFromAPI('articles/categories/'),
-        fetchFromAPI('articles/feed/'),
-    ]).then(([categoriesResult, feedResult]) => {
-        const categoriesPayload = categoriesResult.status === 'fulfilled' ? categoriesResult.value : null;
-        const feedPayload = feedResult.status === 'fulfilled' ? feedResult.value : null;
+        fetchFromAPI('articles/feed/?ordering=-id'),
+    ]).then(([catResult, feedResult]) => {
+        const categories = extractList(catResult.status === 'fulfilled' ? catResult.value : null);
+        const count = extractCount(feedResult.status === 'fulfilled' ? feedResult.value : null);
 
-        const categories = extractList(categoriesPayload);
-        const articleCount = extractCount(feedPayload);
+        if (categoryContainer) renderCategoryChips(categoryContainer, categories);
 
-        if (categoryContainer) {
-            renderCategoryChips(categoryContainer, categories);
+        if (liveChip) {
+            const textEl = liveChip.querySelector('.live-text');
+            if (textEl) {
+                textEl.textContent = count > 0
+                    ? `${count} live ${count === 1 ? 'story' : 'stories'}`
+                    : 'Live';
+            } else {
+                liveChip.textContent = count > 0 ? `${count} live stories` : 'Live';
+            }
         }
-
-        if (statusChipText) {
-            statusChipText.textContent = articleCount > 0
-                ? `${articleCount} live ${articleCount === 1 ? 'story' : 'stories'}`
-                : '0 live stories';
-        }
-
     });
 }
 
 function initActiveNav() {
     const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
-    document.querySelectorAll('.site-nav__links a').forEach((link) => {
-        const linkPath = new URL(link.href).pathname.replace(/\/$/, '') || '/';
-        if (linkPath === currentPath) {
-            link.setAttribute('aria-current', 'page');
-        }
+    document.querySelectorAll('.nav-link').forEach((link) => {
+        try {
+            const linkPath = new URL(link.href, location.origin).pathname.replace(/\/$/, '') || '/';
+            if (linkPath === currentPath) {
+                link.setAttribute('aria-current', 'page');
+                link.classList.add('active');
+            }
+        } catch { }
     });
 }
 
 function renderCategoryChips(container, categories) {
     container.innerHTML = '';
+    if (!categories.length) return;
 
-    if (!categories.length) {
-        const emptyChip = document.createElement('span');
-        emptyChip.className = 'category-chip';
-        emptyChip.textContent = 'No live categories yet';
-        container.appendChild(emptyChip);
-        return;
-    }
-
-    categories.slice(0, 5).forEach((category) => {
+    categories.slice(0, 6).forEach((cat) => {
         const chip = document.createElement('span');
         chip.className = 'category-chip';
-        chip.textContent = category.name || category.title || category.label || category.slug || 'Category';
+        chip.textContent = cat.name || cat.title || cat.label || cat.slug || 'Category';
         container.appendChild(chip);
     });
 }
 
-// Utility function to handle API errors
-function handleAPIError(error) {
-    console.error('API Error:', error);
-    // Display user-friendly error message
+// ============================================================
+// ADVERTISEMENTS
+// Ads endpoint may not exist; silently skip on any error.
+// Ad slots remain hidden (display:none) until .has-ad is added.
+// ============================================================
+
+function getAdsEndpoint() {
+    return document.body?.dataset?.adsEndpoint?.trim() || '';
 }
 
-// --- Mock data and helpers (used when remote API returns 404/unavailable) ---
+async function fetchAdvertisements() {
+    const endpoint = getAdsEndpoint();
+    if (!endpoint) return null;
+    const url = /^https?:\/\//i.test(endpoint) ? endpoint : buildApiUrl(endpoint);
+    return fetchJson(url, { timeoutMs: 8000 });
+}
+
+async function initAdvertisements() {
+    const adSlots = document.querySelectorAll('[data-ad-slot]');
+    if (!adSlots.length) return;
+
+    let payload;
+    try {
+        payload = await fetchAdvertisements();
+    } catch {
+        payload = null;
+    }
+
+    // payload === null → no ads → all slots stay display:none (no is-empty class added)
+    if (!payload) return;
+
+    const adsByPosition = normalizeAdsPayload(payload);
+    adSlots.forEach((slot) => {
+        const position = slot.dataset.adSlot;
+        const ad = adsByPosition[position];
+        if (ad) renderAdSlot(slot, ad, position);
+        // If no ad for this slot — do nothing; slot stays hidden
+    });
+}
+
+function normalizeAdsPayload(payload) {
+    const positions = ['top_banner', 'sidebar', 'between_articles', 'in_article', 'footer_banner', 'footer', 'popup'];
+    const grouped = Object.fromEntries(positions.map((p) => [p, null]));
+
+    if (!payload) return grouped;
+
+    if (Array.isArray(payload)) {
+        payload.forEach((ad) => {
+            if (!isVisibleAdvertisement(ad)) {
+                return;
+            }
+
+            const position = normalizeAdPosition(ad?.position);
+            if (position && grouped[position] === null) grouped[position] = ad;
+        });
+        return grouped;
+    }
+
+    if (Array.isArray(payload.results)) return normalizeAdsPayload(payload.results);
+
+    positions.forEach((p) => {
+        const v = payload[p];
+        const ad = Array.isArray(v) ? (v.find(isVisibleAdvertisement) || null) : (isVisibleAdvertisement(v) ? v : null);
+        grouped[p] = ad;
+    });
+
+    return grouped;
+}
+
+function isVisibleAdvertisement(ad) {
+    if (!ad) {
+        return false;
+    }
+
+    const active = ad.is_active ?? ad.active;
+    const status = String(ad.status || '').toLowerCase();
+
+    if (active === false || ['inactive', 'disabled', 'draft', 'archived'].includes(status)) {
+        return false;
+    }
+
+    const now = new Date();
+    const startDate = ad.start_date ? new Date(ad.start_date) : null;
+    const endDate = ad.end_date ? new Date(ad.end_date) : null;
+
+    if (startDate && !Number.isNaN(startDate.getTime()) && now < startDate) {
+        return false;
+    }
+
+    if (endDate && !Number.isNaN(endDate.getTime()) && now > endDate) {
+        return false;
+    }
+
+    return true;
+}
+
+function normalizeAdPosition(value) {
+    const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+
+    if (raw === 'in_article') {
+        return 'between_articles';
+    }
+
+    if (raw === 'footer') {
+        return 'footer_banner';
+    }
+
+    if (['top_banner', 'sidebar', 'between_articles', 'footer_banner', 'popup'].includes(raw)) {
+        return raw;
+    }
+
+    if (raw.includes('top')) {
+        return 'top_banner';
+    }
+
+    if (raw.includes('side')) {
+        return 'sidebar';
+    }
+
+    if (raw.includes('footer')) {
+        return 'footer_banner';
+    }
+
+    return 'between_articles';
+}
+
+function renderAdSlot(slot, ad, position) {
+    if (!ad) return; // slot stays hidden
+    const isPopup = position === 'popup';
+
+    if (isPopup && sessionStorage.getItem(`dismissed-ad-${ad.id}`)) return;
+
+    slot.classList.remove('has-ad', 'is-empty');
+    slot.innerHTML = '';
+    slot.classList.add('has-ad');
+
+    const card = buildAdCard(ad);
+
+    if (isPopup) {
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'ad-popup__close';
+        closeBtn.setAttribute('aria-label', 'Close advertisement');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('click', () => {
+            if (ad.id) sessionStorage.setItem(`dismissed-ad-${ad.id}`, '1');
+            slot.classList.remove('has-ad');
+            slot.innerHTML = '';
+        });
+        slot.append(closeBtn, card);
+    } else {
+        slot.appendChild(card);
+    }
+
+    trackAdEvent(ad, 'impression');
+}
+
+function buildAdCard(ad) {
+    const link = document.createElement('a');
+    link.className = 'ad-card';
+    link.href = ad.target_url || '#';
+    link.target = '_blank';
+    link.rel = 'noopener sponsored';
+    link.setAttribute('aria-label', `${ad.title || 'Advertisement'} — sponsored`);
+    link.addEventListener('click', () => trackAdEvent(ad, 'click'));
+
+    const imageUrl = resolveAdMediaUrl(ad.image || ad.image_url || ad.banner || ad.media);
+    if (imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = ad.title || 'Advertisement';
+        img.loading = 'lazy';
+        link.appendChild(img);
+        return link;
+    }
+
+    const fallback = document.createElement('span');
+    fallback.className = 'ad-card__fallback';
+    fallback.innerHTML = `
+        <span>
+            <span class="ad-card__label">Sponsored</span>
+            <span class="ad-card__title">${escapeHtml(ad.title || 'Advertisement')}</span>
+        </span>
+        <span class="ad-card__client">${escapeHtml(ad.client_name || 'Learn more')}</span>
+    `;
+    link.appendChild(fallback);
+    return link;
+}
+
+function trackAdEvent(ad, type) {
+    const tracker = window.NewsPortalAdvertisementService?.trackAdvertisementEvent;
+
+    if (typeof tracker !== 'function') {
+        return;
+    }
+
+    Promise.resolve(tracker(ad, type)).catch(() => { });
+}
+
+function resolveAdMediaUrl(value) {
+    if (!value) return '';
+    const url = String(value).trim();
+    if (!url) return '';
+    if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+    const mediaBase = (document.body?.dataset?.mediaBase || getApiBase()).replace(/\/$/, '');
+    return url.startsWith('/') ? `${mediaBase}${url}` : `${mediaBase}/${url}`;
+}
+
+function slugifyCategory(label) {
+    return String(label || '')
+        .toLowerCase()
+        .trim()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+// ============================================================
+// MOCK DATA (fallback when remote API is unreachable)
+// ============================================================
 function getMock(endpoint) {
     const e = endpoint.replace(/\?.*$/, '').replace(/^\/+/, '');
 
-    // Feed mock
-    if (e.startsWith('articles/feed')) {
+    if (e.includes('articles/feed') || e.includes('articles/feed')) {
         return {
             count: 3,
             results: [
-                { id: 101, title: 'Mock: City inaugurates new park', description: 'A new public park opened today...', published_at: '2026-06-10T12:00:00Z', image_url: '', category_name: 'Local' },
-                { id: 102, title: 'Mock: Tech startup raises funds', description: 'Startup secures seed round...', published_at: '2026-06-09T09:30:00Z', image_url: '', category_name: 'Business' },
-                { id: 103, title: 'Mock: Sports team wins final', description: 'Local team clinches the championship...', published_at: '2026-06-08T20:15:00Z', image_url: '', category_name: 'Sports' },
+                { id: 101, title: 'Breaking: Major Policy Announcement Expected Today', description: 'Officials are set to unveil a sweeping new initiative that could reshape the landscape for millions.', published_at: new Date().toISOString(), category_name: 'Politics' },
+                { id: 102, title: 'Tech Giants Report Record Quarter Amid Market Uncertainty', description: 'Despite broader economic headwinds, leading technology companies have posted remarkable earnings.', published_at: new Date(Date.now() - 3600000).toISOString(), category_name: 'Business' },
+                { id: 103, title: 'Climate Summit Concludes with Landmark Agreement', description: 'World leaders signed a historic pact aimed at dramatically reducing carbon emissions by 2035.', published_at: new Date(Date.now() - 7200000).toISOString(), category_name: 'World' },
             ],
         };
     }
 
-    // Trending mock
-    if (e.startsWith('articles/trending')) {
+    if (e.includes('articles/trending')) {
         return [
-            { id: 201, title: 'Mock Trending: Election updates', description: 'Key moments from the election...', published_at: '2026-06-10T18:00:00Z' },
-            { id: 202, title: 'Mock Trending: Weather alert', description: 'Severe weather expected...', published_at: '2026-06-10T06:00:00Z' },
+            { id: 201, title: 'Election Results Live: Every Update as They Come', published_at: new Date().toISOString() },
+            { id: 202, title: 'Markets Rally Ahead of Central Bank Decision', published_at: new Date(Date.now() - 1800000).toISOString() },
+            { id: 203, title: 'Sport: National Team Secures Historic Victory', published_at: new Date(Date.now() - 3600000).toISOString() },
         ];
     }
 
-    // Categories mock
-    if (e.startsWith('articles/categories')) {
+    if (e.includes('articles/categories')) {
         return [
-            { id: 1, name: 'Top' },
-            { id: 2, name: 'Local' },
+            { id: 1, name: 'World' },
+            { id: 2, name: 'Politics' },
             { id: 3, name: 'Business' },
             { id: 4, name: 'Sports' },
+            { id: 5, name: 'Technology' },
         ];
     }
 
-    // Article detail mock
-    if (/^articles\/\d+\/$/.test(e) || /^articles\/\d+$/.test(e)) {
-        const idMatch = e.match(/articles\/(\d+)/);
-        const id = idMatch ? Number(idMatch[1]) : 999;
-        return { id, title: `Mock Article ${id}`, description: 'Full article content (mock).', body: 'This is mock article content used when the API is unreachable.' };
+    if (/articles\/\d+/.test(e)) {
+        const id = (e.match(/articles\/(\d+)/) || [])[1] || 999;
+        return { id, title: `Article ${id}`, description: 'Full article content (mock).', body: 'This is placeholder content shown while the API is loading.' };
     }
 
     return null;
 }
+
+// ============================================================
+// PUBLIC API
+// ============================================================
+window.NewsAds = {
+    refresh: () => initAdvertisements().catch(() => { }),
+    slugifyCategory,
+};

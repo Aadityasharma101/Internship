@@ -1,0 +1,62 @@
+{% extends 'frontend/base.html' %}
+{% load static %}
+
+{% block title %}My Profile | News Portal{% endblock %}
+{% block meta_description %}View your News Portal account profile, role, and reader activity.{% endblock %}
+
+{% block content %}
+<section class="profile-page">
+    <div class="container profile-shell">
+        <div class="ad-slot-wrap" style="display:flex;justify-content:center;margin-bottom:1rem;">
+            {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
+        </div>
+        <div class="profile-header">
+            <div class="profile-avatar" id="profileAvatar">NP</div>
+            <div>
+                <p class="section-kicker">My Account</p>
+                <h1 id="profileName">Loading profile...</h1>
+                <p id="profileEmail" class="profile-email">Checking your signed-in session.</p>
+            </div>
+        </div>
+
+        <div id="profileMessage" class="profile-message" role="status" aria-live="polite"></div>
+
+        <div class="profile-grid" id="profileContent" hidden>
+            <section class="profile-panel">
+                <h2>Profile</h2>
+                <dl class="profile-list">
+                    <div>
+                        <dt>Email</dt>
+                        <dd id="profileDetailEmail"></dd>
+                    </div>
+                    <div>
+                        <dt>Role</dt>
+                        <dd id="profileRole"></dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd id="profileStatus"></dd>
+                    </div>
+                    <div>
+                        <dt>Bio</dt>
+                        <dd id="profileBio"></dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="profile-panel">
+                <h2>Reader Access</h2>
+                <div class="profile-actions">
+                    <a href="/newsletter/" class="profile-action">Newsletter</a>
+                    <a href="/" class="profile-action">Latest news</a>
+                    <a href="#" class="profile-action" id="profileDashboardLink">Dashboard</a>
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/profile.js' %}?v=1"></script>
+{% endblock %}

@@ -1,24 +1,20 @@
-# standard imports
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 # authentication removed for public staff pages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.conf import settings
-from django.contrib.auth import authenticate
 from django.urls import reverse
+from django.utils import timezone
+from .models import Advertisement
+import base64
 import json
 import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime
 import re
-import base64
-try:
-    import requests
-except ImportError:
-    requests = None
+import requests
 
 NEWS_API_BASE = "https://news-portal-hvgs.onrender.com/api"
 HOP_BY_HOP_HEADERS = {
@@ -45,6 +41,177 @@ def fetch_json(path):
         return json.loads(resp.read().decode())
 
 
+def _normalize_position(value):
+    raw = str(value or '').strip().lower().replace(' ', '_')
+    if raw in {'top_banner', 'sidebar', 'between_articles', 'footer_banner'}:
+        return raw
+    if raw in {'in_article', 'between_articles'}:
+        return 'between_articles'
+    if raw in {'footer', 'footer_banner'}:
+        return 'footer_banner'
+    return 'between_articles'
+
+
+def _normalize_status(value, is_active=None):
+    if is_active is not None:
+        return 'active' if is_active else 'inactive'
+
+    raw = str(value or '').strip().lower()
+    if raw in {'inactive', 'disabled', 'draft', 'archived'}:
+        return 'inactive'
+    return 'active'
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+
+def _coerce_payload(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body.decode() or '{}') or {}
+        except json.JSONDecodeError:
+            return {}
+
+    payload = {}
+    for key, value in request.POST.items():
+        payload[key] = value
+    return payload
+
+
+@csrf_exempt
+def ads_api(request):
+    if request.method == 'GET':
+        ads = Advertisement.objects.all().order_by('-created_at')
+        return JsonResponse({
+            'count': ads.count(),
+            'next': None,
+            'previous': None,
+            'results': [ad.to_api_dict() for ad in ads],
+        })
+
+    if request.method == 'POST':
+        payload = _coerce_payload(request)
+        title = (payload.get('title') or request.POST.get('title') or '').strip()
+        if not title:
+            return JsonResponse({'detail': 'Title is required.'}, status=400)
+
+        description = (payload.get('description') or payload.get('client_name') or request.POST.get('description') or request.POST.get('client_name') or '').strip()
+        target_url = (payload.get('target_url') or payload.get('redirect_url') or request.POST.get('target_url') or request.POST.get('redirect_url') or '').strip()
+        image_value = payload.get('image') or request.POST.get('image') or ''
+        image_url_value = (payload.get('image_url') or request.POST.get('image_url') or '').strip()
+        position = _normalize_position(payload.get('position') or request.POST.get('position') or 'between_articles')
+        start_date = _parse_datetime(payload.get('start_date') or request.POST.get('start_date')) or timezone.now()
+        end_date = _parse_datetime(payload.get('end_date') or request.POST.get('end_date'))
+        status_value = payload.get('status') or request.POST.get('status') or payload.get('state') or request.POST.get('state') or 'active'
+        is_active = payload.get('is_active') if 'is_active' in payload else request.POST.get('is_active')
+        if is_active is None:
+            is_active = _normalize_status(status_value) == 'active'
+        else:
+            is_active = str(is_active).lower() in {'1', 'true', 'yes', 'on'}
+
+        ad = Advertisement(
+            title=title,
+            description=description,
+            target_url=target_url,
+            position=position,
+            image_url=image_url_value,
+            start_date=start_date,
+            end_date=end_date,
+            is_active=is_active,
+        )
+
+        uploaded_image = request.FILES.get('image')
+        if uploaded_image:
+            ad.image = uploaded_image
+        elif isinstance(image_value, str) and image_value and (image_value.startswith('http://') or image_value.startswith('https://') or image_value.startswith('/')):
+            ad.image_url = image_value
+
+        ad.save()
+        return JsonResponse(ad.to_api_dict(), status=201)
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+def ads_detail(request, ad_id):
+    try:
+        ad = Advertisement.objects.get(pk=ad_id)
+    except Advertisement.DoesNotExist:
+        return JsonResponse({'detail': 'Advertisement not found.'}, status=404)
+
+    if request.method == 'GET':
+        return JsonResponse(ad.to_api_dict())
+
+    if request.method in {'PATCH', 'PUT'}:
+        payload = _coerce_payload(request)
+        if 'title' in payload and payload['title'] is not None:
+            ad.title = str(payload['title']).strip()
+        if 'description' in payload and payload['description'] is not None:
+            ad.description = str(payload['description']).strip()
+        if 'client_name' in payload and payload['client_name'] is not None:
+            ad.description = str(payload['client_name']).strip()
+        if 'target_url' in payload and payload['target_url'] is not None:
+            ad.target_url = str(payload['target_url']).strip()
+        if 'redirect_url' in payload and payload['redirect_url'] is not None:
+            ad.target_url = str(payload['redirect_url']).strip()
+        if 'position' in payload:
+            ad.position = _normalize_position(payload['position'])
+        if 'image' in payload and payload['image'] is not None:
+            image_value = str(payload['image']).strip()
+            if image_value.startswith('http://') or image_value.startswith('https://') or image_value.startswith('/'):
+                ad.image_url = image_value
+            else:
+                ad.image_url = ''
+        if 'image_url' in payload and payload['image_url'] is not None:
+            ad.image_url = str(payload['image_url']).strip()
+        if 'start_date' in payload and payload['start_date'] is not None:
+            parsed_start = _parse_datetime(payload['start_date'])
+            if parsed_start:
+                ad.start_date = parsed_start
+        if 'end_date' in payload and payload['end_date'] is not None:
+            parsed_end = _parse_datetime(payload['end_date'])
+            if parsed_end:
+                ad.end_date = parsed_end
+        if 'status' in payload or 'state' in payload:
+            ad.is_active = _normalize_status(payload.get('status') or payload.get('state') or 'active') == 'active'
+        if 'is_active' in payload:
+            value = payload['is_active']
+            ad.is_active = str(value).lower() in {'1', 'true', 'yes', 'on'}
+
+        ad.save()
+        return JsonResponse(ad.to_api_dict())
+
+    if request.method == 'DELETE':
+        ad.delete()
+        return HttpResponse(status=204)
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+def ads_tracking(request, action):
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    ad_id = request.POST.get('ad_id') or request.POST.get('advertisement') or request.POST.get('id')
+    try:
+        ad = Advertisement.objects.get(pk=ad_id)
+    except (Advertisement.DoesNotExist, TypeError, ValueError):
+        return JsonResponse({'detail': 'Advertisement not found.'}, status=404)
+
+    if action == 'click':
+        ad.target_url = ad.target_url or '#'
+    ad.save()
+    return JsonResponse(ad.to_api_dict())
+
+
 @csrf_exempt
 def api_proxy(request, path):
     query = request.META.get("QUERY_STRING")
@@ -52,6 +219,19 @@ def api_proxy(request, path):
 
     if query:
         url = f"{url}?{query}"
+
+    if path in {'api/ads', 'api/ads/'}:
+        return ads_api(request)
+
+    if re.match(r'^api/ads/(?P<ad_id>\d+)/?$', path):
+        ad_id = int(re.match(r'^api/ads/(?P<ad_id>\d+)/?$', path).group('ad_id'))
+        return ads_detail(request, ad_id)
+
+    if path in {'api/ads/click', 'api/ads/click/'}:
+        return ads_tracking(request, 'click')
+
+    if path in {'api/ads/impressions', 'api/ads/impressions/'}:
+        return ads_tracking(request, 'impression')
 
     headers = {
         "Accept": request.headers.get("Accept", "application/json"),
@@ -90,6 +270,14 @@ def api_proxy(request, path):
             status=502,
             content_type="application/json",
         )
+
+    # Debug logging to help trace proxy issues during development
+    try:
+        print(f"[api_proxy] {request.method} {path} -> {url} (status={remote_response.status_code})")
+        if remote_response.status_code >= 400:
+            print("[api_proxy] remote response body:", remote_response.text[:1000])
+    except Exception:
+        pass
 
     django_response = HttpResponse(
         remote_response.content,
@@ -205,6 +393,10 @@ def newsletter(request):
     context = {}
     return render(request, "frontend/newsletter.html", context)
 
+
+def profile(request):
+    context = {}
+    return render(request, "frontend/pages/profile.html", context)
 def register(request):
     """
     User registration page.
@@ -222,6 +414,14 @@ def login(request):
     return render(request, 'frontend/pages/login.html', context)
 
 
+def _get_bearer_token(request):
+    authorization = request.headers.get('Authorization', '')
+    parts = authorization.split()
+    if len(parts) == 2 and parts[0].lower() == 'bearer':
+        return parts[1]
+    return ''
+
+
 def _decode_jwt_payload(token):
     """Decode JWT payload without verification to extract claims (useful for role)."""
     try:
@@ -235,6 +435,46 @@ def _decode_jwt_payload(token):
         return json.loads(payload_bytes.decode())
     except Exception:
         return {}
+
+
+def normalize_user_role(user):
+    """Return a normalized role slug from remote user payload."""
+    if not isinstance(user, dict):
+        return ''
+    role = user.get('role')
+    if isinstance(role, str):
+        return role.strip().lower().replace(' ', '_').replace('-', '_')
+    if isinstance(role, dict):
+        raw = role.get('role_name') or role.get('name') or ''
+        return str(raw).strip().lower().replace(' ', '_').replace('-', '_')
+    return ''
+
+
+def is_admin_user(user):
+    if not isinstance(user, dict):
+        return False
+    if user.get('is_superuser'):
+        return True
+    return normalize_user_role(user) in ('admin', 'super_admin', 'superadmin')
+
+
+def is_staff_portal_user(user):
+    if not isinstance(user, dict):
+        return False
+    if is_admin_user(user):
+        return False
+    role = normalize_user_role(user)
+    if role == 'staff':
+        return True
+    return bool(user.get('is_staff'))
+
+
+def login_redirect_for_user(user):
+    if is_admin_user(user):
+        return reverse('frontend:users')
+    if is_staff_portal_user(user):
+        return reverse('frontend:staff')
+    return reverse('frontend:index')
 
 
 def get_remote_user_info(access_token):
@@ -264,14 +504,27 @@ def get_remote_user_info(access_token):
         except Exception:
             continue
 
-    # Fallback: decode JWT payload
+    # Fallback: decode JWT payload and normalize values
     payload = _decode_jwt_payload(access_token)
     user = {}
     # common claim names
-    user['email'] = payload.get('email') or payload.get('username')
-    user['role'] = payload.get('role') or payload.get('user_role')
-    user['is_staff'] = payload.get('is_staff') or payload.get('staff') or False
-    user['is_superuser'] = payload.get('is_superuser') or payload.get('admin') or False
+    user['email'] = payload.get('email') or payload.get('username') or ''
+    # role: ensure string lowercased when present
+    raw_role = payload.get('role') or payload.get('user_role') or ''
+    user['role'] = str(raw_role).lower() if raw_role is not None else ''
+
+    def _to_bool(val):
+        if isinstance(val, bool):
+            return val
+        if val is None:
+            return False
+        if isinstance(val, (int, float)):
+            return bool(val)
+        s = str(val).strip().lower()
+        return s in ('1', 'true', 'yes', 'y', 't')
+
+    user['is_staff'] = _to_bool(payload.get('is_staff') or payload.get('staff'))
+    user['is_superuser'] = _to_bool(payload.get('is_superuser') or payload.get('admin'))
     return user
 
 
@@ -338,25 +591,20 @@ def auth_login(request):
         # Authentication failed - forward error message
         return JsonResponse(token_json, status=token_response.status_code)
 
-    # Save tokens in session (server-side). Avoid exposing tokens to client JS.
-    request.session['access_token'] = access
-    if refresh:
-        request.session['refresh_token'] = refresh
-
     # Fetch user info and store minimal profile
     user = get_remote_user_info(access) or {}
-    request.session['user'] = user
 
-    # Determine redirect based on role
-    role = (user.get('role') or 'reader').lower() if isinstance(user.get('role'), str) else None
-    if user.get('is_superuser') or user.get('is_staff') or role == 'admin':
-        next_url = reverse('frontend:users')  # admin area
-    elif role == 'staff' or user.get('is_staff'):
-        next_url = reverse('frontend:staff')
-    else:
-        next_url = reverse('frontend:index')
+    role = normalize_user_role(user) or 'reader'
+    next_url = login_redirect_for_user(user)
 
-    return JsonResponse({'detail': 'Login successful', 'next': next_url, 'role': role})
+    return JsonResponse({
+        'detail': 'Login successful',
+        'next': next_url,
+        'role': role,
+        'user': user,
+        'access': access,
+        'refresh': refresh,
+    })
 
 
 @csrf_exempt
@@ -379,7 +627,7 @@ def require_remote_login(view_func):
 
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        token = request.session.get('access_token')
+        token = _get_bearer_token(request)
         if not token:
             # Not logged in -> redirect to login page
             if request.is_ajax() or request.headers.get('Accept') == 'application/json':
@@ -390,34 +638,14 @@ def require_remote_login(view_func):
     return _wrapped
 
 def dashboard(request):
-    """
-    Newsletter page view.
-    """
-    # Render the staff dashboard for overview instead of the admin base
-    return staff_dashboard(request)
+    """Staff dashboard overview page."""
+    context = {}
+    return render(request, 'staff/pages/dashboard.html', context)
 
 
 def staff_dashboard(request):
-    """Staff dashboard view (restricted to staff users)."""
-    # require login
-    token = request.session.get('access_token')
-    user = request.session.get('user') or {}
-    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
-    if not token or not (role == 'staff' or user.get('is_staff')):
-        return redirect(reverse('frontend:login'))
-    context = {}
-    articles = []
-    try:
-        data = fetch_json('/articles/feed/?ordering=-id')
-        if isinstance(data, dict):
-            articles = data.get('results', [])
-        elif isinstance(data, list):
-            articles = data
-    except Exception as e:
-        print('staff_dashboard fetch error:', e)
-
-    context['articles'] = articles
-    return render(request, 'staff/pages/staff.html', context)
+    """Staff dashboard view (alias for /staff/)."""
+    return dashboard(request)
 
 
 @csrf_exempt
@@ -427,11 +655,8 @@ def staff_add_article(request):
 
     Expects JSON body or form data with at least `title` and `body`.
     """
-    # Require server-side login
-    token = request.session.get('access_token')
-    user = request.session.get('user') or {}
-    role = (user.get('role') or '').lower() if isinstance(user.get('role'), str) else None
-    if not token or not (role == 'staff' or user.get('is_staff')):
+    token = _get_bearer_token(request)
+    if not token:
         return JsonResponse({'detail': 'Authentication required'}, status=401)
 
     try:
@@ -455,15 +680,6 @@ def staff_add_article(request):
 
     try:
         headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
-        # Prefer client-provided Authorization header. If missing, allow a dev-only
-        # fallback token when running in DEBUG and an environment token is configured.
-        # token already added to headers above; allow fallback for debug
-        if not headers.get('Authorization'):
-            fallback = getattr(settings, 'ADMIN_FALLBACK_ACCESS_TOKEN', '')
-            if settings.DEBUG and fallback:
-                headers['Authorization'] = f'Bearer {fallback}'
-            else:
-                return JsonResponse({'detail': 'Missing Authorization header'}, status=401)
 
         # If the client sent multipart/form-data (file upload), forward as multipart
         content_type = request.META.get('CONTENT_TYPE', '')
@@ -571,3 +787,18 @@ def comments(request):
 def reacts(request):
     context = {}
     return render(request, 'admin/pages/reacts.html', context)
+
+
+def staff_comments(request):
+    context = {}
+    return render(request, 'staff/pages/comments.html', context)
+
+
+def staff_advertisements(request):
+    context = {}
+    return render(request, 'staff/pages/ads.html', context)
+
+
+def staff_profile(request):
+    context = {}
+    return render(request, 'staff/pages/profile.html', context)

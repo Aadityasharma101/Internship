@@ -2,6 +2,7 @@
 
 const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
 const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
+const AUTH_INVALID_KEY = 'news_portal_auth_invalid';
 
 function apiUrl(path = '') {
     if (/^https?:\/\//i.test(path)) {
@@ -25,6 +26,10 @@ function decodeJwtPayload(token) {
 }
 
 function isTokenExpired(token) {
+    if (!token) {
+        return true;
+    }
+
     const payload = decodeJwtPayload(token);
     const expiresAt = payload?.exp;
 
@@ -32,7 +37,90 @@ function isTokenExpired(token) {
         return true;
     }
 
-    return Date.now() >= expiresAt * 1000;
+    return Date.now() >= (expiresAt - 30) * 1000;
+}
+
+function isAuthInvalid() {
+    return localStorage.getItem(AUTH_INVALID_KEY) === '1';
+}
+
+function markAuthInvalid() {
+    localStorage.setItem(AUTH_INVALID_KEY, '1');
+}
+
+function clearAuthInvalid() {
+    localStorage.removeItem(AUTH_INVALID_KEY);
+}
+
+function clearAuthTokens() {
+    if (window.NewsPortalSession?.clear) {
+        window.NewsPortalSession.clear();
+        return;
+    }
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+    clearAuthInvalid();
+}
+
+function getRefreshToken() {
+    if (isAuthInvalid()) {
+        return null;
+    }
+
+    const storedToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
+
+    if (storedToken && !isTokenExpired(storedToken)) {
+        localStorage.setItem('refresh_token', storedToken);
+        localStorage.setItem('refreshToken', storedToken);
+        return storedToken;
+    }
+
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('refreshToken');
+    return null;
+}
+
+function hasStoredAuthToken() {
+    const accessToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
+    return Boolean((accessToken && !isTokenExpired(accessToken)) || (refreshToken && !isTokenExpired(refreshToken)));
+}
+
+function redirectToLogin() {
+    if (window.location.pathname !== '/login/') {
+        window.location.href = '/login/';
+    }
+}
+
+function isAuthEndpoint(config = {}) {
+    const url = String(config.url || '');
+    return /\/(auth\/login|token|token\/refresh)\//.test(url);
+}
+
+async function refreshAccessToken() {
+    const refresh = getRefreshToken();
+
+    if (!refresh) {
+        return null;
+    }
+
+    const response = await axios.post(apiUrl('/api/token/refresh/'), { refresh });
+    const access = response.data?.access;
+
+    if (!access) {
+        return null;
+    }
+
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refresh_token', refresh);
+    localStorage.setItem('refreshToken', refresh);
+    clearAuthInvalid();
+
+    return access;
 }
 
 function getAccessToken() {
@@ -42,6 +130,8 @@ function getAccessToken() {
         return storedToken;
     }
 
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('accessToken');
     return null;
 }
 
@@ -53,90 +143,73 @@ const api = axios.create({
     }
 });
 
-/*
-|--------------------------------------------------------------------------
-| Request Interceptor
-|--------------------------------------------------------------------------
-| Runs before every request
-|--------------------------------------------------------------------------
-*/
+window.api = api;
+window.apiUrl = apiUrl;
 
 api.interceptors.request.use(
-    (config) => {
-
-        const token = getAccessToken();
-
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+    async (config) => {
+        if (isAuthEndpoint(config)) {
+            return config;
         }
 
+        let token = getAccessToken();
+
+        if (!token && getRefreshToken()) {
+            token = await refreshAccessToken();
+        }
+
+        if (!token) {
+            clearAuthTokens();
+            markAuthInvalid();
+            redirectToLogin();
+            throw new Error('Authentication required');
+        }
+
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-
-/*
-|--------------------------------------------------------------------------
-| Response Interceptor
-|--------------------------------------------------------------------------
-| Runs after every response
-|--------------------------------------------------------------------------
-*/
-
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
+        const originalRequest = error.config || {};
 
-        if (error.response) {
-            const originalRequest = error.config;
-
-            if (error.response.status === 401 && !originalRequest._retry) {
-                originalRequest._retry = true;
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint(originalRequest)) {
+            originalRequest._retry = true;
 
                 try {
-                    const storedRefreshToken = localStorage.getItem('refresh_token') || localStorage.getItem('refreshToken');
-                    if (!storedRefreshToken) throw new Error('No refresh token available');
-
-                    const refreshResponse = await axios.post(apiUrl('/api/token/refresh/'), {
-                        refresh: storedRefreshToken
-                    });
-
-                    const newAccessToken = refreshResponse.data.access;
-                    localStorage.setItem('access_token', newAccessToken);
-                    localStorage.setItem('accessToken', newAccessToken);
-                    // keep the existing refresh token
+                    const newAccessToken = await refreshAccessToken();
+                    if (!newAccessToken) {
+                        throw new Error('Authentication required');
+                    }
                     originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
                     return api(originalRequest);
                 } catch (refreshError) {
                     console.error('Token refresh failed', refreshError);
-                    // Clear tokens if refresh fails
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refresh_token');
-                    localStorage.removeItem('refreshToken');
+                    clearAuthTokens();
+                    markAuthInvalid();
+                    redirectToLogin();
                 }
             }
 
+        if (error.response) {
             switch (error.response.status) {
-
                 case 401:
                     console.error('Unauthorized');
                     break;
-
                 case 403:
                     console.error('Forbidden');
                     break;
-
                 case 404:
                     console.error('Not Found');
                     break;
-
                 case 500:
                     console.error('Server Error');
                     break;
-
                 default:
                     console.error(error.response.data);
             }
@@ -145,3 +218,10 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
+
+window.NewsPortalAuth = {
+    clearAuthInvalid,
+    clearAuthTokens,
+    hasStoredAuthToken,
+    redirectToLogin
+};

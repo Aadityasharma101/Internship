@@ -1,0 +1,139 @@
+{% extends 'staff/components/base.html' %}
+{% load static %}
+
+{% block title %}Advertisements - Staff Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
+<link rel="stylesheet" href="{% static 'staff/css/articles.css' %}">
+{% endblock %}
+
+{% block breadcrumb %}Advertisements{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2>Advertisements</h2>
+        <p class="text-muted">Create and manage advertisements that appear across the public website.</p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshAdsBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+        <button class="btn-add" id="openAdModalBtn" type="button">
+            <i class="fa-solid fa-plus"></i> Add Advertisement
+        </button>
+    </div>
+</div>
+
+<div class="resource-summary">
+    <div class="summary-card"><span class="summary-label">Total Advertisements</span><strong id="totalAds">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Active</span><strong id="activeAds">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Inactive</span><strong id="inactiveAds">0</strong></div>
+    <div class="summary-card"><span class="summary-label">Top Banner</span><strong id="topBannerAds">0</strong></div>
+</div>
+
+<div class="resource-toolbar">
+    <div class="resource-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="adSearchInput" placeholder="Search ads by title, description, position, or URL">
+    </div>
+    <span class="toolbar-count" id="visibleAdsCount">0 advertisements shown</span>
+</div>
+
+<div class="table-wrapper">
+    <table class="resource-table">
+        <thead>
+            <tr>
+                <th>Advertisement</th>
+                <th>Position</th>
+                <th>Status</th>
+                <th>Dates</th>
+                <th>Redirect URL</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="adsTableBody">
+            <tr class="loading-row"><td colspan="6">Loading advertisements...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div id="adModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 id="adModalTitle">Create Advertisement</h3>
+        <input type="hidden" id="adId">
+
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label for="adTitle">Title</label>
+                <input type="text" id="adTitle" placeholder="Homepage top banner">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="adImage">Image</label>
+                <input type="url" id="adImage" placeholder="https://example.com/banner.jpg">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="adImageFile">Upload Image</label>
+                <div class="upload-row">
+                    <input type="file" id="adImageFile" accept="image/*">
+                    <button type="button" id="clearAdImageBtn" class="btn-secondary-outline upload-clear-btn">Clear Image</button>
+                </div>
+                <div id="adImagePreview" class="article-image-preview hidden" aria-live="polite"></div>
+                <p class="upload-hint">Choose an image file to upload through the remote API.</p>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="adRedirectUrl">Redirect URL</label>
+                <input type="url" id="adRedirectUrl" placeholder="https://sponsor.example.com">
+            </div>
+
+            <div class="form-group full-width">
+                <label for="adDescription">Description</label>
+                <textarea id="adDescription" placeholder="Campaign notes or supporting copy"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="adPosition">Position</label>
+                <select id="adPosition">
+                    <option value="top_banner">Top Banner</option>
+                    <option value="sidebar">Sidebar</option>
+                    <option value="in_article">Between Articles</option>
+                    <option value="footer">Footer Banner</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="adStatus">Status</label>
+                <select id="adStatus">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="adStartDate">Start Date</label>
+                <input type="datetime-local" id="adStartDate">
+            </div>
+
+            <div class="form-group">
+                <label for="adEndDate">End Date</label>
+                <input type="datetime-local" id="adEndDate">
+            </div>
+        </div>
+
+        <p class="modal-status" id="adFormStatus"></p>
+
+        <div class="modal-actions">
+            <button class="btn-secondary-outline" id="toggleAdStatusBtn" type="button">Toggle Status</button>
+            <button class="btn-primary" id="saveAdBtn" type="button">Save Advertisement</button>
+            <button class="btn-secondary" id="closeAdModalBtn" type="button">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'staff/js/ads.js' %}?v=1"></script>
+{% endblock %}

@@ -7,7 +7,6 @@
 {% block content %}
 <div class="page-shell" data-api-base="{{ API_BASE }}">
 
-    <!-- BREAKING NEWS TICKER -->
     <section class="breaking-news-banner" aria-live="polite" aria-label="Breaking news">
         <div class="container breaking-news-inner">
             <span class="breaking-badge">Live</span>
@@ -17,14 +16,41 @@
         </div>
     </section>
 
-    <!-- TOP BANNER AD (hidden until ad loaded) -->
     <section class="ad-band" aria-label="Sponsored">
-        <div class="container" style="display:flex;justify-content:center;">
+        <div class="container ad-band__inner">
             {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
         </div>
     </section>
 
-    <!-- BROWSE / CATEGORY FILTER -->
+    <section class="homepage-hero" aria-labelledby="homepage-hero-heading">
+        <div class="container homepage-hero-inner">
+            <div class="hero-copy">
+                <span class="hero-label">Live newsroom</span>
+                <h1 id="homepage-hero-heading" class="hero-title">Trusted reporting for the stories shaping the day.</h1>
+                <p class="hero-description">A premium editorial experience built around fast updates, sharp visuals, and deeply reported coverage.</p>
+                <div class="hero-actions">
+                    <a href="{% url 'frontend:newsletter' %}" class="btn-nav btn-nav--primary">Subscribe</a>
+                    <a href="{% url 'frontend:login' %}" class="btn-nav btn-nav--ghost">Sign in</a>
+                </div>
+            </div>
+            <div class="hero-support">
+                <div class="hero-support-card">
+                    <span class="hero-preview-label">Why it feels different</span>
+                    <h3 class="hero-support-title">A modern newsroom layout, designed for focus and clarity.</h3>
+                    <p class="hero-support-copy">Every story is surfaced with strong hierarchy, generous spacing, and a calm editorial rhythm.</p>
+                </div>
+                <div class="hero-support-card hero-support-card--secondary">
+                    <span class="hero-preview-label">What’s live now</span>
+                    <ul class="hero-preview-list">
+                        <li>Featured coverage front and center</li>
+                        <li>Trending headlines in a polished sidebar</li>
+                        <li>Category sections updated from the live feed</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="browse-section">
         <div class="container browse-inner">
             <div class="browse-label-group">
@@ -37,14 +63,10 @@
         </div>
     </section>
 
-    <!-- MAIN PAGE CONTENT -->
     <div class="container page-sections">
-
-        <!-- FEATURED + SIDEBAR -->
-        <section class="lead-layout">
-            <!-- Featured Story -->
+        <section class="lead-layout hero-panel">
             <div class="featured-section">
-                <div class="section-heading">
+                <div class="section-heading section-heading--hero">
                     <span class="section-kicker">Editor's Pick</span>
                     <h2 class="section-title">Featured Story</h2>
                 </div>
@@ -53,37 +75,44 @@
                 </div>
             </div>
 
-            <!-- Right Sidebar -->
-            <aside class="lead-sidebar" aria-label="Sidebar">
-                <!-- Sidebar ad (hidden until loaded) -->
-                {% include 'frontend/components/advertisement_slot.html' with position='sidebar' class_name='ad-slot--sidebar' %}
-
-                <!-- Trending widget -->
-                <div class="sidebar-widget">
-                    <h3 class="sidebar-title">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--brand)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                        Trending Now
-                    </h3>
+            <aside class="lead-sidebar" aria-label="Highlights and trending">
+                <div class="sidebar-widget sidebar-widget--compact">
+                    <h3 class="sidebar-title">Trending Now</h3>
                     <div id="trending-news-grid" class="top-stories-list loading-state">
                         <div class="loading-spinner" style="width:20px;height:20px;border-width:2px;"></div>
                     </div>
                 </div>
+                <div class="sidebar-widget sidebar-widget--compact sidebar-widget--bg">
+                    <span class="sidebar-preview-label">Editorial note</span>
+                    <p class="sidebar-preview-copy">Every card, section, and transition is designed to feel polished, readable, and magazine-like.</p>
+                </div>
             </aside>
         </section>
 
-        <!-- INLINE AD (hidden until loaded) -->
         <section class="ad-band ad-band--inline">
-            <div style="display:flex;justify-content:center;">
+            <div class="ad-band__inner">
                 {% include 'frontend/components/advertisement_slot.html' with position='between_articles' class_name='ad-slot--inline' %}
             </div>
         </section>
 
-        <!-- LATEST ARTICLES GRID -->
+        <section class="editorial-section" aria-label="Editor’s pick">
+            <div class="section-heading section-heading--row">
+                <div>
+                    <span class="section-kicker">Editor’s Pick</span>
+                    <h2 class="section-title">Fresh from the desk</h2>
+                </div>
+                <span class="section-meta">Updated automatically</span>
+            </div>
+            <div id="editorial-grid" class="editorial-grid loading-state">
+                <div class="loading-spinner"></div>
+            </div>
+        </section>
+
         <section class="articles-section" aria-label="Latest news">
             <div class="section-heading section-heading--row">
                 <div>
                     <span class="section-kicker">Latest Wire</span>
-                    <h2 class="section-title">Top Stories Live</h2>
+                    <h2 class="section-title">Top stories live</h2>
                 </div>
                 <span class="section-meta">Refreshes automatically</span>
             </div>
@@ -92,11 +121,41 @@
             </div>
         </section>
 
+        <section class="category-showcase-section" aria-label="Category coverage">
+            <div class="section-heading section-heading--row">
+                <div>
+                    <span class="section-kicker">Coverage by topic</span>
+                    <h2 class="section-title">What’s moving right now</h2>
+                </div>
+                <span class="section-meta">Live from the feed</span>
+            </div>
+            <div id="category-sections-grid" class="category-sections-grid"></div>
+        </section>
+
+        <section class="video-section" aria-label="Video highlights">
+            <div class="section-heading section-heading--row">
+                <div>
+                    <span class="section-kicker">Watch</span>
+                    <h2 class="section-title">Video highlights</h2>
+                </div>
+                <span class="section-meta">From the latest stories</span>
+            </div>
+            <div id="video-section-content" class="video-section-card"></div>
+        </section>
+
+        <section class="newsletter-cta-section" aria-label="Newsletter subscription">
+            <div class="newsletter-card">
+                <div>
+                    <span class="section-kicker">Newsletter</span>
+                    <h3>Get the day’s essential stories in one concise briefing.</h3>
+                    <p>Join our editorial update for daily analysis, top headlines, and sharp reporting.</p>
+                </div>
+                <a href="{% url 'frontend:newsletter' %}" class="btn-nav btn-nav--primary">Subscribe now</a>
+            </div>
+        </section>
     </div>
 
-    <!-- POPUP AD (hidden until loaded) -->
     <div class="ad-popup" data-ad-slot="popup" aria-live="polite"></div>
-
 </div>
 {% endblock %}
 

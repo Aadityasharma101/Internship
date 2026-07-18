@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
-<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}" data-ads-endpoint="/api/ads/">
+<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}" data-ads-endpoint="https://news-portal-hvgs.onrender.com/api/ads/">
 
     <!-- TOP BAR -->
     <div class="topbar">
@@ -81,6 +81,8 @@
         {% block content %}{% endblock %}
     </main>
 
+    <button class="back-to-top" id="back-to-top" type="button" aria-label="Back to top">↑</button>
+
     <footer class="footer">
         <div class="container">
             <!-- Ad slot - hidden until ad is present -->
@@ -121,6 +123,19 @@
     <script src="{% static 'js/services/advertisementService.js' %}?v=1"></script>
     <script src="{% static 'js/main.js' %}?v=3"></script>
     {% block extra_js %}{% endblock %}
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const button = document.getElementById('back-to-top');
+        if (!button) return;
+        const toggle = () => {
+            button.style.display = window.scrollY > 600 ? 'inline-flex' : 'none';
+        };
+        toggle();
+        window.addEventListener('scroll', toggle, { passive: true });
+        button.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    });
+    </script>
 
     <script>
     // Set today's date in topbar

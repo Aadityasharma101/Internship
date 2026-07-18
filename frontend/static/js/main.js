@@ -4,16 +4,51 @@
 // ============================================================
 
 const DEFAULT_API_BASE = 'https://news-portal-hvgs.onrender.com';
+let ADS_REFRESH_TIMER = null;
+
+function refreshAdvertisements() {
+    if (!getAdsEndpoint()) return;
+    initAdvertisements().catch(() => { });
+}
+
+function startAdvertisementPolling(intervalMs = 15000) {
+    if (ADS_REFRESH_TIMER) {
+        window.clearInterval(ADS_REFRESH_TIMER);
+    }
+
+    if (!getAdsEndpoint()) return;
+    ADS_REFRESH_TIMER = window.setInterval(() => {
+        refreshAdvertisements();
+    }, intervalMs);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initActiveNav();
     initLiveNavbar();
     // Fetch ads only when an endpoint is configured; missing ad routes create noisy console failures.
     if (getAdsEndpoint()) {
-        initAdvertisements().catch(() => { });
-        setInterval(() => initAdvertisements().catch(() => { }), 90000);
+        refreshAdvertisements();
     }
-    setInterval(initLiveNavbar, 20000);
+});
+
+window.addEventListener('focus', () => {
+    refreshAdvertisements();
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        refreshAdvertisements();
+    }
+});
+
+window.addEventListener('online', () => {
+    refreshAdvertisements();
+});
+
+window.NewsPortalApi?.onDataChanged?.((event) => {
+    if (event?.type === 'advertisements' || event?.type === 'articles') {
+        refreshAdvertisements();
+    }
 });
 
 // ============================================================
@@ -25,8 +60,20 @@ function getApiBase() {
 }
 
 function buildApiUrl(endpoint) {
-    const base = getApiBase();
+    if (!endpoint) return '';
+
+    if (/^https?:\/\//i.test(endpoint)) {
+        return endpoint;
+    }
+
     const clean = endpoint.replace(/^\//, '');
+    const isLocalAdsEndpoint = /^(api\/ads|ads|advertisements)\//i.test(clean);
+
+    if (isLocalAdsEndpoint) {
+        return new URL(`/${clean}`, window.location.origin).toString();
+    }
+
+    const base = getApiBase();
     return `${base}/${clean}`;
 }
 
@@ -156,13 +203,15 @@ function renderCategoryChips(container, categories) {
 // ============================================================
 
 function getAdsEndpoint() {
-    return document.body?.dataset?.adsEndpoint?.trim() || '';
+    const configured = document.body?.dataset?.adsEndpoint?.trim() || '';
+    if (configured) return configured;
+    return '/api/ads/';
 }
 
 async function fetchAdvertisements() {
     const endpoint = getAdsEndpoint();
     if (!endpoint) return null;
-    const url = /^https?:\/\//i.test(endpoint) ? endpoint : buildApiUrl(endpoint);
+    const url = buildApiUrl(endpoint);
     return fetchJson(url, { timeoutMs: 8000 });
 }
 
@@ -195,19 +244,23 @@ function normalizeAdsPayload(payload) {
 
     if (!payload) return grouped;
 
-    if (Array.isArray(payload)) {
-        payload.forEach((ad) => {
+    const list = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload.results) ? payload.results : []);
+
+    if (list.length) {
+        list.forEach((ad) => {
             if (!isVisibleAdvertisement(ad)) {
                 return;
             }
 
             const position = normalizeAdPosition(ad?.position);
-            if (position && grouped[position] === null) grouped[position] = ad;
+            if (position && grouped[position] === null) {
+                grouped[position] = ad;
+            }
         });
         return grouped;
     }
-
-    if (Array.isArray(payload.results)) return normalizeAdsPayload(payload.results);
 
     positions.forEach((p) => {
         const v = payload[p];

@@ -10,6 +10,7 @@ const MAX_PARALLEL_DETAIL = 3;
 
 let CURRENT_FEED = [];
 let HOME_API_BASE = DEFAULT_MEDIA_BASE;
+let HOME_REFRESH_TIMER = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.querySelector('.page-shell');
@@ -18,15 +19,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiBase = root.dataset.apiBase || document.body?.dataset?.apiBase || DEFAULT_MEDIA_BASE;
     HOME_API_BASE = apiBase;
     initializeHomepage(apiBase);
-    startFeedPolling(apiBase, 20000);
 });
 
 window.addEventListener('pageshow', () => {
     initializeHomepage(HOME_API_BASE);
 });
 
+window.addEventListener('focus', () => {
+    initializeHomepage(HOME_API_BASE);
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        initializeHomepage(HOME_API_BASE);
+    }
+});
+
+window.addEventListener('online', () => {
+    initializeHomepage(HOME_API_BASE);
+});
+
 window.NewsPortalApi?.onDataChanged?.((event) => {
-    if (event?.type === 'articles') {
+    if (event?.type === 'articles' || event?.type === 'advertisements') {
         initializeHomepage(HOME_API_BASE);
     }
 });
@@ -42,9 +56,12 @@ function getMediaBase() {
 // MAIN INITIALISER
 // ============================================================
 async function initializeHomepage(apiBase) {
-    const featuredHero    = document.getElementById('featured-hero');
-    const latestGrid      = document.getElementById('latest-news-grid');
-    const trendingGrid    = document.getElementById('trending-news-grid');
+    const featuredHero       = document.getElementById('featured-hero');
+    const latestGrid         = document.getElementById('latest-news-grid');
+    const trendingGrid       = document.getElementById('trending-news-grid');
+    const editorialGrid      = document.getElementById('editorial-grid');
+    const categoryGrid       = document.getElementById('category-sections-grid');
+    const videoSection       = document.getElementById('video-section-content');
 
     try {
         const [feedResult, trendingResult] = await Promise.allSettled([
@@ -57,13 +74,18 @@ async function initializeHomepage(apiBase) {
 
         CURRENT_FEED = feedArticles.slice();
 
-        const latestArticles  = take(feedArticles.length ? feedArticles : trendingArticles, 6).map(mergeArticleData);
-        const trendingCards   = take(trendingArticles, 5).map(mergeArticleData);
-        const featuredArticle = mergeArticleData(feedArticles[0] || trendingArticles[0] || null);
+        const latestArticles   = take(feedArticles.length ? feedArticles : trendingArticles, 9).map(mergeArticleData);
+        const trendingCards    = take(trendingArticles, 8).map(mergeArticleData);
+        const editorialArticles = take(feedArticles.slice(1), 6).map(mergeArticleData);
+        const featuredArticle  = mergeArticleData(feedArticles[0] || trendingArticles[0] || null);
+        const videoArticles    = take(feedArticles.filter(hasVideoContent), 3).map(mergeArticleData);
 
         renderFeaturedHero(featuredHero, featuredArticle);
         renderNewsGrid(latestGrid, latestArticles);
         renderTrendingGrid(trendingGrid, trendingCards);
+        renderEditorialGrid(editorialGrid, editorialArticles);
+        renderCategorySectionsGrid(categoryGrid, feedArticles);
+        renderVideoSection(videoSection, videoArticles);
         updateBreakingHeadline(featuredArticle);
         updateCategoryFilter(categoriesFromArticles(feedArticles, trendingArticles));
 
@@ -79,6 +101,9 @@ async function initializeHomepage(apiBase) {
             { articles: [featuredArticle].filter(Boolean), render: () => renderFeaturedHero(featuredHero, featuredArticle) },
             { articles: latestArticles,                    render: () => renderNewsGrid(latestGrid, latestArticles) },
             { articles: trendingCards,                     render: () => renderTrendingGrid(trendingGrid, trendingCards) },
+            { articles: editorialArticles,                 render: () => renderEditorialGrid(editorialGrid, editorialArticles) },
+            { articles: feedArticles,                      render: () => renderCategorySectionsGrid(categoryGrid, feedArticles) },
+            { articles: videoArticles,                     render: () => renderVideoSection(videoSection, videoArticles) },
         ]);
 
     } catch (err) {
@@ -92,25 +117,6 @@ async function initializeHomepage(apiBase) {
 // ============================================================
 // POLLING
 // ============================================================
-function startFeedPolling(apiBase, intervalMs = 20000) {
-    setInterval(async () => {
-        try {
-            const fresh = await fetchJson(`${apiBase}/articles/feed/?ordering=-id`);
-            const articles = extractArticles(fresh);
-            if (!articles.length) return;
-
-            const newestId = articles[0]?.id;
-            if (newestId && newestId !== CURRENT_FEED[0]?.id) {
-                CURRENT_FEED = articles.slice();
-                const latest    = take(CURRENT_FEED, 6).map(mergeArticleData);
-                const featured  = mergeArticleData(CURRENT_FEED[0]);
-                renderFeaturedHero(document.getElementById('featured-hero'), featured);
-                renderNewsGrid(document.getElementById('latest-news-grid'), latest);
-                updateBreakingHeadline(featured);
-            }
-        } catch { /* silently ignore polling errors */ }
-    }, intervalMs);
-}
 
 // ============================================================
 // FETCH HELPERS
@@ -224,6 +230,22 @@ function categoriesFromArticles(...lists) {
     return cats;
 }
 
+function groupArticlesByCategory(articles) {
+    const grouped = new Map();
+    (articles || []).forEach((article) => {
+        const category = article?.categoryLabel || article?.category_name || article?.category || 'News';
+        if (!grouped.has(category)) grouped.set(category, []);
+        grouped.get(category).push(article);
+    });
+    return [...grouped.entries()].filter(([, items]) => items.length);
+}
+
+function hasVideoContent(article) {
+    if (!article) return false;
+    const videoFields = ['video', 'video_url', 'videoUrl', 'embed_url', 'embedUrl', 'youtube_url', 'youtubeUrl'];
+    return videoFields.some((field) => Boolean(article[field]));
+}
+
 // ============================================================
 // RENDER FUNCTIONS
 // ============================================================
@@ -251,12 +273,17 @@ function renderFeaturedHero(container, article) {
         return;
     }
     const imgUrl = article.imageUrl || '/static/images/placeholder.svg';
-    const img = `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image">`;
     container.innerHTML = `
         <a href="/news/${escapeHtml(article.id)}/" class="featured-link">
-            ${img}
-            <h3 class="featured-title">${escapeHtml(article.title)}</h3>
-            <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+            <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(article.title)}" class="featured-image" loading="eager">
+            <div class="featured-text">
+                <div class="featured-meta">
+                    <span class="featured-category">${escapeHtml(article.categoryLabel || 'News')}</span>
+                    <span class="featured-time">${escapeHtml(article.displayDate || 'Recently')}</span>
+                </div>
+                <h3 class="featured-title">${escapeHtml(article.title)}</h3>
+                <p class="featured-summary">${escapeHtml(article.summary || article.description || '')}</p>
+            </div>
         </a>
     `;
 }
@@ -271,19 +298,110 @@ function renderNewsGrid(container, articles) {
     }
 
     container.innerHTML = articles.map((a, i) => {
-        const thumb   = a.imageUrl || '';
-        const imgHtml = thumb
-            ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="${i < 3 ? 'eager' : 'lazy'}" onerror="this.parentElement.classList.add('no-img')">`
-            : '';
+        const thumb = a.imageUrl || '';
         return `
         <article class="news-card">
             <a href="/news/${escapeHtml(a.id)}/">
-                <div class="thumb"><img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}"></div>
-                <h4>${escapeHtml(a.title)}</h4>
-                <p class="excerpt">${escapeHtml(a.summary || a.description || '')}</p>
+                <div class="news-card__media">
+                    ${thumb ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(a.title)}" loading="${i < 3 ? 'eager' : 'lazy'}">` : '<div class="featured-image-placeholder" style="height:100%"></div>'}
+                </div>
+                <div class="news-card__body">
+                    <div class="news-card__meta">
+                        <span class="category-pill">${escapeHtml(a.categoryLabel || 'News')}</span>
+                        <span>${escapeHtml(a.displayDate || 'Recently')}</span>
+                    </div>
+                    <h4 class="news-card__title">${escapeHtml(a.title)}</h4>
+                    <p class="news-card__summary">${escapeHtml(a.summary || a.description || '')}</p>
+                    <div class="news-card__footer">
+                        <span>${escapeHtml(a.authorLabel || 'News Desk')}</span>
+                        <span>Read more →</span>
+                    </div>
+                </div>
             </a>
         </article>
-    `}).join('');
+    `;}).join('');
+}
+
+function renderEditorialGrid(container, articles) {
+    if (!container) return;
+    container.classList.remove('loading-state');
+
+    if (!articles || !articles.length) {
+        container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">No editorial picks available.</p>';
+        return;
+    }
+
+    container.innerHTML = articles.map((a) => `
+        <article class="editorial-card">
+            <a href="/news/${escapeHtml(a.id)}/">
+                <div class="editorial-card__media">
+                    ${a.imageUrl ? `<img src="${escapeHtml(a.imageUrl)}" alt="${escapeHtml(a.title)}" loading="lazy">` : '<div class="featured-image-placeholder" style="height:100%"></div>'}
+                </div>
+                <div class="editorial-card__body">
+                    <div class="editorial-card__meta">
+                        <span class="category-pill">${escapeHtml(a.categoryLabel || 'News')}</span>
+                        <span>${escapeHtml(a.displayDate || 'Recently')}</span>
+                    </div>
+                    <h4 class="editorial-card__title">${escapeHtml(a.title)}</h4>
+                    <p class="editorial-card__summary">${escapeHtml(a.summary || a.description || '')}</p>
+                </div>
+            </a>
+        </article>
+    `).join('');
+}
+
+function renderCategorySectionsGrid(container, articles) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const grouped = groupArticlesByCategory(articles);
+    if (!grouped.length) {
+        container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">No category coverage available.</p>';
+        return;
+    }
+
+    container.innerHTML = grouped.slice(0, 8).map(([category, items]) => `
+        <section class="category-card">
+            <div class="category-card__body">
+                <div class="editorial-card__meta">
+                    <span class="category-pill">${escapeHtml(category)}</span>
+                    <span>${items.length} stories</span>
+                </div>
+                <h4 class="category-card__title">${escapeHtml(category)} coverage</h4>
+                <ul class="hero-preview-list">
+                    ${items.slice(0, 4).map((item) => `<li><a href="/news/${escapeHtml(item.id)}/">${escapeHtml(item.title)}</a></li>`).join('')}
+                </ul>
+            </div>
+        </section>
+    `).join('');
+}
+
+function renderVideoSection(container, articles) {
+    if (!container) return;
+
+    if (!articles || !articles.length) {
+        container.innerHTML = '<div class="editorial-card"><div class="editorial-card__body"><p style="color:var(--muted)">No video highlights are available right now.</p></div></div>';
+        return;
+    }
+
+    const article = articles[0];
+    container.innerHTML = `
+        <article class="video-section-card">
+            <a href="/news/${escapeHtml(article.id)}/">
+                <div class="editorial-card__media">
+                    ${article.imageUrl ? `<img src="${escapeHtml(article.imageUrl)}" alt="${escapeHtml(article.title)}" loading="lazy">` : '<div class="featured-image-placeholder" style="height:100%"></div>'}
+                </div>
+                <div class="editorial-card__body">
+                    <div class="editorial-card__meta">
+                        <span class="category-pill">Video</span>
+                        <span>${escapeHtml(article.displayDate || 'Recently')}</span>
+                    </div>
+                    <h4 class="editorial-card__title">${escapeHtml(article.title)}</h4>
+                    <p class="editorial-card__summary">${escapeHtml(article.summary || article.description || '')}</p>
+                </div>
+            </a>
+        </article>
+    `;
 }
 
 function renderTrendingGrid(container, cards) {

@@ -1,7 +1,14 @@
 // static/admin/js/api.js
 
-const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
-const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
+const API_ORIGIN_URL = (() => {
+    const configuredOrigin = window.API_BASE_URL || window.API_BASE || '';
+    if (configuredOrigin && /^https?:\/\//i.test(configuredOrigin)) {
+        return configuredOrigin.replace(/\/$/, '').replace(/\/api$/i, '');
+    }
+
+    return window.location?.origin || 'http://127.0.0.1:8000';
+})();
+const API_BASE_URL = API_ORIGIN_URL;
 const AUTH_INVALID_KEY = 'news_portal_auth_invalid';
 
 function apiUrl(path = '') {

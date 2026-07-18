@@ -1,3 +1,4 @@
+import json
 from django.test import TestCase
 from django.urls import reverse
 from unittest.mock import patch
@@ -7,6 +8,8 @@ class MockApiResponse:
     def __init__(self, status_code, payload):
         self.status_code = status_code
         self.payload = payload
+        self.content = json.dumps(payload).encode('utf-8') if isinstance(payload, (dict, list)) else str(payload).encode('utf-8')
+        self.headers = {'Content-Type': 'application/json'}
         self.text = str(payload)
 
     def json(self):
@@ -34,6 +37,41 @@ class AdvertisementApiTests(TestCase):
         list_response = self.client.get(reverse('frontend:ads_api'))
         self.assertEqual(list_response.status_code, 200)
         self.assertGreaterEqual(list_response.json()['count'], 1)
+
+
+class PortalArticlesProxyTests(TestCase):
+    @patch('frontend.views.requests.request')
+    def test_portal_articles_list_proxies_to_remote_api(self, mock_request):
+        mock_request.return_value = MockApiResponse(200, {
+            'results': [{'id': 1, 'title': 'Hello world'}],
+            'count': 1,
+            'next': None,
+            'previous': None,
+        })
+
+        response = self.client.get(reverse('frontend:portal_articles_proxy'))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['count'], 1)
+        self.assertEqual(payload['results'][0]['title'], 'Hello world')
+        self.assertEqual(mock_request.call_args.args[0], 'GET')
+        self.assertIn('/articles/', mock_request.call_args.args[1])
+
+    @patch('frontend.views.requests.request')
+    def test_portal_articles_create_proxies_to_remote_api(self, mock_request):
+        mock_request.return_value = MockApiResponse(201, {'id': 2, 'title': 'New story'})
+
+        response = self.client.post(
+            reverse('frontend:portal_articles_create_proxy'),
+            {'title': 'New story', 'body': 'Body'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['title'], 'New story')
+        self.assertEqual(mock_request.call_args.args[0], 'POST')
+        self.assertIn('/articles/create/', mock_request.call_args.args[1])
 
 
 class AuthLoginTests(TestCase):

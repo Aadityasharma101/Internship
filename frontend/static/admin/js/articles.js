@@ -3,34 +3,28 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = '/articles/feed/';
 
-// Try API-mounted endpoints and proxy routes first, then fall back to root paths.
-// If a global `API_BASE` is set by templates, try absolute remote endpoints first.
+// Prefer the local Django proxy endpoints so staff/article actions resolve on this site.
 const REMOTE_BASE = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE.replace(/\/$/, '') : '';
-const ARTICLE_ENDPOINTS = REMOTE_BASE ? [
-    `${REMOTE_BASE}/api/articles/feed/`,
-    `${REMOTE_BASE}/remote/articles/feed/`,
-    `${REMOTE_BASE}/articles/feed/`,
-    '/api/articles/feed/',
-    '/remote/articles/feed/',
+const ARTICLE_ENDPOINTS = [
     '/articles/feed/',
+    '/portal/articles/',
+    '/remote/articles/feed/',
+    '/api/articles/feed/',
     'articles/feed/',
-    `${REMOTE_BASE}/api/articles/`,
-    `${REMOTE_BASE}/remote/articles/`,
-    `${REMOTE_BASE}/articles/`,
-    '/api/articles/',
-    '/remote/articles/',
-    '/articles/',
-    'articles/'
-] : ['/api/articles/feed/', '/remote/articles/feed/', '/articles/feed/', 'articles/feed/', '/api/articles/', '/remote/articles/', '/articles/', 'articles/'];
+    `${REMOTE_BASE}/articles/feed/`,
+    `${REMOTE_BASE}/remote/articles/feed/`,
+    `${REMOTE_BASE}/api/articles/feed/`
+];
 
-const ARTICLE_MUTATION_ENDPOINTS = REMOTE_BASE ? [
-    `${REMOTE_BASE}/api/articles/create/`,
-    `${REMOTE_BASE}/remote/articles/create/`,
-    `${REMOTE_BASE}/articles/create/`,
-    '/api/articles/create/',
+const ARTICLE_MUTATION_ENDPOINTS = [
+    '/articles/create/',
+    '/portal/articles/create/',
     '/remote/articles/create/',
-    '/articles/create/'
-] : ['/api/articles/create/', '/remote/articles/create/', '/articles/create/'];
+    '/api/articles/create/',
+    `${REMOTE_BASE}/articles/create/`,
+    `${REMOTE_BASE}/remote/articles/create/`,
+    `${REMOTE_BASE}/api/articles/create/`
+];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');
@@ -331,7 +325,7 @@ async function saveArticle() {
 
     try {
         if (id) {
-            await updateItem(activeArticleEndpoint, id, payload);
+            await updateItem('/articles/', id, payload);
         } else {
             await createItem(ARTICLE_MUTATION_ENDPOINTS, buildCreatePayload(payload));
         }

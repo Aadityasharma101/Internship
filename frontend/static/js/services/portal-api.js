@@ -1,9 +1,21 @@
 (function (window) {
     const DEFAULT_API_ORIGIN = 'https://news-portal-hvgs.onrender.com';
 
-    function getApiOrigin() {
+    function getApiOrigin(path = '') {
+        const rawPath = String(path || '').trim();
+
+        if (/^https?:\/\//i.test(rawPath)) {
+            return rawPath.replace(/\/$/, '');
+        }
+
         const bodyBase = window.document?.body?.dataset?.apiBase;
         const configuredBase = window.NEWS_PORTAL_API_BASE || bodyBase || DEFAULT_API_ORIGIN;
+        const localOrigin = window.location?.origin || '';
+
+        if (!rawPath || rawPath.startsWith('/') || rawPath.startsWith('articles/') || rawPath.startsWith('api/') || rawPath.startsWith('remote/') || rawPath.startsWith('staff/') || rawPath.startsWith('auth/')) {
+            return localOrigin || String(configuredBase).replace(/\/$/, '');
+        }
+
         return String(configuredBase).replace(/\/$/, '');
     }
 
@@ -42,18 +54,18 @@
     }
 
     function buildUrl(path = '', params = null) {
-        if (!path) {
+        const rawPath = String(path || '').trim();
+
+        if (!rawPath) {
             return appendParams(getApiOrigin(), params);
         }
-
-        const rawPath = String(path).trim();
 
         if (/^https?:\/\//i.test(rawPath)) {
             return appendParams(rawPath, params);
         }
 
         const cleanPath = rawPath.replace(/^\/+/, '');
-        return appendParams(`${getApiOrigin()}/${cleanPath}`, params);
+        return appendParams(`${getApiOrigin(rawPath)}/${cleanPath}`, params);
     }
 
     function isFormData(value) {
@@ -212,12 +224,22 @@
         }
     }
 
+    function isLocalRoute(path) {
+        const rawPath = String(path || '').trim();
+
+        if (!rawPath || /^https?:\/\//i.test(rawPath)) {
+            return false;
+        }
+
+        return rawPath.startsWith('/') || rawPath.startsWith('articles/') || rawPath.startsWith('api/') || rawPath.startsWith('remote/') || rawPath.startsWith('staff/') || rawPath.startsWith('auth/');
+    }
+
     async function request(method, path, options = {}) {
         const url = buildUrl(path, options.params || null);
         const auth = options.auth !== false;
         const headers = { ...(options.headers || {}) };
 
-        if (auth && window.api && typeof window.api.request === 'function') {
+        if (auth && !isLocalRoute(path) && window.api && typeof window.api.request === 'function') {
             const response = await window.api.request({
                 method,
                 url,

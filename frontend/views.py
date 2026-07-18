@@ -290,6 +290,46 @@ def api_proxy(request, path):
     return django_response
 
 
+@csrf_exempt
+def portal_articles_proxy(request):
+    return api_proxy(request, 'articles/feed/')
+
+
+@csrf_exempt
+def portal_articles_create_proxy(request):
+    return api_proxy(request, 'articles/create/')
+
+
+@csrf_exempt
+def portal_articles_feed(request):
+    return api_proxy(request, 'articles/feed/')
+
+
+@csrf_exempt
+def portal_reporter_articles(request):
+    return api_proxy(request, 'articles/reporter/articles/')
+
+
+@csrf_exempt
+def portal_articles_create(request):
+    return api_proxy(request, 'articles/create/')
+
+
+@csrf_exempt
+def portal_article_detail(request, article_id):
+    return api_proxy(request, f'articles/{article_id}/')
+
+
+@csrf_exempt
+def portal_article_update(request, article_id):
+    return api_proxy(request, f'articles/{article_id}/update/')
+
+
+@csrf_exempt
+def portal_article_delete(request, article_id):
+    return api_proxy(request, f'articles/{article_id}/delete/')
+
+
 def _time_ago(date_string):
     if not date_string:
         return ""

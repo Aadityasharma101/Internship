@@ -4,8 +4,8 @@
     const Utils = window.StaffUtils;
 
     const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
-    const listEndpoints = hasAuth ? ['/articles/reporter/articles/', '/articles/feed/'] : ['/articles/feed/'];
-    const createEndpoints = ['/articles/create/'];
+    const listEndpoints = hasAuth ? ['/articles/reporter/articles/', '/articles/feed/', '/portal/articles/'] : ['/articles/feed/', '/portal/articles/'];
+    const createEndpoints = ['/articles/create/', '/portal/articles/create/'];
 
     const state = {
         user: null,

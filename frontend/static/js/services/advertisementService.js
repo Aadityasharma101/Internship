@@ -1,6 +1,15 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/api/ads/', '/ads/', '/advertisements/', '/advertise/'];
+    // Use absolute remote endpoints so the client always queries the remote API.
+    // These cover common remote paths; the first successful endpoint will be used.
+    const REMOTE_BASE = 'https://news-portal-hvgs.onrender.com';
+    const LIST_ENDPOINTS = [
+        `${REMOTE_BASE}/api/ads/`,
+        `${REMOTE_BASE}/api/advertisements/`,
+        `${REMOTE_BASE}/ads/`,
+        `${REMOTE_BASE}/advertisements/`,
+        `${REMOTE_BASE}/advertise/`
+    ];
     const POSITION_MAP = {
         top_banner: 'Top Banner',
         sidebar: 'Sidebar',

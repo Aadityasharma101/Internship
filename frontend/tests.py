@@ -56,7 +56,8 @@ class PortalArticlesProxyTests(TestCase):
         self.assertEqual(payload['count'], 1)
         self.assertEqual(payload['results'][0]['title'], 'Hello world')
         self.assertEqual(mock_request.call_args.args[0], 'GET')
-        self.assertIn('/articles/', mock_request.call_args.args[1])
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/articles/feed/')
+        self.assertNotIn('/api/articles/', mock_request.call_args.args[1])
 
     @patch('frontend.views.requests.request')
     def test_portal_articles_create_proxies_to_remote_api(self, mock_request):
@@ -71,7 +72,89 @@ class PortalArticlesProxyTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['title'], 'New story')
         self.assertEqual(mock_request.call_args.args[0], 'POST')
-        self.assertIn('/articles/create/', mock_request.call_args.args[1])
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/articles/create/')
+        self.assertNotIn('/api/articles/', mock_request.call_args.args[1])
+
+
+class StaffArticleCreateTests(TestCase):
+    def test_staff_add_article_requires_authentication(self):
+        response = self.client.post(
+            reverse('frontend:staff_add_article'),
+            json.dumps({'title': 'New story', 'body': 'Body'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['detail'], 'Authentication required')
+
+    @patch('frontend.views.requests.post')
+    def test_staff_add_article_forwards_publishable_article_payload(self, mock_post):
+        mock_post.return_value = MockApiResponse(201, {
+            'id': 35,
+            'title': 'New story',
+            'status': 'published',
+        })
+
+        response = self.client.post(
+            reverse('frontend:staff_add_article'),
+            json.dumps({
+                'title': 'New story',
+                'body': 'Full story body',
+                'description': 'Short summary',
+                'category': 'International',
+                'image': 'https://example.com/story.jpg',
+                'published': True,
+                'featured': True,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Bearer staff-token',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(mock_post.call_args.args[0], 'https://news-portal-hvgs.onrender.com/articles/create/')
+
+        kwargs = mock_post.call_args.kwargs
+        self.assertEqual(kwargs['headers']['Authorization'], 'Bearer staff-token')
+        payload = kwargs['json']
+        self.assertEqual(payload['title'], 'New story')
+        self.assertEqual(payload['status'], 'published')
+        self.assertEqual(payload['body'], 'Full story body')
+        self.assertEqual(payload['content'], 'Full story body')
+        self.assertEqual(payload['description'], 'Short summary')
+        self.assertEqual(payload['summary'], 'Short summary')
+        self.assertEqual(payload['category_name'], 'International')
+        self.assertEqual(payload['image_url'], 'https://example.com/story.jpg')
+        self.assertTrue(payload['featured'])
+        self.assertTrue(payload['published'])
+        self.assertIn('published_at', payload)
+
+    @patch('frontend.views.requests.post')
+    def test_staff_add_article_retries_pending_review_when_remote_blocks_publish(self, mock_post):
+        mock_post.side_effect = [
+            MockApiResponse(403, {'detail': 'You do not have permission to perform this action.'}),
+            MockApiResponse(201, {'id': 36, 'title': 'Pending story', 'status': 'pending_review'}),
+        ]
+
+        response = self.client.post(
+            reverse('frontend:staff_add_article'),
+            json.dumps({
+                'title': 'Pending story',
+                'body': 'Full story body',
+                'description': 'Short summary',
+                'published': True,
+            }),
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Bearer staff-token',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(mock_post.call_count, 2)
+        retry_payload = mock_post.call_args.kwargs['json']
+        self.assertEqual(retry_payload['status'], 'pending_review')
+        self.assertFalse(retry_payload['published'])
+        self.assertFalse(retry_payload['is_published'])
+        self.assertNotIn('published_at', retry_payload)
+        self.assertIn('pending review', response.json()['detail'])
 
 
 class AuthLoginTests(TestCase):

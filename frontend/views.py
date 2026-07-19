@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -16,7 +17,13 @@ from datetime import datetime
 import re
 import requests
 
-NEWS_API_BASE = "https://news-portal-hvgs.onrender.com/api"
+NEWS_REMOTE_ORIGIN = getattr(settings, 'API_BASE_URL', 'https://news-portal-hvgs.onrender.com').rstrip('/')
+if NEWS_REMOTE_ORIGIN.endswith('/api'):
+    NEWS_REMOTE_ORIGIN = NEWS_REMOTE_ORIGIN[:-4]
+
+NEWS_API_BASE = f"{NEWS_REMOTE_ORIGIN}/api"
+NEWS_ARTICLE_BASE = NEWS_REMOTE_ORIGIN
+ARTICLE_STATUS_CHOICES = {'draft', 'pending_review', 'published', 'rejected'}
 HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -31,8 +38,55 @@ HOP_BY_HOP_HEADERS = {
 }
 
 
+def _join_remote_path(base, path):
+    return f"{base.rstrip('/')}/{str(path or '').lstrip('/')}"
+
+
+def _is_article_path(path):
+    clean_path = str(path or '').lstrip('/')
+    return clean_path == 'articles' or clean_path.startswith('articles/')
+
+
+def _remote_url_for_path(path):
+    clean_path = str(path or '').lstrip('/')
+    if clean_path.startswith('api/'):
+        return _join_remote_path(NEWS_REMOTE_ORIGIN, clean_path)
+
+    base = NEWS_ARTICLE_BASE if _is_article_path(clean_path) else NEWS_API_BASE
+    return _join_remote_path(base, clean_path)
+
+
+def _truthy(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on', 'published'}
+
+
+def _normalize_article_status(value, published=None):
+    if _truthy(published):
+        return 'published'
+
+    raw = str(value or '').strip().lower().replace('-', '_').replace(' ', '_')
+    if raw in ARTICLE_STATUS_CHOICES:
+        return raw
+    if raw in {'archive', 'archived'}:
+        return 'rejected'
+    return 'draft'
+
+
+def _remote_json_response(response):
+    try:
+        return response.json()
+    except Exception:
+        return None
+
+
 def fetch_json(path):
-    url = f"{NEWS_API_BASE}{path}"
+    url = _remote_url_for_path(path)
     req = urllib.request.Request(url, headers={
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0"
@@ -215,7 +269,7 @@ def ads_tracking(request, action):
 @csrf_exempt
 def api_proxy(request, path):
     query = request.META.get("QUERY_STRING")
-    url = f"{NEWS_API_BASE}/{path}"
+    url = _remote_url_for_path(path)
 
     if query:
         url = f"{url}?{query}"
@@ -298,6 +352,72 @@ def portal_articles_proxy(request):
 @csrf_exempt
 def portal_articles_create_proxy(request):
     return api_proxy(request, 'articles/create/')
+
+
+@csrf_exempt
+def portal_token_obtain(request):
+    return api_proxy(request, 'api/token/')
+
+
+@csrf_exempt
+def portal_token_refresh(request):
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode()) if request.body else request.POST.dict()
+    except Exception:
+        data = request.POST.dict()
+
+    refresh = data.get('refresh') or data.get('refresh_token')
+    if not refresh:
+        return JsonResponse({'detail': 'Refresh token is required.'}, status=400)
+
+    if requests is None:
+        return JsonResponse({'detail': 'requests library not installed on server. Install it in your virtualenv (pip install requests).'}, status=500)
+
+    refresh_paths = [
+        '/api/token/refresh/',
+        '/auth/token/refresh/',
+        '/token/refresh/',
+        '/refresh/',
+    ]
+
+    last_response = None
+    for path in refresh_paths:
+        try:
+            url = _remote_url_for_path(path)
+            resp = requests.post(
+                url,
+                json={'refresh': refresh},
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+                timeout=15,
+            )
+            if resp.status_code in (200, 201):
+                django_response = HttpResponse(
+                    resp.content,
+                    status=resp.status_code,
+                    content_type=resp.headers.get('Content-Type', 'application/json'),
+                )
+                for header, value in resp.headers.items():
+                    if header.lower() not in HOP_BY_HOP_HEADERS and header.lower() != 'content-type':
+                        django_response[header] = value
+                return django_response
+
+            last_response = resp
+            if resp.status_code not in (404, 405):
+                break
+        except requests.RequestException:
+            continue
+
+    if last_response is not None:
+        try:
+            body = last_response.json()
+        except Exception:
+            body = {'detail': last_response.text or 'Token refresh failed.'}
+        return JsonResponse(body, status=last_response.status_code)
+
+    return JsonResponse({'detail': 'Unable to refresh token.'}, status=502)
 
 
 @csrf_exempt
@@ -455,7 +575,12 @@ def login(request):
 
 
 def _get_bearer_token(request):
-    authorization = request.headers.get('Authorization', '')
+    authorization = (
+        request.headers.get('Authorization') or
+        request.META.get('HTTP_AUTHORIZATION') or
+        request.META.get('Authorization') or
+        ''
+    )
     parts = authorization.split()
     if len(parts) == 2 and parts[0].lower() == 'bearer':
         return parts[1]
@@ -534,7 +659,7 @@ def get_remote_user_info(access_token):
     ]
     for path in candidates:
         try:
-            url = f"{NEWS_API_BASE}{path}"
+            url = _remote_url_for_path(path)
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 try:
@@ -596,7 +721,7 @@ def auth_login(request):
     last_error_resp = None
     for path in token_paths:
         try:
-            url = f"{NEWS_API_BASE}{path}"
+            url = _remote_url_for_path(path)
             resp = requests.post(url, json={'email': email, 'username': email, 'password': password}, timeout=15)
             # accept 200/201 as success; otherwise capture last non-2xx for forwarding
             if resp.status_code in (200, 201):
@@ -705,14 +830,27 @@ def staff_add_article(request):
     except Exception:
         data = request.POST.dict()
 
+    status = _normalize_article_status(
+        data.get('status'),
+        data.get('published') if 'published' in data else data.get('is_published')
+    )
+    body = data.get('body') or data.get('content') or ''
+    description = data.get('description') or data.get('summary') or data.get('excerpt') or ''
+
     payload = {
         'title': data.get('title', ''),
-        'body': data.get('body', ''),
-        'description': data.get('description', ''),
+        'status': status,
+        'body': body,
+        'content': body,
+        'description': description,
+        'summary': description,
     }
 
+    if status == 'published' and not data.get('published_at'):
+        payload['published_at'] = timezone.now().isoformat()
+
     # Use the remote API's create endpoint for article creation
-    url = f"{NEWS_API_BASE}/articles/create/"
+    url = _join_remote_path(NEWS_ARTICLE_BASE, 'articles/create/')
 
     if requests is None:
         return JsonResponse({'detail': 'requests library not installed on server. Install it in your virtualenv (pip install requests).'}, status=500)
@@ -731,6 +869,27 @@ def staff_add_article(request):
             for k, v in request.POST.items():
                 data_fields[k] = v
 
+            data_fields['status'] = status
+            if body:
+                data_fields.setdefault('body', body)
+                data_fields.setdefault('content', body)
+            if description:
+                data_fields.setdefault('description', description)
+                data_fields.setdefault('summary', description)
+            if status == 'published' and not data_fields.get('published_at'):
+                data_fields['published_at'] = timezone.now().isoformat()
+
+            category_value = data_fields.get('category', '').strip()
+            if category_value and not data_fields.get('category_id') and not data_fields.get('category_name'):
+                if category_value.isdigit():
+                    data_fields['category_id'] = category_value
+                else:
+                    data_fields['category_name'] = category_value
+
+            image_value = data_fields.get('image', '').strip()
+            if image_value.startswith(('http://', 'https://')) and not data_fields.get('image_url'):
+                data_fields['image_url'] = image_value
+
             # request.FILES contains uploaded files
             for k, f in request.FILES.items():
                 # requests accepts file tuples: (filename, fileobj, content_type)
@@ -739,7 +898,19 @@ def staff_add_article(request):
             resp = requests.post(url, data=data_fields, files=files, headers=headers, timeout=30)
         else:
             # include any optional fields from JSON/form data
-            for key in ('category', 'tags', 'status', 'image', 'featured', 'published'):
+            for key in (
+                'category',
+                'category_id',
+                'category_name',
+                'tags',
+                'image',
+                'image_url',
+                'featured',
+                'is_featured',
+                'published',
+                'is_published',
+                'published_at',
+            ):
                 if key in data:
                     if key in ('featured', 'published'):
                         val = data.get(key)
@@ -750,9 +921,62 @@ def staff_add_article(request):
                     else:
                         payload[key] = data[key]
 
+            category_value = str(payload.get('category') or '').strip()
+            if category_value and not payload.get('category_id') and not payload.get('category_name'):
+                if category_value.isdigit():
+                    payload['category_id'] = int(category_value)
+                else:
+                    payload['category_name'] = category_value
+
+            image_value = str(payload.get('image') or '').strip()
+            if image_value.startswith(('http://', 'https://')) and not payload.get('image_url'):
+                payload['image_url'] = image_value
+
             resp = requests.post(url, json=payload, headers=headers, timeout=30)
     except requests.RequestException as e:
         return JsonResponse({'detail': str(e)}, status=502)
+
+    if resp.status_code == 403 and status != 'draft':
+        retry_statuses = []
+        if status != 'pending_review':
+            retry_statuses.append('pending_review')
+        if status != 'draft':
+            retry_statuses.append('draft')
+
+        for retry_status in retry_statuses:
+            try:
+                print(f"[staff_add_article] publish blocked for status={status}, retrying as {retry_status}")
+                if content_type.startswith('multipart/'):
+                    retry_fields = dict(data_fields)
+                    retry_fields['status'] = retry_status
+                    retry_fields['published'] = 'false'
+                    retry_fields['is_published'] = 'false'
+                    retry_fields.pop('published_at', None)
+                    retry_resp = requests.post(url, data=retry_fields, files=files, headers=headers, timeout=30)
+                else:
+                    retry_payload = {
+                        **payload,
+                        'status': retry_status,
+                        'published': False,
+                        'is_published': False,
+                    }
+                    retry_payload.pop('published_at', None)
+                    retry_resp = requests.post(url, json=retry_payload, headers=headers, timeout=30)
+
+                if 200 <= retry_resp.status_code < 300:
+                    retry_data = retry_resp.json()
+                    if isinstance(retry_data, dict):
+                        retry_data['detail'] = (
+                            'Article saved to the remote database as ' \
+                            f'{retry_status.replace("_", " ")}. '
+                            'This staff account cannot publish directly.'
+                        )
+                    return JsonResponse(retry_data, status=retry_resp.status_code)
+
+                print(f"[staff_add_article] {retry_status} retry failed: {retry_resp.status_code} {retry_resp.text[:200]}")
+            except (requests.RequestException, ValueError) as e:
+                print(f"[staff_add_article] {retry_status} retry exception: {e}")
+                continue
 
     try:
         return JsonResponse(resp.json(), status=resp.status_code)

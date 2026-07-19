@@ -82,6 +82,16 @@
                     </a>
                     <span class="badge badge-orange">12</span>
                 </li>
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_advertisements' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_advertisements' %}">
+                        <i class="fa-solid fa-bullhorn"></i> Advertisements
+                    </a>
+                </li>
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_profile' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_profile' %}">
+                        <i class="fa-solid fa-user"></i> Profile
+                    </a>
+                </li>
 
             </ul>
 

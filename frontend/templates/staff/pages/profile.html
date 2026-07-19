@@ -27,7 +27,10 @@
 <div class="profile-grid">
     <section class="profile-panel">
         <div class="profile-header-block">
-            <div class="profile-avatar" id="profileAvatar">ST</div>
+            <div class="profile-avatar" id="profileAvatar">
+                <img id="profileAvatarImg" src="" alt="Avatar" style="display:none; width:72px; height:72px; object-fit:cover; border-radius:6px;" />
+                <span id="profileAvatarInitials">ST</span>
+            </div>
             <div>
                 <p class="section-kicker">Signed in as</p>
                 <h3 id="profileName">Loading profile...</h3>
@@ -56,7 +59,34 @@
     </section>
 
     <section class="profile-panel">
-        <h3 class="profile-panel-title">Quick Access</h3>
+        <h3 class="profile-panel-title">Edit Profile</h3>
+        <div class="form-grid">
+            <div class="form-group full-width">
+                <label for="profileInputName">Display Name</label>
+                <input type="text" id="profileInputName" placeholder="Enter your display name">
+            </div>
+            <div class="form-group full-width">
+                <label for="profileInputUsername">Username</label>
+                <input type="text" id="profileInputUsername" placeholder="Enter your username">
+            </div>
+            <div class="form-group full-width">
+                <label for="profileInputEmail">Email</label>
+                <input type="email" id="profileInputEmail" placeholder="Enter your email address">
+            </div>
+            <div class="form-group full-width">
+                <label for="profileInputImage">Profile Image</label>
+                <input type="file" id="profileInputImage" accept="image/*">
+                <div class="image-preview">
+                    <img id="profilePreviewImg" src="" alt="Preview" style="display:none; max-width:120px; max-height:120px; margin-top:8px; object-fit:cover; border-radius:6px;">
+                </div>
+            </div>
+        </div>
+
+        <p class="modal-status" id="profileFormStatus"></p>
+        <div class="modal-actions">
+            <button class="btn-primary" id="saveProfileBtn" type="button">Save Profile</button>
+        </div>
+
         <div class="profile-actions">
             <a href="{% url 'frontend:staff_dashboard' %}" class="profile-action">Dashboard</a>
             <a href="{% url 'frontend:staff_articles' %}" class="profile-action">Articles</a>

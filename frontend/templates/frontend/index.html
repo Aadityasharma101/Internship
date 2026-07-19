@@ -5,7 +5,7 @@
 {% block meta_description %}Stay informed with the latest breaking news, live updates, and in-depth analysis from around the world.{% endblock %}
 
 {% block content %}
-<div class="page-shell" data-api-base="{{ API_BASE }}">
+<div class="page-shell" data-api-base="{{ request.scheme }}://{{ request.get_host }}">
 
     <section class="breaking-news-banner" aria-live="polite" aria-label="Breaking news">
         <div class="container breaking-news-inner">

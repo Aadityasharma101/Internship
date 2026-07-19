@@ -49,6 +49,10 @@
     }
 
     function setTableMessage(tbody, colspan, message) {
+        if (!tbody) {
+            return;
+        }
+
         tbody.innerHTML = `
             <tr class="loading-row">
                 <td colspan="${colspan}">${Api.escapeHtml(message)}</td>

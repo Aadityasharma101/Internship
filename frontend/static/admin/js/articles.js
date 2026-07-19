@@ -17,6 +17,7 @@ const ARTICLE_ENDPOINTS = [
 ];
 
 const ARTICLE_MUTATION_ENDPOINTS = [
+    '/staff/add_article/',
     '/articles/create/',
     '/portal/articles/create/',
     '/remote/articles/create/',
@@ -242,7 +243,10 @@ function resetForm() {
             field.value = '';
         }
     });
-    articleFields.status.value = 'draft';
+
+    const defaultStatus = articleModal?.dataset?.defaultStatus || 'draft';
+    articleFields.status.value = defaultStatus;
+    articleFields.published.checked = defaultStatus === 'published';
     articleFormStatus.textContent = '';
 }
 
@@ -300,7 +304,7 @@ function buildPayload() {
 
 function buildCreatePayload(payload) {
     const createPayload = {
-        title: payload.title,
+        ...payload,
         status: payload.status
     };
 
@@ -339,13 +343,31 @@ async function saveArticle() {
     }
 }
 
+async function initializeArticlesPage() {
+    await loadArticles();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+        openCreateModal();
+        return;
+    }
+
+    const editId = params.get('edit');
+    if (editId) {
+        const article = currentArticles.find((item) => String(item.id) === String(editId));
+        if (article) {
+            openEditModal(article);
+        }
+    }
+}
+
 async function removeArticle(article) {
     if (!window.confirm(`Delete "${getArticleTitle(article)}"? This cannot be undone.`)) {
         return;
     }
 
     try {
-        await deleteItem(activeArticleEndpoint, article.id);
+        await deleteItem('/articles/', article.id);
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to delete article:', error);
@@ -398,4 +420,4 @@ articleModal.addEventListener('click', (event) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => loadArticles());
+document.addEventListener('DOMContentLoaded', initializeArticlesPage);

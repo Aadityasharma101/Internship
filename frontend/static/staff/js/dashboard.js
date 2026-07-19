@@ -25,6 +25,10 @@
     }
 
     function renderRecentArticles(items) {
+        if (!els.recentArticles) {
+            return;
+        }
+
         if (!items.length) {
             renderEmpty(els.recentArticles, 4, 'No articles found for your account.');
             return;
@@ -46,6 +50,10 @@
     }
 
     function renderRecentComments(items) {
+        if (!els.recentComments) {
+            return;
+        }
+
         if (!items.length) {
             renderEmpty(els.recentComments, 4, 'No comments found on your articles.');
             return;

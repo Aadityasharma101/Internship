@@ -135,7 +135,7 @@ function getPortalDashboardPath(user) {
         return '/users/';
     }
     if (isPortalStaff(user)) {
-        return '/dashboard/';
+        return '/staff/';
     }
     return '/profile/';
 }

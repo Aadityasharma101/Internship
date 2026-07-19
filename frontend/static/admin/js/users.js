@@ -32,7 +32,7 @@ const userFields = {
     is_verified: document.getElementById('is_verified')
 };
 
-const { escapeHTML, formatDate, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
+const { escapeHTML, formatDate, formatApiError, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
 
 function getFullName(user) {
     const name = `${user.first_name || ''} ${user.last_name || ''}`.trim();
@@ -217,6 +217,18 @@ function buildPayload(id) {
     return payload;
 }
 
+function validateNewUser(payload) {
+    if (!payload.password) {
+        return 'Password is required for new users.';
+    }
+
+    if (payload.password.length < 8) {
+        return 'Password must be at least 8 characters.';
+    }
+
+    return '';
+}
+
 async function saveUser() {
     const id = userFields.id.value;
     const payload = buildPayload(id);
@@ -226,8 +238,9 @@ async function saveUser() {
         return;
     }
 
-    if (!id && !payload.password) {
-        userFormStatus.textContent = 'Password is required for new users.';
+    const passwordError = !id ? validateNewUser(payload) : '';
+    if (passwordError) {
+        userFormStatus.textContent = passwordError;
         return;
     }
 
@@ -244,7 +257,7 @@ async function saveUser() {
         await loadUsers(currentPage);
     } catch (error) {
         console.error('Unable to save user:', error);
-        userFormStatus.textContent = 'Unable to save user. Check required fields and permissions.';
+        userFormStatus.textContent = formatApiError(error, 'Unable to save user. Check required fields and permissions.');
     } finally {
         saveUserBtn.disabled = false;
     }

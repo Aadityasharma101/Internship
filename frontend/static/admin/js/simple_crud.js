@@ -225,7 +225,7 @@ async function saveResource() {
         await loadResources(simpleState.page);
     } catch (error) {
         console.error('Unable to save resource:', error);
-        simpleEls.status.textContent = 'Unable to save. Check required fields and permissions.';
+        simpleEls.status.textContent = RH.formatApiError(error, 'Unable to save. Check required fields and permissions.');
     } finally {
         simpleEls.save.disabled = false;
     }

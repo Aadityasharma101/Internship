@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.utils import timezone
-from .models import Advertisement
+from .models import Advertisement, Article, Category
 import base64
 import json
 import urllib.request
@@ -210,6 +210,147 @@ def ads_tracking(request, action):
         ad.target_url = ad.target_url or '#'
     ad.save()
     return JsonResponse(ad.to_api_dict())
+
+
+def _admin_category_dict(category):
+    return {
+        'id': category.id,
+        'name': category.name,
+        'slug': category.slug,
+        'description': category.description,
+        'is_active': category.is_active,
+        'is_featured': category.is_featured,
+        'article_count': category.articles.count(),
+        'created_at': category.created_at.isoformat(),
+        'updated_at': category.updated_at.isoformat(),
+    }
+
+
+def _admin_article_dict(article):
+    return {
+        'id': article.id,
+        'title': article.title,
+        'category': _admin_category_dict(article.category) if article.category else None,
+        'description': article.description,
+        'body': article.body,
+        'image_url': article.image_url,
+        'status': article.status,
+        'is_featured': article.is_featured,
+        'is_published': article.is_published,
+        'published_at': article.published_at.isoformat() if article.published_at else None,
+        'created_at': article.created_at.isoformat(),
+        'updated_at': article.updated_at.isoformat(),
+    }
+
+
+def _admin_bool(value, default=False):
+    if value is None:
+        return default
+    return str(value).lower() in {'1', 'true', 'yes', 'on'}
+
+
+@csrf_exempt
+def admin_categories_api(request, category_id=None):
+    if category_id is None:
+        if request.method == 'GET':
+            categories = Category.objects.all()
+            return JsonResponse({'count': categories.count(), 'next': None, 'previous': None, 'results': [_admin_category_dict(item) for item in categories]})
+        if request.method == 'POST':
+            payload = _coerce_payload(request)
+            name = str(payload.get('name') or '').strip()
+            if not name:
+                return JsonResponse({'name': ['Name is required.']}, status=400)
+            slug = str(payload.get('slug') or '').strip()
+            category = Category(name=name, slug=slug, description=str(payload.get('description') or '').strip(), is_active=_admin_bool(payload.get('is_active'), True), is_featured=_admin_bool(payload.get('is_featured')))
+            try:
+                category.save()
+            except Exception:
+                return JsonResponse({'detail': 'A category with this name or slug already exists.'}, status=400)
+            return JsonResponse(_admin_category_dict(category), status=201)
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    try:
+        category = Category.objects.get(pk=category_id)
+    except Category.DoesNotExist:
+        return JsonResponse({'detail': 'Category not found.'}, status=404)
+    if request.method == 'DELETE':
+        category.delete()
+        return HttpResponse(status=204)
+    if request.method not in {'PATCH', 'PUT'}:
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+    payload = _coerce_payload(request)
+    for field in ('name', 'slug', 'description'):
+        if field in payload:
+            setattr(category, field, str(payload[field]).strip())
+    if 'is_active' in payload:
+        category.is_active = _admin_bool(payload['is_active'])
+    if 'is_featured' in payload:
+        category.is_featured = _admin_bool(payload['is_featured'])
+    try:
+        category.save()
+    except Exception:
+        return JsonResponse({'detail': 'A category with this name or slug already exists.'}, status=400)
+    return JsonResponse(_admin_category_dict(category))
+
+
+def _article_category(value):
+    if not value:
+        return None
+    try:
+        return Category.objects.get(pk=int(value))
+    except (Category.DoesNotExist, TypeError, ValueError):
+        return Category.objects.filter(name__iexact=str(value).strip()).first()
+
+
+@csrf_exempt
+def admin_articles_api(request, article_id=None):
+    if article_id is None:
+        if request.method == 'GET':
+            articles = Article.objects.select_related('category').all()
+            return JsonResponse({'count': articles.count(), 'next': None, 'previous': None, 'results': [_admin_article_dict(item) for item in articles]})
+        if request.method == 'POST':
+            payload = _coerce_payload(request)
+            title = str(payload.get('title') or '').strip()
+            if not title:
+                return JsonResponse({'title': ['Title is required.']}, status=400)
+            status = str(payload.get('status') or 'draft').lower()
+            if status not in {'draft', 'published', 'archived'}:
+                return JsonResponse({'status': ['Choose draft, published, or archived.']}, status=400)
+            is_published = _admin_bool(payload.get('is_published')) or status == 'published'
+            article = Article(title=title, category=_article_category(payload.get('category')), description=str(payload.get('description') or '').strip(), body=str(payload.get('body') or '').strip(), image_url=str(payload.get('image_url') or payload.get('image') or '').strip(), status=status, is_featured=_admin_bool(payload.get('is_featured') or payload.get('featured')), is_published=is_published, published_at=timezone.now() if is_published else None)
+            article.save()
+            return JsonResponse(_admin_article_dict(article), status=201)
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    try:
+        article = Article.objects.select_related('category').get(pk=article_id)
+    except Article.DoesNotExist:
+        return JsonResponse({'detail': 'Article not found.'}, status=404)
+    if request.method == 'DELETE':
+        article.delete()
+        return HttpResponse(status=204)
+    if request.method not in {'PATCH', 'PUT'}:
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+    payload = _coerce_payload(request)
+    for field in ('title', 'description', 'body'):
+        if field in payload:
+            setattr(article, field, str(payload[field]).strip())
+    if 'image_url' in payload or 'image' in payload:
+        article.image_url = str(payload.get('image_url') or payload.get('image') or '').strip()
+    if 'category' in payload:
+        article.category = _article_category(payload['category'])
+    if 'status' in payload:
+        article.status = str(payload['status']).lower()
+    if 'is_featured' in payload or 'featured' in payload:
+        article.is_featured = _admin_bool(payload.get('is_featured', payload.get('featured')))
+    if 'is_published' in payload or 'published' in payload:
+        article.is_published = _admin_bool(payload.get('is_published', payload.get('published')))
+    if article.status == 'published':
+        article.is_published = True
+    if article.is_published and not article.published_at:
+        article.published_at = timezone.now()
+    article.save()
+    return JsonResponse(_admin_article_dict(article))
 
 
 @csrf_exempt
@@ -781,7 +922,7 @@ def bookmarks(request):
 
 def comments(request):
     context = {}
-    return render(request, 'staff/pages/comments.html', context)
+    return render(request, 'admin/pages/comments.html', context)
 
 
 def reacts(request):

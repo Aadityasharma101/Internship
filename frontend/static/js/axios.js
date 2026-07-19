@@ -9,6 +9,12 @@ function apiUrl(path = '') {
         return path;
     }
 
+    // Local-only routes (if enabled) stay on this Django application. The
+    // documented Ads endpoint remains on the remote API at /api/ads/.
+    if (/^\/api\/admin(?:\/|$)/.test(path)) {
+        return `${window.location.origin}${path}`;
+    }
+
     if (path.startsWith('/')) {
         return `${API_ORIGIN_URL}${path}`;
     }

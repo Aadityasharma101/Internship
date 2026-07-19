@@ -47,7 +47,7 @@ const ResourceHelpers = (() => {
     async function firstSuccessful(endpoints, requestFactory) {
         let lastError = null;
 
-        for (const endpoint of endpoints) {
+        for (const endpoint of [...new Set(endpoints.filter(Boolean))]) {
             try {
                 return {
                     endpoint,
@@ -55,6 +55,16 @@ const ResourceHelpers = (() => {
                 };
             } catch (error) {
                 lastError = error;
+
+                // Endpoint alternatives are useful for backwards-compatible GET
+                // routes, but a validation/permission error is an answer from the
+                // API, not a reason to repeat a mutation elsewhere. Retrying a
+                // POST on every 400 was causing duplicate requests and hiding the
+                // useful field-level error returned by the server.
+                const status = error?.response?.status;
+                if (status && ![404, 405].includes(status)) {
+                    throw error;
+                }
             }
         }
 
@@ -115,6 +125,31 @@ const ResourceHelpers = (() => {
         `;
     }
 
+    function formatApiError(error, fallback = 'Unable to save. Please try again.') {
+        const data = error?.response?.data;
+
+        if (!data) {
+            return fallback;
+        }
+
+        if (typeof data === 'string') {
+            return data;
+        }
+
+        if (data.detail) {
+            return Array.isArray(data.detail) ? data.detail.join(' ') : String(data.detail);
+        }
+
+        const messages = Object.entries(data)
+            .map(([field, value]) => {
+                const message = Array.isArray(value) ? value.join(' ') : String(value);
+                return `${field.replace(/_/g, ' ')}: ${message}`;
+            })
+            .filter(Boolean);
+
+        return messages.join(' ') || fallback;
+    }
+
     return {
         buildPagedEndpoint,
         createItem,
@@ -122,6 +157,7 @@ const ResourceHelpers = (() => {
         escapeHTML,
         firstSuccessful,
         formatDate,
+        formatApiError,
         getValue,
         loadList,
         normalizeList,

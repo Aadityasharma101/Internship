@@ -88,7 +88,7 @@
 window.simpleCrudConfig = {
     itemName: 'Role',
     itemPlural: 'roles',
-    endpoints: ['roles/', '/roles/', 'users/roles/', '/users/roles/'],
+    endpoints: ['roles/', 'users/roles/'],
     secondaryKeys: ['is_system', 'system'],
     titleField: { name: 'role_name', keys: ['role_name', 'name', 'title'] },
     columns: [
@@ -97,9 +97,11 @@ window.simpleCrudConfig = {
         { name: 'created_at', keys: ['created_at', 'created_on'], type: 'date' }
     ],
     fields: [
-        { id: 'roleName', name: 'role_name', label: 'Role name', required: true }
+        { id: 'roleName', name: 'role_name', label: 'Role name', required: true },
+        { id: 'roleDescription', name: 'description', label: 'Description', includeEmpty: true },
+        { id: 'roleActive', name: 'is_active', label: 'Active', type: 'checkbox', default: true }
     ]
 };
 </script>
-<script src="{% static 'admin/js/simple_crud.js' %}"></script>
+<script src="{% static 'admin/js/simple_crud.js' %}?v=2"></script>
 {% endblock %}

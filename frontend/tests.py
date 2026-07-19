@@ -35,6 +35,71 @@ class AdvertisementApiTests(TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertGreaterEqual(list_response.json()['count'], 1)
 
+    def test_staff_can_update_and_delete_an_ad(self):
+        created = self.client.post(
+            reverse('frontend:ads_api'),
+            {
+                'title': 'Original campaign',
+                'target_url': 'https://example.com',
+                'position': 'sidebar',
+            },
+            content_type='application/json',
+        )
+        ad_id = created.json()['id']
+        detail_url = reverse('frontend:ads_detail', args=[ad_id])
+
+        updated = self.client.patch(
+            detail_url,
+            {'title': 'Updated campaign', 'is_active': False},
+            content_type='application/json',
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()['title'], 'Updated campaign')
+        self.assertFalse(updated.json()['is_active'])
+
+        deleted = self.client.delete(detail_url)
+        self.assertEqual(deleted.status_code, 204)
+
+
+class AdminContentApiTests(TestCase):
+    def test_category_crud(self):
+        created = self.client.post(
+            reverse('frontend:admin_categories_api'),
+            {'name': 'Technology', 'slug': 'technology', 'description': 'Tech news', 'is_featured': True},
+            content_type='application/json',
+        )
+        self.assertEqual(created.status_code, 201)
+        category_id = created.json()['id']
+
+        updated = self.client.patch(
+            reverse('frontend:admin_category_detail', args=[category_id]),
+            {'description': 'Updated tech news', 'is_active': False},
+            content_type='application/json',
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertFalse(updated.json()['is_active'])
+        self.assertEqual(self.client.delete(reverse('frontend:admin_category_detail', args=[category_id])).status_code, 204)
+
+    def test_article_crud(self):
+        category = self.client.post(reverse('frontend:admin_categories_api'), {'name': 'World'}, content_type='application/json').json()
+        created = self.client.post(
+            reverse('frontend:admin_articles_api'),
+            {'title': 'Headline', 'category': category['id'], 'description': 'Summary', 'body': 'Full body', 'status': 'published'},
+            content_type='application/json',
+        )
+        self.assertEqual(created.status_code, 201)
+        article_id = created.json()['id']
+        self.assertTrue(created.json()['is_published'])
+
+        updated = self.client.patch(
+            reverse('frontend:admin_article_detail', args=[article_id]),
+            {'title': 'Updated headline', 'is_featured': True},
+            content_type='application/json',
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertTrue(updated.json()['is_featured'])
+        self.assertEqual(self.client.delete(reverse('frontend:admin_article_detail', args=[article_id])).status_code, 204)
+
 
 class AuthLoginTests(TestCase):
     @patch('frontend.views.requests.get')

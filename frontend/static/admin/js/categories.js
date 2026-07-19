@@ -3,7 +3,7 @@ let lastCategoryResponse = null;
 let currentCategories = [];
 let activeCategoryEndpoint = '/articles/categories/';
 
-const CATEGORY_ENDPOINTS = ['/articles/categories/', 'articles/categories/', '/categories/', 'categories/'];
+const CATEGORY_ENDPOINTS = ['/articles/categories/'];
 
 const categoriesTableBody = document.getElementById('categoriesTableBody');
 const prevCategoryBtn = document.getElementById('prevCategoryBtn');
@@ -32,7 +32,7 @@ const categoryFields = {
     featured: document.getElementById('categoryFeatured')
 };
 
-const { escapeHTML, formatDate, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
+const { escapeHTML, formatDate, formatApiError, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
 
 function normalize(value, fallback = 'Not available') {
     return value === null || value === undefined || value === '' ? fallback : String(value);
@@ -212,7 +212,11 @@ function closeModal() {
 
 function buildPayload() {
     return {
-        name: categoryFields.name.value.trim()
+        name: categoryFields.name.value.trim(),
+        slug: categoryFields.slug.value.trim(),
+        description: categoryFields.description.value.trim(),
+        is_active: categoryFields.active.checked,
+        is_featured: categoryFields.featured.checked
     };
 }
 
@@ -238,7 +242,7 @@ async function saveCategory() {
         await loadCategories(currentCategoryPage);
     } catch (error) {
         console.error('Unable to save category:', error);
-        categoryFormStatus.textContent = 'Unable to save category. Check required fields and permissions.';
+        categoryFormStatus.textContent = formatApiError(error, 'Unable to save category. Check required fields and permissions.');
     } finally {
         saveCategoryBtn.disabled = false;
     }

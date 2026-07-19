@@ -20,7 +20,7 @@
 <div class="resource-summary">
     <div class="summary-card"><span class="summary-label">Total ads</span><strong id="totalResources">0</strong></div>
     <div class="summary-card"><span class="summary-label">Active</span><strong id="activeResources">0</strong></div>
-    <div class="summary-card"><span class="summary-label">Featured</span><strong id="secondaryResources">0</strong></div>
+    <div class="summary-card"><span class="summary-label">With image</span><strong id="secondaryResources">0</strong></div>
     <div class="summary-card"><span class="summary-label">Purpose</span><strong>Revenue</strong></div>
 </div>
 
@@ -84,7 +84,8 @@
 window.simpleCrudConfig = {
     itemName: 'Advertise',
     itemPlural: 'ads',
-    endpoints: ['/advertise/', 'advertise/', '/advertisements/', 'advertisements/', '/ads/', 'ads/'],
+    endpoints: ['/api/ads/'],
+    secondaryKeys: ['image_url', 'image'],
     titleField: { name: 'title', keys: ['title', 'name', 'campaign_name'] },
     columns: [
         { name: 'title', keys: ['title', 'name', 'campaign_name'], primary: true, description: { keys: ['description', 'summary', 'sponsor'], fallback: 'No notes added' } },
@@ -95,14 +96,13 @@ window.simpleCrudConfig = {
     ],
     fields: [
         { id: 'adTitle', name: 'title', label: 'Title', required: true, payloadNames: ['title', 'name'] },
-        { id: 'adPlacement', name: 'placement', label: 'Placement' },
-        { id: 'adImage', name: 'image', label: 'Image URL', payloadNames: ['image', 'image_url'] },
-        { id: 'adLink', name: 'target_url', label: 'Target URL', payloadNames: ['target_url', 'url', 'link'] },
-        { id: 'adDescription', name: 'description', label: 'Description' },
-        { id: 'adActive', name: 'is_active', label: 'Active', type: 'checkbox', default: true, payloadNames: ['is_active', 'active'] },
-        { id: 'adFeatured', name: 'is_featured', label: 'Featured', type: 'checkbox', payloadNames: ['is_featured', 'featured'] }
+        { id: 'adPlacement', name: 'position', label: 'Placement', payloadNames: ['position'] },
+        { id: 'adImage', name: 'image_url', label: 'Image URL', includeEmpty: true, payloadNames: ['image_url'] },
+        { id: 'adLink', name: 'target_url', label: 'Target URL', includeEmpty: true, payloadNames: ['target_url'] },
+        { id: 'adDescription', name: 'description', label: 'Description', includeEmpty: true },
+        { id: 'adActive', name: 'is_active', label: 'Active', type: 'checkbox', default: true }
     ]
 };
 </script>
-<script src="{% static 'admin/js/simple_crud.js' %}"></script>
+<script src="{% static 'admin/js/simple_crud.js' %}?v=2"></script>
 {% endblock %}

@@ -76,7 +76,7 @@
 window.simpleCrudConfig = {
     itemName: 'Tag',
     itemPlural: 'tags',
-    endpoints: ['/articles/tags/', 'articles/tags/', '/tags/', 'tags/'],
+    endpoints: ['articles/tags/', 'tags/'],
     titleField: { name: 'name', keys: ['name', 'tag_name', 'title'] },
     columns: [
         { name: 'name', keys: ['name', 'tag_name', 'title'], primary: true, description: { keys: ['description', 'summary'], fallback: 'No description added' } },
@@ -86,12 +86,12 @@ window.simpleCrudConfig = {
     ],
     fields: [
         { id: 'tagName', name: 'name', label: 'Name', required: true, payloadNames: ['name', 'tag_name'] },
-        { id: 'tagSlug', name: 'slug', label: 'Slug' },
-        { id: 'tagDescription', name: 'description', label: 'Description' },
+        { id: 'tagSlug', name: 'slug', label: 'Slug', includeEmpty: true },
+        { id: 'tagDescription', name: 'description', label: 'Description', includeEmpty: true },
         { id: 'tagActive', name: 'is_active', label: 'Active', type: 'checkbox', default: true, payloadNames: ['is_active', 'active'] },
         { id: 'tagFeatured', name: 'is_featured', label: 'Featured', type: 'checkbox', payloadNames: ['is_featured', 'featured'] }
     ]
 };
 </script>
-<script src="{% static 'admin/js/simple_crud.js' %}"></script>
+<script src="{% static 'admin/js/simple_crud.js' %}?v=2"></script>
 {% endblock %}

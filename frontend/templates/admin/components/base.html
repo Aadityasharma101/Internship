@@ -40,8 +40,8 @@
             <div class="menu-section">OVERVIEW</div>
 
             <ul class="menu-list">
-                <li class="menu-item {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
-                    <a href="{% url 'frontend:users' %}">
+                <li class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <a href="{% url 'frontend:dashboard' %}">
                         <i class="fa-solid fa-table-columns"></i> Dashboard
                     </a>
                 </li>
@@ -197,8 +197,8 @@
 <!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="{% static 'js/auth.js' %}?v=3"></script>
-<script src="{% static 'js/axios.js' %}?v=4"></script>
-<script src="{% static 'admin/js/resource_helpers.js' %}"></script>
+<script src="{% static 'js/axios.js' %}?v=7"></script>
+<script src="{% static 'admin/js/resource_helpers.js' %}?v=2"></script>
 <script src="{% static 'admin/js/main.js' %}?v=2"></script>
 {% block extra_js %}{% endblock %}
 

@@ -4,7 +4,7 @@ let currentMedia = [];
 let activeMediaEndpoint = null;
 let currentMediaView = 'grid';
 
-const ARTICLE_MEDIA_ENDPOINT = '/articles/feed/';
+const ARTICLE_MEDIA_ENDPOINT = 'articles/feed/';
 const ADS_MEDIA_ENDPOINT = '/api/ads/';
 
 const mediaGrid = document.getElementById('mediaGrid');
@@ -468,7 +468,7 @@ async function fetchArticleMedia(page) {
         }
 
         try {
-            const detailResponse = await api.get(apiUrl(`/articles/${article.id}/`));
+            const detailResponse = await api.get(apiUrl(`articles/${article.id}/`));
             return { ...article, ...detailResponse.data };
         } catch (error) {
             return article;
@@ -568,7 +568,7 @@ async function uploadMedia() {
         loadMedia(currentMediaPage);
     } catch (error) {
         console.error('Error uploading media:', error);
-        mediaUploadStatus.textContent = 'Unable to upload media. Check required fields and permissions.';
+        mediaUploadStatus.textContent = ResourceHelpers.formatApiError(error, 'Unable to upload media. Check required fields and permissions.');
     } finally {
         uploadMediaBtn.disabled = false;
     }

@@ -3,34 +3,10 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = '/articles/feed/';
 
-// Try API-mounted endpoints and proxy routes first, then fall back to root paths.
-// If a global `API_BASE` is set by templates, try absolute remote endpoints first.
-const REMOTE_BASE = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE.replace(/\/$/, '') : '';
-const ARTICLE_ENDPOINTS = REMOTE_BASE ? [
-    `${REMOTE_BASE}/api/articles/feed/`,
-    `${REMOTE_BASE}/remote/articles/feed/`,
-    `${REMOTE_BASE}/articles/feed/`,
-    '/api/articles/feed/',
-    '/remote/articles/feed/',
-    '/articles/feed/',
-    'articles/feed/',
-    `${REMOTE_BASE}/api/articles/`,
-    `${REMOTE_BASE}/remote/articles/`,
-    `${REMOTE_BASE}/articles/`,
-    '/api/articles/',
-    '/remote/articles/',
-    '/articles/',
-    'articles/'
-] : ['/api/articles/feed/', '/remote/articles/feed/', '/articles/feed/', 'articles/feed/', '/api/articles/', '/remote/articles/', '/articles/', 'articles/'];
-
-const ARTICLE_MUTATION_ENDPOINTS = REMOTE_BASE ? [
-    `${REMOTE_BASE}/api/articles/create/`,
-    `${REMOTE_BASE}/remote/articles/create/`,
-    `${REMOTE_BASE}/articles/create/`,
-    '/api/articles/create/',
-    '/remote/articles/create/',
-    '/articles/create/'
-] : ['/api/articles/create/', '/remote/articles/create/', '/articles/create/'];
+// The article service is mounted at the site root, unlike Users/Roles/Ads
+// which are mounted below /api/.
+const ARTICLE_ENDPOINTS = ['/articles/feed/', '/articles/reporter/articles/'];
+const ARTICLE_MUTATION_ENDPOINTS = ['/articles/create/'];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');
@@ -62,7 +38,7 @@ const articleFields = {
     published: document.getElementById('articlePublished')
 };
 
-const { escapeHTML, formatDate, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
+const { escapeHTML, formatDate, formatApiError, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
 
 function text(value, fallback = 'Not available') {
     return value === null || value === undefined || value === '' ? fallback : String(value);
@@ -305,10 +281,7 @@ function buildPayload() {
 }
 
 function buildCreatePayload(payload) {
-    const createPayload = {
-        title: payload.title,
-        status: payload.status
-    };
+    const createPayload = { ...payload };
 
     if (payload.status === 'published') {
         createPayload.published_at = new Date().toISOString();
@@ -331,7 +304,14 @@ async function saveArticle() {
 
     try {
         if (id) {
-            await updateItem(activeArticleEndpoint, id, payload);
+            try {
+                await api.patch(apiUrl(`/articles/${id}/update/`), payload);
+            } catch (error) {
+                if (error?.response?.status !== 405) {
+                    throw error;
+                }
+                await api.put(apiUrl(`/articles/${id}/update/`), payload);
+            }
         } else {
             await createItem(ARTICLE_MUTATION_ENDPOINTS, buildCreatePayload(payload));
         }
@@ -339,7 +319,7 @@ async function saveArticle() {
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to save article:', error);
-        articleFormStatus.textContent = 'Unable to save article. Check required fields and permissions.';
+        articleFormStatus.textContent = formatApiError(error, 'Unable to save article. Check required fields and permissions.');
     } finally {
         saveArticleBtn.disabled = false;
     }
@@ -351,7 +331,7 @@ async function removeArticle(article) {
     }
 
     try {
-        await deleteItem(activeArticleEndpoint, article.id);
+        await api.delete(apiUrl(`/articles/${article.id}/delete/`));
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to delete article:', error);

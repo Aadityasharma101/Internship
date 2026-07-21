@@ -17,7 +17,6 @@ const ARTICLE_ENDPOINTS = [
 ];
 
 const ARTICLE_MUTATION_ENDPOINTS = [
-    '/staff/add_article/',
     '/articles/create/',
     '/portal/articles/create/',
     '/remote/articles/create/',
@@ -367,7 +366,7 @@ async function removeArticle(article) {
     }
 
     try {
-        await deleteItem('/articles/', article.id);
+        await deleteItem(activeArticleEndpoint, article.id);
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to delete article:', error);

@@ -361,63 +361,7 @@ def portal_token_obtain(request):
 
 @csrf_exempt
 def portal_token_refresh(request):
-    if request.method != 'POST':
-        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
-
-    try:
-        data = json.loads(request.body.decode()) if request.body else request.POST.dict()
-    except Exception:
-        data = request.POST.dict()
-
-    refresh = data.get('refresh') or data.get('refresh_token')
-    if not refresh:
-        return JsonResponse({'detail': 'Refresh token is required.'}, status=400)
-
-    if requests is None:
-        return JsonResponse({'detail': 'requests library not installed on server. Install it in your virtualenv (pip install requests).'}, status=500)
-
-    refresh_paths = [
-        '/api/token/refresh/',
-        '/auth/token/refresh/',
-        '/token/refresh/',
-        '/refresh/',
-    ]
-
-    last_response = None
-    for path in refresh_paths:
-        try:
-            url = _remote_url_for_path(path)
-            resp = requests.post(
-                url,
-                json={'refresh': refresh},
-                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
-                timeout=15,
-            )
-            if resp.status_code in (200, 201):
-                django_response = HttpResponse(
-                    resp.content,
-                    status=resp.status_code,
-                    content_type=resp.headers.get('Content-Type', 'application/json'),
-                )
-                for header, value in resp.headers.items():
-                    if header.lower() not in HOP_BY_HOP_HEADERS and header.lower() != 'content-type':
-                        django_response[header] = value
-                return django_response
-
-            last_response = resp
-            if resp.status_code not in (404, 405):
-                break
-        except requests.RequestException:
-            continue
-
-    if last_response is not None:
-        try:
-            body = last_response.json()
-        except Exception:
-            body = {'detail': last_response.text or 'Token refresh failed.'}
-        return JsonResponse(body, status=last_response.status_code)
-
-    return JsonResponse({'detail': 'Unable to refresh token.'}, status=502)
+    return api_proxy(request, 'api/token/refresh/')
 
 
 @csrf_exempt
@@ -448,6 +392,20 @@ def portal_article_update(request, article_id):
 @csrf_exempt
 def portal_article_delete(request, article_id):
     return api_proxy(request, f'articles/{article_id}/delete/')
+
+
+@csrf_exempt
+def portal_ads_proxy(request):
+    if request.method == 'GET':
+        return ads_api(request)
+    if request.method == 'POST':
+        return ads_api(request)
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@csrf_exempt
+def portal_ads_detail_proxy(request, ad_id):
+    return ads_detail(request, ad_id)
 
 
 def _time_ago(date_string):
@@ -575,12 +533,7 @@ def login(request):
 
 
 def _get_bearer_token(request):
-    authorization = (
-        request.headers.get('Authorization') or
-        request.META.get('HTTP_AUTHORIZATION') or
-        request.META.get('Authorization') or
-        ''
-    )
+    authorization = request.headers.get('Authorization', '')
     parts = authorization.split()
     if len(parts) == 2 and parts[0].lower() == 'bearer':
         return parts[1]
@@ -659,7 +612,7 @@ def get_remote_user_info(access_token):
     ]
     for path in candidates:
         try:
-            url = _remote_url_for_path(path)
+            url = f"{NEWS_API_BASE}{path}"
             resp = requests.get(url, headers=headers, timeout=10)
             if resp.status_code == 200:
                 try:
@@ -721,7 +674,7 @@ def auth_login(request):
     last_error_resp = None
     for path in token_paths:
         try:
-            url = _remote_url_for_path(path)
+            url = f"{NEWS_API_BASE}{path}"
             resp = requests.post(url, json={'email': email, 'username': email, 'password': password}, timeout=15)
             # accept 200/201 as success; otherwise capture last non-2xx for forwarding
             if resp.status_code in (200, 201):
@@ -936,47 +889,32 @@ def staff_add_article(request):
     except requests.RequestException as e:
         return JsonResponse({'detail': str(e)}, status=502)
 
-    if resp.status_code == 403 and status != 'draft':
-        retry_statuses = []
-        if status != 'pending_review':
-            retry_statuses.append('pending_review')
-        if status != 'draft':
-            retry_statuses.append('draft')
+    if resp.status_code == 403 and status == 'published':
+        try:
+            if content_type.startswith('multipart/'):
+                retry_fields = dict(data_fields)
+                retry_fields['status'] = 'pending_review'
+                retry_fields['published'] = 'false'
+                retry_fields['is_published'] = 'false'
+                retry_fields.pop('published_at', None)
+                retry_resp = requests.post(url, data=retry_fields, files=files, headers=headers, timeout=30)
+            else:
+                retry_payload = {
+                    **payload,
+                    'status': 'pending_review',
+                    'published': False,
+                    'is_published': False,
+                }
+                retry_payload.pop('published_at', None)
+                retry_resp = requests.post(url, json=retry_payload, headers=headers, timeout=30)
 
-        for retry_status in retry_statuses:
-            try:
-                print(f"[staff_add_article] publish blocked for status={status}, retrying as {retry_status}")
-                if content_type.startswith('multipart/'):
-                    retry_fields = dict(data_fields)
-                    retry_fields['status'] = retry_status
-                    retry_fields['published'] = 'false'
-                    retry_fields['is_published'] = 'false'
-                    retry_fields.pop('published_at', None)
-                    retry_resp = requests.post(url, data=retry_fields, files=files, headers=headers, timeout=30)
-                else:
-                    retry_payload = {
-                        **payload,
-                        'status': retry_status,
-                        'published': False,
-                        'is_published': False,
-                    }
-                    retry_payload.pop('published_at', None)
-                    retry_resp = requests.post(url, json=retry_payload, headers=headers, timeout=30)
-
-                if 200 <= retry_resp.status_code < 300:
-                    retry_data = retry_resp.json()
-                    if isinstance(retry_data, dict):
-                        retry_data['detail'] = (
-                            'Article saved to the remote database as ' \
-                            f'{retry_status.replace("_", " ")}. '
-                            'This staff account cannot publish directly.'
-                        )
-                    return JsonResponse(retry_data, status=retry_resp.status_code)
-
-                print(f"[staff_add_article] {retry_status} retry failed: {retry_resp.status_code} {retry_resp.text[:200]}")
-            except (requests.RequestException, ValueError) as e:
-                print(f"[staff_add_article] {retry_status} retry exception: {e}")
-                continue
+            if 200 <= retry_resp.status_code < 300:
+                retry_data = retry_resp.json()
+                if isinstance(retry_data, dict):
+                    retry_data['detail'] = 'Article saved to the remote database as pending review. This staff account cannot publish directly.'
+                return JsonResponse(retry_data, status=retry_resp.status_code)
+        except (requests.RequestException, ValueError):
+            pass
 
     try:
         return JsonResponse(resp.json(), status=resp.status_code)

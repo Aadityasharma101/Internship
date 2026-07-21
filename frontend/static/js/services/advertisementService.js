@@ -1,14 +1,22 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    // Use absolute remote endpoints so the client always queries the remote API.
-    // These cover common remote paths; the first successful endpoint will be used.
+    // Prefer local Django endpoints for ad operations so staff flow resolves on this site.
     const REMOTE_BASE = 'https://news-portal-hvgs.onrender.com';
     const LIST_ENDPOINTS = [
         `${REMOTE_BASE}/api/ads/`,
         `${REMOTE_BASE}/api/advertisements/`,
         `${REMOTE_BASE}/ads/`,
         `${REMOTE_BASE}/advertisements/`,
-        `${REMOTE_BASE}/advertise/`
+        `${REMOTE_BASE}/advertise/`,
+        '/api/ads/',
+        '/portal/ads/'
+    ];
+    const CREATE_ENDPOINTS = [
+        `${REMOTE_BASE}/api/ads/`,
+        `${REMOTE_BASE}/api/advertisements/`,
+        `${REMOTE_BASE}/ads/`,
+        '/api/ads/',
+        '/portal/ads/'
     ];
     const POSITION_MAP = {
         top_banner: 'Top Banner',
@@ -180,7 +188,7 @@
     }
 
     async function createAdvertisement(payload, options = {}) {
-        return Api.createItem(LIST_ENDPOINTS, payload, options);
+        return Api.createItem(CREATE_ENDPOINTS, payload, options);
     }
 
     async function updateAdvertisement(id, payload, options = {}) {

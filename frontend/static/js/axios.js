@@ -1,7 +1,7 @@
 // static/admin/js/api.js
 
 const API_ORIGIN_URL = (() => {
-    const configuredOrigin = window.API_BASE_URL || window.API_BASE || document.body?.dataset?.apiBase || '';
+    const configuredOrigin = window.API_BASE_URL || window.API_BASE || '';
     if (configuredOrigin && /^https?:\/\//i.test(configuredOrigin)) {
         return configuredOrigin.replace(/\/$/, '').replace(/\/api$/i, '');
     }

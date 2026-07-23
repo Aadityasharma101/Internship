@@ -4,15 +4,25 @@
     const Utils = window.StaffUtils;
 
     const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
-    const listEndpoints = hasAuth ? ['/articles/reporter/articles/', '/articles/feed/', '/portal/articles/'] : ['/articles/feed/', '/portal/articles/'];
-    const createEndpoints = ['/articles/create/', '/portal/articles/create/'];
+    const articleApiBase = '/remote/api/articles';
+    const publicListEndpoints = [`${articleApiBase}/feed/`, `${articleApiBase}/`];
+    const reporterListEndpoints = [`${articleApiBase}/reporter/articles/`];
+    const createEndpoints = [`${articleApiBase}/create/`];
+    const statusActionMap = {
+        submitted: 'submit',
+        under_review: 'start-review',
+        approved: 'approve',
+        published: 'publish',
+        rejected: 'reject',
+        archived: 'archive'
+    };
 
     const state = {
         user: null,
         articles: [],
         response: null,
         page: 1,
-        endpoint: listEndpoints[0],
+        endpoint: publicListEndpoints[0],
         imageFile: null,
         imageCleared: false,
         imagePreviewUrl: ''
@@ -27,7 +37,7 @@
         search: document.getElementById('articleSearchInput'),
         visible: document.getElementById('visibleArticlesCount'),
         total: document.getElementById('totalArticles'),
-        published: document.getElementById('publishedArticles'),
+        publishedCount: document.getElementById('publishedArticles'),
         draft: document.getElementById('draftArticles'),
         featured: document.getElementById('featuredArticles'),
         modal: document.getElementById('articleModal'),
@@ -47,7 +57,7 @@
         description: document.getElementById('articleDescription'),
         body: document.getElementById('articleBody'),
         featuredArticle: document.getElementById('articleFeatured'),
-        published: document.getElementById('articlePublished')
+        publishedCheckbox: document.getElementById('articlePublished')
     };
 
     function normalizeStatus(article) {
@@ -55,8 +65,12 @@
             return 'published';
         }
 
-        const status = Api.getValue(article, ['status', 'state', 'publication_status'], 'draft');
-        return String(status || 'draft').toLowerCase();
+        const status = Api.getValue(article, ['status', 'state', 'publication_status'], '');
+        if (status) {
+            return String(status).toLowerCase();
+        }
+
+        return Api.getValue(article, ['published_at', 'publish_date', 'published_on'], '') ? 'published' : 'draft';
     }
 
     function getArticleTitle(article) {
@@ -75,6 +89,9 @@
         const firstName = Api.getValue(article, ['author.first_name', 'user.first_name']);
         const lastName = Api.getValue(article, ['author.last_name', 'user.last_name']);
         const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+        const staffFirstName = Api.getValue(state.user, ['first_name'], '');
+        const staffLastName = Api.getValue(state.user, ['last_name'], '');
+        const staffName = `${staffFirstName || ''} ${staffLastName || ''}`.trim();
 
         return fullName || Api.getValue(article, [
             'author.full_name',
@@ -87,11 +104,22 @@
             'user.username',
             'created_by.username',
             'created_by.email'
-        ], 'Unknown author');
+        ], staffName || Api.getValue(state.user, ['full_name', 'name', 'username', 'email'], 'Unknown author'));
     }
 
     function getArticleImage(article) {
         return Api.getValue(article, ['image', 'image_url', 'thumbnail', 'thumbnail_url', 'featured_image', 'cover_image', 'media.url'], '');
+    }
+
+    function getPublishedDisplay(article) {
+        const dateValue = Api.getValue(article, ['published_at', 'publish_date', 'published_on', 'created_at'], '');
+        const formattedDate = Api.formatDate(dateValue);
+
+        if (formattedDate !== 'Not available') {
+            return formattedDate;
+        }
+
+        return isPublished(article) ? 'Published' : 'Not published';
     }
 
     function isPublished(article) {
@@ -167,7 +195,7 @@
                     <td>${escape(getArticleAuthor(article))}</td>
                     <td><span class="status-pill ${statusClass(status)}">${escape(status)}</span></td>
                     <td><span class="feature-pill ${featured ? 'feature-yes' : 'feature-no'}">${featured ? 'Featured' : 'Standard'}</span></td>
-                    <td class="article-meta-muted">${escape(Api.formatDate(Api.getValue(article, ['published_at', 'publish_date', 'published_on', 'created_at'])))}</td>
+                    <td class="article-meta-muted">${escape(getPublishedDisplay(article))}</td>
                     <td class="article-meta-muted">${escape(Api.formatDate(Api.getValue(article, ['updated_at', 'modified_at', 'created_at'])))}</td>
                     <td>
                         <div class="row-actions">
@@ -189,7 +217,7 @@
 
     function updateSummary(items, totalCount) {
         els.total.textContent = totalCount ?? items.length;
-        els.published.textContent = items.filter(isPublished).length;
+        els.publishedCount.textContent = items.filter(isPublished).length;
         els.draft.textContent = items.filter((article) => !isPublished(article)).length;
         els.featured.textContent = items.filter(isFeatured).length;
     }
@@ -232,15 +260,16 @@
     }
 
     function openCreateModal() {
+        const defaultStatus = els.modal?.dataset?.defaultStatus || 'submitted';
         els.id.value = '';
         els.title.value = '';
         els.category.value = '';
-        els.articleStatus.value = 'draft';
+        els.articleStatus.value = defaultStatus;
         els.image.value = '';
         els.description.value = '';
         els.body.value = '';
         els.featuredArticle.checked = false;
-        els.published.checked = false;
+        els.publishedCheckbox.checked = defaultStatus === 'published';
         els.status.textContent = '';
         els.modalTitle.textContent = 'Create New Article';
         els.save.textContent = 'Create Article';
@@ -250,7 +279,7 @@
 
     async function loadArticleDetail(id) {
         try {
-            const detail = await Api.request('GET', `/articles/${id}/`, { auth: hasAuth });
+            const detail = await Api.request('GET', `${articleApiBase}/${id}/`, { auth: hasAuth });
             return detail || {};
         } catch {
             return {};
@@ -269,7 +298,7 @@
         els.description.value = Api.getValue(record, ['description', 'summary', 'excerpt'], '');
         els.body.value = Api.getValue(record, ['body', 'content'], '');
         els.featuredArticle.checked = isFeatured(record);
-        els.published.checked = isPublished(record);
+        els.publishedCheckbox.checked = isPublished(record);
         els.status.textContent = '';
         els.modalTitle.textContent = 'Edit Article';
         els.save.textContent = 'Save Changes';
@@ -285,25 +314,30 @@
         els.modal.classList.add('hidden');
     }
 
+    function normalizeCreateStatus(value) {
+        const status = String(value || 'submitted').trim().toLowerCase().replace(/[\s-]+/g, '_');
+        if (status === 'pending' || status === 'pending_review') {
+            return 'submitted';
+        }
+        if (['draft', 'submitted', 'under_review', 'approved', 'published', 'rejected', 'archived'].includes(status)) {
+            return status;
+        }
+        return 'submitted';
+    }
+
     function collectPayload(statusOverride = null) {
         const formData = new FormData();
-        const status = statusOverride || els.articleStatus.value || 'draft';
+        const status = normalizeCreateStatus(
+            statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'submitted'
+        );
         const imageUrl = els.image.value.trim();
         const categoryValue = els.category.value.trim();
-        const publishedAt = status === 'published' ? new Date().toISOString() : '';
+        const body = els.body.value.trim();
+        const summary = els.description.value.trim() || body.slice(0, 500);
 
         formData.append('title', els.title.value.trim());
-        formData.append('status', status);
-        formData.append('body', els.body.value.trim());
-        formData.append('description', els.description.value.trim());
-        formData.append('is_featured', String(els.featuredArticle.checked));
-        formData.append('featured', String(els.featuredArticle.checked));
-        formData.append('is_published', String(els.published.checked || status === 'published'));
-        formData.append('published', String(els.published.checked || status === 'published'));
-
-        if (publishedAt) {
-            formData.append('published_at', publishedAt);
-        }
+        formData.append('body', body);
+        formData.append('summary', summary);
 
         if (categoryValue) {
             if (/^\d+$/.test(categoryValue)) {
@@ -321,7 +355,47 @@
             formData.append('image', imageUrl);
         }
 
-        return formData;
+        return {
+            data: formData,
+            desiredStatus: status
+        };
+    }
+
+    async function appendCurrentStaffAuthor(formData) {
+        if (!hasAuth || formData.has('author_name')) {
+            return;
+        }
+
+        try {
+            const user = state.user || await window.NewsPortalSession.fetchCurrentUser();
+            const name = [
+                Api.getValue(user, ['first_name'], ''),
+                Api.getValue(user, ['last_name'], '')
+            ].filter(Boolean).join(' ').trim()
+                || Api.getValue(user, ['full_name', 'name', 'username', 'email'], '');
+
+            if (name) {
+                formData.append('author_name', name);
+            }
+        } catch {}
+    }
+
+    async function applyArticleStatus(article, desiredStatus) {
+        const articleId = Api.getValue(article, ['id'], null);
+        const normalizedStatus = normalizeCreateStatus(desiredStatus);
+        const action = statusActionMap[normalizedStatus];
+
+        if (!articleId || !action || normalizeStatus(article) === normalizedStatus) {
+            return article;
+        }
+
+        const updated = await Api.request('POST', `${articleApiBase}/${articleId}/${action}/`, {
+            data: {},
+            auth: true,
+            timeoutMs: 30000
+        });
+
+        return updated || { ...article, status: normalizedStatus };
     }
 
     async function saveArticle() {
@@ -339,9 +413,12 @@
         try {
             let savedArticle = null;
             if (id) {
-                savedArticle = await Api.request('PATCH', `/articles/${id}/update/`, { data: payload, auth: hasAuth });
+                savedArticle = await Api.request('PATCH', `${articleApiBase}/${id}/update/`, { data: payload.data, auth: true });
+                savedArticle = await applyArticleStatus(savedArticle || { id }, payload.desiredStatus);
             } else {
-                savedArticle = await Api.request('POST', createEndpoints[0], { data: payload, auth: hasAuth });
+                await appendCurrentStaffAuthor(payload.data);
+                savedArticle = await Api.request('POST', createEndpoints[0], { data: payload.data, auth: true, timeoutMs: 30000 });
+                savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
             }
 
             closeModal();
@@ -349,7 +426,8 @@
             await loadArticles(1);
         } catch (error) {
             console.error('Unable to save article:', error);
-            els.status.textContent = 'Unable to save article. Check required fields and permissions.';
+            const apiDetail = error?.response?.data?.detail || error?.response?.data?.message || '';
+            els.status.textContent = apiDetail || 'Unable to save article. Check required fields and permissions.';
         } finally {
             els.save.disabled = false;
         }
@@ -361,13 +439,77 @@
         }
 
         try {
-            await Api.request('DELETE', `/articles/${article.id}/delete/`, { auth: hasAuth });
+            await Api.request('DELETE', `${articleApiBase}/${article.id}/delete/`, { auth: true });
             Api.notifyDataChanged?.('articles', { action: 'delete', id: article.id });
             await loadArticles(1);
         } catch (error) {
             console.error('Unable to delete article:', error);
             window.alert('Unable to delete this article. Check your permissions and try again.');
         }
+    }
+
+    function mergeArticleLists(...lists) {
+        const byKey = new Map();
+
+        lists.flat().forEach((article) => {
+            const key = article?.id || article?.slug || `${article?.title || ''}-${article?.published_at || ''}`;
+            if (key) {
+                byKey.set(String(key), article);
+            }
+        });
+
+        return [...byKey.values()];
+    }
+
+    async function hydrateArticleDetails(records) {
+        const items = records || [];
+        const details = await Promise.all(items.map(async (article) => {
+            if (!article?.id) {
+                return article;
+            }
+
+            try {
+                const detail = await Api.request('GET', `${articleApiBase}/${article.id}/`, { auth: false, timeoutMs: 10000 });
+                return { ...article, ...(detail || {}) };
+            } catch {
+                return article;
+            }
+        }));
+
+        return details;
+    }
+
+    async function loadVisibleArticles(page) {
+        const publicResult = await Api.loadList(publicListEndpoints, page, {
+            auth: false,
+            params: {
+                ordering: '-id'
+            }
+        });
+
+        let reporterRecords = [];
+        if (hasAuth) {
+            try {
+                const reporterResult = await Api.loadList(reporterListEndpoints, page, {
+                    auth: true,
+                    params: {
+                        ordering: '-id'
+                    }
+                });
+                reporterRecords = reporterResult.data.results || [];
+            } catch (error) {
+                console.warn('Reporter article list unavailable; showing public feed.', error);
+            }
+        }
+
+        return {
+            endpoint: publicResult.endpoint,
+            data: {
+                ...publicResult.data,
+                count: undefined,
+                results: await hydrateArticleDetails(mergeArticleLists(publicResult.data.results || [], reporterRecords))
+            }
+        };
     }
 
     async function loadArticles(page = 1) {
@@ -383,24 +525,16 @@
             } else {
                 state.user = null;
             }
-
-            const result = await Api.loadList(listEndpoints, page, {
-                auth: hasAuth,
-                params: {
-                    ordering: '-id'
-                }
-            });
+            const result = await loadVisibleArticles(page);
 
             state.endpoint = result.endpoint || state.endpoint;
             state.response = result.data;
             state.page = page;
 
             const records = result.data.results.map((item) => ArticleService.normalizeArticle ? ArticleService.normalizeArticle(item) : item);
-            state.articles = state.user
-                ? Utils.sortByNewest(records.filter((article) => ArticleService.articleMatchesUser(article, state.user)))
-                : Utils.sortByNewest(records);
+            state.articles = Utils.sortByNewest(records);
 
-            updateSummary(state.articles, result.data.count);
+            updateSummary(state.articles, state.articles.length);
             renderArticles(state.articles);
             updatePagination(result.data);
         } catch (error) {
@@ -469,6 +603,16 @@
     els.open.addEventListener('click', openCreateModal);
     els.close.addEventListener('click', closeModal);
     els.save.addEventListener('click', saveArticle);
+    els.articleStatus.addEventListener('change', () => {
+        els.publishedCheckbox.checked = normalizeCreateStatus(els.articleStatus.value) === 'published';
+    });
+    els.publishedCheckbox.addEventListener('change', () => {
+        if (els.publishedCheckbox.checked) {
+            els.articleStatus.value = 'published';
+        } else if (normalizeCreateStatus(els.articleStatus.value) === 'published') {
+            els.articleStatus.value = els.modal?.dataset?.defaultStatus || 'submitted';
+        }
+    });
     els.modal.addEventListener('click', (event) => {
         if (event.target === els.modal) {
             closeModal();

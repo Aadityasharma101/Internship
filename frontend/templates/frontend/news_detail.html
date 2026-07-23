@@ -86,6 +86,11 @@
         {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
     </div>
     <div class="article-full" id="article-detail">
+        {% with article_image=article.image|default_if_none:'' %}
+        {% if article_image %}
+        <img id="article-image" src="{{ article_image }}" alt="{{ article.title|default:'Article image' }}" style="width:100%;max-height:320px;object-fit:cover;border-radius:10px;margin-bottom:1rem;">
+        {% endif %}
+        {% endwith %}
         <h1 class="article-title">{{ article.title|default:"Loading..." }}</h1>
         <div class="article-meta">
             <span>Category: {{ article.category_name|default:"Uncategorized" }}</span>
@@ -174,7 +179,7 @@
     }
 
     async function loadComments() {
-        fetch(`${API_BASE}/articles/${articleId}/`)
+        fetch(`${API_BASE}/api/articles/${articleId}/`)
             .then(res => res.json())
             .then(data => {
                 renderComments(normalizeCommentsPayload(data), 'comments-list');
@@ -216,7 +221,7 @@
         }
 
         try {
-            const response = await fetch(`${API_BASE}/articles/${articleId}/comment/`, {
+            const response = await fetch(`${API_BASE}/api/articles/${articleId}/comment/`, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',

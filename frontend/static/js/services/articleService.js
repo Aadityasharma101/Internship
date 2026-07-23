@@ -1,8 +1,9 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/articles/feed/'];
-    const AUTH_LIST_ENDPOINTS = ['/articles/reporter/articles/', '/articles/feed/'];
-    const CREATE_ENDPOINTS = ['/articles/create/'];
+    const ARTICLE_API_BASE = '/remote/api/articles';
+    const LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/feed/`];
+    const AUTH_LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/reporter/articles/`, `${ARTICLE_API_BASE}/feed/`];
+    const CREATE_ENDPOINTS = [`${ARTICLE_API_BASE}/create/`];
 
     function normalizeStatus(article) {
         const rawStatus = Api.getValue(article, ['status', 'state', 'publication_status'], '');
@@ -15,7 +16,7 @@
             return String(rawStatus).toLowerCase();
         }
 
-        return 'draft';
+        return Api.getValue(article, ['published_at', 'publish_date', 'published_on'], '') ? 'published' : 'draft';
     }
 
     function normalizeArticle(article) {
@@ -90,29 +91,25 @@
     }
 
     async function updateArticle(id, payload, options = {}) {
-        return Api.updateItem('/articles/', id, payload, options);
+        return Api.request('PATCH', `${ARTICLE_API_BASE}/${id}/update/`, {
+            ...options,
+            data: payload
+        });
     }
 
     async function deleteArticle(id, options = {}) {
-        return Api.deleteItem('/articles/', id, options);
+        return Api.request('DELETE', `${ARTICLE_API_BASE}/${id}/delete/`, options);
     }
 
     async function publishArticle(id, options = {}) {
-        return updateArticle(id, {
-            status: 'published',
-            is_published: true,
-            published: true,
-            published_at: new Date().toISOString(),
-            publish_date: new Date().toISOString()
-        }, options);
+        return Api.request('POST', `${ARTICLE_API_BASE}/${id}/publish/`, {
+            ...options,
+            data: {}
+        });
     }
 
     async function saveDraftArticle(id, options = {}) {
-        return updateArticle(id, {
-            status: 'draft',
-            is_published: false,
-            published: false
-        }, options);
+        return updateArticle(id, {}, options);
     }
 
     window.NewsPortalArticleService = {

@@ -13,23 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (parts.length === 2) return parts.pop().split(';').shift();
     }
 
-    function boolString(value) {
-        return value ? 'true' : 'false';
-    }
-
-    function normalizeStatus(value, published) {
-        if (published) return 'published';
-
-        const status = String(value || 'published').trim().toLowerCase().replace(/[\s-]+/g, '_');
-        if (['draft', 'pending_review', 'published', 'rejected'].includes(status)) {
-            return status;
-        }
-        if (status === 'archived' || status === 'archive') {
-            return 'rejected';
-        }
-        return 'published';
-    }
-
     function apiErrorMessage(err) {
         const data = err?.response?.data;
         if (!data) return err?.message || 'Failed to submit article.';
@@ -96,18 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const idEl = document.getElementById('articleId');
         const titleEl = document.getElementById('articleTitle');
         const categoryEl = document.getElementById('articleCategory');
-        const statusElInput = document.getElementById('articleStatus');
         const imageUrlEl = document.getElementById('articleImage');
         const descriptionEl = document.getElementById('articleDescription');
         const bodyEl = document.getElementById('articleBody');
-        const featuredEl = document.getElementById('articleFeatured');
-        const publishedEl = document.getElementById('articlePublished');
 
         const title = titleEl ? titleEl.value.trim() : '';
         const body = bodyEl ? bodyEl.value.trim() : '';
         const description = descriptionEl ? descriptionEl.value.trim() : '';
-        const published = Boolean(publishedEl?.checked || statusElInput?.value === 'published');
-        const status = normalizeStatus(statusElInput ? statusElInput.value : 'published', published);
 
         if (!title) {
             if (statusEl) statusEl.textContent = 'Title is required.';
@@ -125,29 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasFile = fileInput && fileInput.files && fileInput.files[0];
         const payload = {
             title,
-            body,
-            content: body,
-            description,
-            summary: description,
-            status,
-            published: status === 'published',
-            is_published: status === 'published',
+            body
         };
 
-        if (status === 'published') {
-            payload.published_at = new Date().toISOString();
-        }
-
-        if (featuredEl) {
-            payload.featured = featuredEl.checked;
-            payload.is_featured = featuredEl.checked;
+        if (description) {
+            payload.summary = description;
         }
 
         const categoryValue = categoryEl ? categoryEl.value.trim() : '';
         if (categoryValue) {
-            payload.category = categoryValue;
             if (/^\d+$/.test(categoryValue)) {
                 payload.category_id = categoryValue;
+            } else if (!Number.isNaN(Number(categoryValue)) && categoryValue !== '') {
+                payload.category_id = String(Number(categoryValue));
             } else {
                 payload.category_name = categoryValue;
             }
@@ -165,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
             requestBody.append('image', fileInput.files[0]);
         } else if (imageUrlEl && imageUrlEl.value) {
             payload.image = imageUrlEl.value.trim();
-            payload.image_url = imageUrlEl.value.trim();
         }
 
         const csrf = getCookie('csrftoken');

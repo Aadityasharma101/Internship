@@ -14,7 +14,8 @@
         activeAds: document.getElementById('activeAds'),
         totalComments: document.getElementById('totalComments'),
         recentArticles: document.getElementById('recentArticlesBody'),
-        recentComments: document.getElementById('recentCommentsBody')
+        recentComments: document.getElementById('recentCommentsBody'),
+        recentAds: document.getElementById('recentAdsBody')
     };
 
     let cachedUser = null;
@@ -74,9 +75,33 @@
         `).join('');
     }
 
+    function renderRecentAds(items) {
+        if (!els.recentAds) return;
+
+        if (!items.length) {
+            Utils.setTableMessage(els.recentAds, 4, 'No advertisements found.');
+            return;
+        }
+
+        els.recentAds.innerHTML = items.map((ad) => `
+            <tr>
+                <td>
+                    <div class="primary-cell">
+                        <strong>${Api.escapeHtml(ad.title || ad.name || 'Untitled')}</strong>
+                        <span>${Api.escapeHtml(ad.description || ad.client_name || '')}</span>
+                    </div>
+                </td>
+                <td><span class="pill pill-blue">${Api.escapeHtml(ad.position_label || ad.position || 'Between Articles')}</span></td>
+                <td><span class="pill ${AdService.isActiveAdvertisement(ad) ? 'pill-green' : 'pill-orange'}">${Api.escapeHtml(ad.status || (ad.is_active ? 'active' : 'inactive'))}</span></td>
+                <td class="article-meta-muted">${Api.escapeHtml(Api.formatDate(ad.start_date) || '')} — ${Api.escapeHtml(Api.formatDate(ad.end_date) || 'ongoing')}</td>
+            </tr>
+        `).join('');
+    }
+
     async function loadDashboard() {
         renderEmpty(els.recentArticles, 4, 'Loading recent articles...');
         renderEmpty(els.recentComments, 4, 'Loading recent comments...');
+        if (els.recentAds) Utils.setTableMessage(els.recentAds, 4, 'Loading recent advertisements...');
 
         try {
             if (hasAuth) {
@@ -99,13 +124,19 @@
                     ordering: '-id'
                 }
             };
+            const articleRequestOptions = {
+                auth: false,
+                params: {
+                    ordering: '-id'
+                }
+            };
 
             const [articlesResponse, commentsResponse, adsResponse] = await Promise.all([
                 Utils.loadAllPages((page, options) => ArticleService.loadArticles(page, {
-                    ...requestOptions,
+                    ...articleRequestOptions,
                     ...options,
                     params: {
-                        ...(requestOptions.params || {}),
+                        ...(articleRequestOptions.params || {}),
                         ...(options.params || {})
                     }
                 })),
@@ -127,9 +158,12 @@
                 }))
             ]);
 
-            const ownArticles = Utils.sortByNewest(cachedUser
-                ? articlesResponse.data.results.filter((article) => ArticleService.articleMatchesUser(article, cachedUser))
-                : articlesResponse.data.results);
+            // Debug: inspect ads payload returned for dashboard
+            try {
+                console.debug('staff dashboard: adsResponse', adsResponse);
+            } catch (e) { /* ignore */ }
+
+            const ownArticles = Utils.sortByNewest(articlesResponse.data.results);
             const ownComments = Utils.sortByNewest(cachedUser
                 ? commentsResponse.data.results.filter((comment) => CommentService.commentMatchesUser(comment, cachedUser))
                 : commentsResponse.data.results, ['created_at', 'updated_at']);
@@ -144,6 +178,7 @@
 
             renderRecentArticles(ownArticles.slice(0, 5));
             renderRecentComments(ownComments.slice(0, 5));
+            renderRecentAds(adsResponse.data.results.slice(0, 5));
         } catch (error) {
             console.error('Unable to load staff dashboard:', error);
             renderEmpty(els.recentArticles, 4, 'Unable to load your articles right now.');

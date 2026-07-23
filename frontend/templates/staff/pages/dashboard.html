@@ -54,7 +54,7 @@
         <div class="panel-header">
             <div>
                 <h3>Recent Articles</h3>
-                <p>Latest work from your account.</p>
+                <p>Latest articles from the remote database.</p>
             </div>
             <a href="{% url 'frontend:staff_articles' %}">View all</a>
         </div>
@@ -75,7 +75,32 @@
         </div>
     </section>
 
-    
+</section>
+
+    <section class="dashboard-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Recent Advertisements</h3>
+                <p>Latest advertisements saved in the system.</p>
+            </div>
+            <a href="{% url 'frontend:staff_advertisements' %}">View all</a>
+        </div>
+        <div class="table-wrapper">
+            <table class="resource-table dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Position</th>
+                        <th>Status</th>
+                        <th>Active Dates</th>
+                    </tr>
+                </thead>
+                <tbody id="recentAdsBody">
+                    <tr class="loading-row"><td colspan="4">Loading recent advertisements...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
 {% endblock %}
 

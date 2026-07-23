@@ -93,7 +93,7 @@
     <button id="nextArticleBtn" type="button">Next</button>
 </div>
 
-<div id="articleModal" class="modal hidden" data-default-status="pending_review">
+<div id="articleModal" class="modal hidden" data-default-status="submitted">
     <div class="modal-content article-modal">
         <h3 id="articleModalTitle">Create New Article</h3>
         <input type="hidden" id="articleId">
@@ -113,9 +113,11 @@
                 <label for="articleStatus">Status</label>
                 <select id="articleStatus">
                     <option value="draft">Draft</option>
-                    <option value="pending_review">Pending Review</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="under_review">Under Review</option>
                     <option value="published">Published</option>
                     <option value="rejected">Rejected</option>
+                    <option value="archived">Archived</option>
                 </select>
             </div>
 
@@ -172,6 +174,5 @@
 
 {% block extra_js %}
 <script>window.API_BASE = "{{ API_BASE }}";</script>
-<script src="{% static 'admin/js/articles.js' %}?v=2"></script>
-<script src="{% static 'staff/js/staff_article_adapter.js' %}?v=2"></script>
+<script src="{% static 'staff/js/articles.js' %}?v=7"></script>
 {% endblock %}

@@ -65,8 +65,8 @@ async function initializeHomepage(apiBase) {
 
     try {
         const [feedResult, trendingResult] = await Promise.allSettled([
-            fetchJson(`${apiBase}/articles/feed/?ordering=-id`),
-            fetchJson(`${apiBase}/articles/trending/`),
+            fetchJsonApi(`${apiBase}/api/articles/feed/?ordering=-id`),
+            fetchJsonApi(`${apiBase}/api/articles/trending/`),
         ]);
 
         const feedArticles     = extractArticles(feedResult.status     === 'fulfilled' ? feedResult.value     : null);
@@ -121,7 +121,7 @@ async function initializeHomepage(apiBase) {
 // ============================================================
 // FETCH HELPERS
 // ============================================================
-async function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
+async function fetchJsonApi(url, timeoutMs = FETCH_TIMEOUT_MS) {
     const ctrl = new AbortController();
     const tid  = window.setTimeout(() => ctrl.abort(), timeoutMs);
     const freshUrl = addFreshParam(url);
@@ -162,7 +162,7 @@ function mergeArticleData(base, detail = null) {
     if (!base && !detail) return null;
     const combined = { ...(base || {}), ...(detail || {}) };
     combined.summary       = getSummary(combined);
-    combined.displayDate   = formatDate(combined.published_at);
+    combined.displayDate   = formatDate(combined.published_at || combined.publishedAt || combined.publish_date);
     combined.imageUrl      = resolveMediaUrl(extractImageSource(combined));
     combined.categoryLabel = combined.category_name || combined.category || 'News';
     combined.authorLabel   = combined.author_name || 'News Desk';
@@ -171,12 +171,43 @@ function mergeArticleData(base, detail = null) {
 
 function extractImageSource(article) {
     if (!article) return '';
-    const keys = ['image','image_url','thumbnail','thumbnail_url','photo','photo_url',
-                  'cover_image','cover_image_url','featured_image','featured_image_url',
-                  'banner','banner_url','media','media_url','preview','preview_url'];
+    const keys = [
+        'image', 'image_url', 'thumbnail', 'thumbnail_url', 'photo', 'photo_url',
+        'cover_image', 'cover_image_url', 'featured_image', 'featured_image_url',
+        'banner', 'banner_url', 'media', 'media_url', 'preview', 'preview_url',
+        'imageUrl', 'thumbnailUrl', 'featuredImage', 'featuredImageUrl',
+        'coverImage', 'coverImageUrl', 'photoUrl', 'bannerUrl'
+    ];
+
     for (const k of keys) {
-        if (article[k]) return article[k];
+        const value = article?.[k];
+        if (value) return value;
     }
+
+    const nestedCandidates = [
+        article?.image?.url,
+        article?.image?.src,
+        article?.image?.path,
+        article?.image?.file,
+        article?.thumbnail?.url,
+        article?.thumbnail?.src,
+        article?.featured_image?.url,
+        article?.featured_image?.src,
+        article?.cover_image?.url,
+        article?.cover_image?.src,
+        article?.media?.url,
+        article?.media?.src,
+        article?.photo?.url,
+        article?.photo?.src,
+    ];
+
+    for (const nested of nestedCandidates) {
+        if (nested) return nested;
+    }
+
+    const fallbackSource = article?.image_url || article?.imageUrl || article?.thumbnail_url || article?.thumbnailUrl || '';
+    if (fallbackSource) return fallbackSource;
+
     return '';
 }
 
@@ -188,9 +219,12 @@ function resolveMediaUrl(url) {
     const v = String(url).trim();
     if (!v) return '';
     if (/^https?:\/\//i.test(v) || v.startsWith('data:')) return v;
+
     const base = getMediaBase();
     if (v.startsWith('/media/')) return `${base}${v}`;
+    if (v.startsWith('/static/')) return `${base}${v}`;
     if (v.startsWith('media/'))  return `${base}/${v}`;
+    if (v.startsWith('static/')) return `${base}/${v}`;
     if (v.startsWith('/'))       return `${base}${v}`;
     return `${base}/media/${v}`;
 }
@@ -494,7 +528,8 @@ async function hydrateArticleImages(apiBase, sections) {
 async function fetchArticleDetail(apiBase, id) {
     if (!id) return null;
     try {
-        const data = await fetchJson(`${apiBase}/articles/${id}/`, DETAIL_TIMEOUT_MS);
+        const detailUrl = `${apiBase}/api/articles/${id}/`;
+        const data = await fetchJsonApi(detailUrl, DETAIL_TIMEOUT_MS);
         if (!data || typeof data !== 'object' || !Object.keys(data).length) return null;
         return data;
     } catch {

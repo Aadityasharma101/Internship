@@ -12,31 +12,43 @@ class MockApiResponse:
         self.headers = {'Content-Type': 'application/json'}
         self.text = str(payload)
 
+    def raise_for_status(self):
+        return None
+
     def json(self):
         return self.payload
 
 
 class AdvertisementApiTests(TestCase):
-    def test_staff_can_create_and_list_ads(self):
-        response = self.client.post(
+    @patch('frontend.views.requests.request')
+    def test_staff_can_create_and_list_ads_via_remote_api(self, mock_request):
+        mock_request.side_effect = [
+            MockApiResponse(201, {'id': 1, 'title': 'Spring campaign'}),
+            MockApiResponse(200, {'count': 1, 'results': [{'id': 1, 'title': 'Spring campaign'}]}),
+        ]
+
+        create_response = self.client.post(
             reverse('frontend:ads_api'),
-            {
+            json.dumps({
                 'title': 'Spring campaign',
                 'description': 'Seasonal banner',
                 'target_url': 'https://example.com',
                 'position': 'top_banner',
                 'image_url': 'https://example.com/banner.jpg',
-            },
+            }),
             content_type='application/json',
         )
 
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()
-        self.assertEqual(payload['title'], 'Spring campaign')
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.json()['title'], 'Spring campaign')
 
         list_response = self.client.get(reverse('frontend:ads_api'))
         self.assertEqual(list_response.status_code, 200)
-        self.assertGreaterEqual(list_response.json()['count'], 1)
+        self.assertEqual(list_response.json()['count'], 1)
+        self.assertEqual(mock_request.call_args_list[0].args[0], 'POST')
+        self.assertEqual(mock_request.call_args_list[0].args[1], 'https://news-portal-hvgs.onrender.com/api/ads/')
+        self.assertEqual(mock_request.call_args_list[1].args[0], 'GET')
+        self.assertEqual(mock_request.call_args_list[1].args[1], 'https://news-portal-hvgs.onrender.com/api/ads/')
 
 
 class PortalArticlesProxyTests(TestCase):
@@ -56,8 +68,8 @@ class PortalArticlesProxyTests(TestCase):
         self.assertEqual(payload['count'], 1)
         self.assertEqual(payload['results'][0]['title'], 'Hello world')
         self.assertEqual(mock_request.call_args.args[0], 'GET')
-        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/articles/feed/')
-        self.assertNotIn('/api/articles/', mock_request.call_args.args[1])
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/feed/')
+        self.assertIn('/api/articles/', mock_request.call_args.args[1])
 
     @patch('frontend.views.requests.request')
     def test_portal_articles_create_proxies_to_remote_api(self, mock_request):
@@ -72,27 +84,17 @@ class PortalArticlesProxyTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['title'], 'New story')
         self.assertEqual(mock_request.call_args.args[0], 'POST')
-        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/articles/create/')
-        self.assertNotIn('/api/articles/', mock_request.call_args.args[1])
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/create/')
+        self.assertIn('/api/articles/', mock_request.call_args.args[1])
 
 
 class StaffArticleCreateTests(TestCase):
-    def test_staff_add_article_requires_authentication(self):
-        response = self.client.post(
-            reverse('frontend:staff_add_article'),
-            json.dumps({'title': 'New story', 'body': 'Body'}),
-            content_type='application/json',
-        )
-
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()['detail'], 'Authentication required')
-
-    @patch('frontend.views.requests.post')
-    def test_staff_add_article_forwards_publishable_article_payload(self, mock_post):
-        mock_post.return_value = MockApiResponse(201, {
+    @patch('frontend.views.requests.request')
+    def test_staff_add_article_proxies_to_documented_create_api(self, mock_request):
+        mock_request.return_value = MockApiResponse(201, {
             'id': 35,
             'title': 'New story',
-            'status': 'published',
+            'status': 'draft',
         })
 
         response = self.client.post(
@@ -100,61 +102,75 @@ class StaffArticleCreateTests(TestCase):
             json.dumps({
                 'title': 'New story',
                 'body': 'Full story body',
-                'description': 'Short summary',
-                'category': 'International',
-                'image': 'https://example.com/story.jpg',
-                'published': True,
-                'featured': True,
+                'summary': 'Short summary',
+                'author_name': 'Staff User',
+                'category_name': 'International',
             }),
             content_type='application/json',
             HTTP_AUTHORIZATION='Bearer staff-token',
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(mock_post.call_args.args[0], 'https://news-portal-hvgs.onrender.com/articles/create/')
-
-        kwargs = mock_post.call_args.kwargs
+        self.assertEqual(response.json()['title'], 'New story')
+        self.assertEqual(mock_request.call_args.args[0], 'POST')
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/create/')
+        kwargs = mock_request.call_args.kwargs
         self.assertEqual(kwargs['headers']['Authorization'], 'Bearer staff-token')
-        payload = kwargs['json']
-        self.assertEqual(payload['title'], 'New story')
-        self.assertEqual(payload['status'], 'published')
-        self.assertEqual(payload['body'], 'Full story body')
-        self.assertEqual(payload['content'], 'Full story body')
-        self.assertEqual(payload['description'], 'Short summary')
-        self.assertEqual(payload['summary'], 'Short summary')
-        self.assertEqual(payload['category_name'], 'International')
-        self.assertEqual(payload['image_url'], 'https://example.com/story.jpg')
-        self.assertTrue(payload['featured'])
-        self.assertTrue(payload['published'])
-        self.assertIn('published_at', payload)
+        self.assertEqual(json.loads(kwargs['data'].decode()), {
+            'title': 'New story',
+            'body': 'Full story body',
+            'summary': 'Short summary',
+            'author_name': 'Staff User',
+            'category_name': 'International',
+        })
 
-    @patch('frontend.views.requests.post')
-    def test_staff_add_article_retries_pending_review_when_remote_blocks_publish(self, mock_post):
-        mock_post.side_effect = [
-            MockApiResponse(403, {'detail': 'You do not have permission to perform this action.'}),
-            MockApiResponse(201, {'id': 36, 'title': 'Pending story', 'status': 'pending_review'}),
-        ]
-
+    @patch('frontend.views.requests.request')
+    def test_staff_add_article_lets_remote_api_handle_authentication(self, mock_request):
+        mock_request.return_value = MockApiResponse(401, {'detail': 'Authentication credentials were not provided.'})
         response = self.client.post(
             reverse('frontend:staff_add_article'),
-            json.dumps({
-                'title': 'Pending story',
-                'body': 'Full story body',
-                'description': 'Short summary',
-                'published': True,
-            }),
+            json.dumps({'title': 'New story', 'body': 'Body'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['detail'], 'Authentication credentials were not provided.')
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/create/')
+
+    @patch('frontend.views.requests.request')
+    def test_staff_can_call_documented_publish_action_through_proxy(self, mock_request):
+        mock_request.return_value = MockApiResponse(200, {'id': 45, 'status': 'published'})
+
+        response = self.client.post(
+            '/remote/api/articles/45/publish/',
+            json.dumps({}),
             content_type='application/json',
             HTTP_AUTHORIZATION='Bearer staff-token',
         )
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(mock_post.call_count, 2)
-        retry_payload = mock_post.call_args.kwargs['json']
-        self.assertEqual(retry_payload['status'], 'pending_review')
-        self.assertFalse(retry_payload['published'])
-        self.assertFalse(retry_payload['is_published'])
-        self.assertNotIn('published_at', retry_payload)
-        self.assertIn('pending review', response.json()['detail'])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'published')
+        self.assertEqual(mock_request.call_args.args[0], 'POST')
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/45/publish/')
+
+
+class ArticleApiViewTests(TestCase):
+    @patch('frontend.views.requests.get')
+    def test_index_uses_remote_article_feed_api(self, mock_get):
+        mock_get.return_value = MockApiResponse(200, {
+            'results': [
+                {'id': 7, 'title': 'Live from the API', 'description': 'Fetched from remote API'}
+            ],
+            'count': 1,
+            'next': None,
+            'previous': None,
+        })
+
+        response = self.client.get(reverse('frontend:index'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['articles'][0]['title'], 'Live from the API')
+        self.assertEqual(mock_get.call_args.args[0], 'https://news-portal-hvgs.onrender.com/api/articles/feed/?ordering=-id')
 
 
 class AuthLoginTests(TestCase):

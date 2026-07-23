@@ -3,20 +3,20 @@
     // Prefer local Django endpoints for ad operations so staff flow resolves on this site.
     const REMOTE_BASE = 'https://news-portal-hvgs.onrender.com';
     const LIST_ENDPOINTS = [
+        '/api/ads/',
+        '/portal/ads/',
         `${REMOTE_BASE}/api/ads/`,
         `${REMOTE_BASE}/api/advertisements/`,
         `${REMOTE_BASE}/ads/`,
         `${REMOTE_BASE}/advertisements/`,
-        `${REMOTE_BASE}/advertise/`,
-        '/api/ads/',
-        '/portal/ads/'
+        `${REMOTE_BASE}/advertise/`
     ];
     const CREATE_ENDPOINTS = [
+        '/api/ads/',
+        '/portal/ads/',
         `${REMOTE_BASE}/api/ads/`,
         `${REMOTE_BASE}/api/advertisements/`,
-        `${REMOTE_BASE}/ads/`,
-        '/api/ads/',
-        '/portal/ads/'
+        `${REMOTE_BASE}/ads/`
     ];
     const POSITION_MAP = {
         top_banner: 'Top Banner',

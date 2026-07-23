@@ -62,15 +62,15 @@ function getApiBase() {
 function buildApiUrl(endpoint) {
     if (!endpoint) return '';
 
-    if (/^https?:\/\//i.test(endpoint)) {
-        return endpoint;
-    }
-
     const clean = endpoint.replace(/^\//, '');
     const isLocalAdsEndpoint = /^(api\/ads|ads|advertisements)\//i.test(clean);
 
     if (isLocalAdsEndpoint) {
         return new URL(`/${clean}`, window.location.origin).toString();
+    }
+
+    if (/^https?:\/\//i.test(endpoint)) {
+        return endpoint;
     }
 
     const base = getApiBase();
@@ -222,20 +222,28 @@ async function initAdvertisements() {
     let payload;
     try {
         payload = await fetchAdvertisements();
-    } catch {
+    } catch (error) {
+        console.warn('Advertisement fetch failed:', error);
         payload = null;
     }
 
-    // payload === null → no ads → all slots stay display:none (no is-empty class added)
     if (!payload) return;
 
     const adsByPosition = normalizeAdsPayload(payload);
+    let rendered = false;
+
     adSlots.forEach((slot) => {
         const position = slot.dataset.adSlot;
         const ad = adsByPosition[position];
-        if (ad) renderAdSlot(slot, ad, position);
-        // If no ad for this slot — do nothing; slot stays hidden
+        if (ad) {
+            renderAdSlot(slot, ad, position);
+            rendered = true;
+        }
     });
+
+    if (!rendered) {
+        console.warn('No visible advertisement could be rendered for the current page.', payload);
+    }
 }
 
 function normalizeAdsPayload(payload) {
@@ -244,31 +252,76 @@ function normalizeAdsPayload(payload) {
 
     if (!payload) return grouped;
 
-    const list = Array.isArray(payload)
-        ? payload
-        : (Array.isArray(payload.results) ? payload.results : []);
+    const objectPayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
 
-    if (list.length) {
-        list.forEach((ad) => {
-            if (!isVisibleAdvertisement(ad)) {
-                return;
+    if (objectPayload) {
+        positions.forEach((position) => {
+            const slotValue = objectPayload[position];
+            const candidate = Array.isArray(slotValue)
+                ? (slotValue.find((entry) => isVisibleAdvertisement(entry)) || null)
+                : (isVisibleAdvertisement(slotValue) ? slotValue : null);
+
+            if (candidate) {
+                grouped[position] = normalizeAdvertisement(candidate);
             }
+        });
 
+        const fallbackCandidate = positions
+            .map((position) => objectPayload[position])
+            .find((entry) => isVisibleAdvertisement(entry));
+
+        if (!fallbackCandidate && objectPayload.results) {
+            const list = Array.isArray(objectPayload.results) ? objectPayload.results : [];
+            const visibleAd = list.find((entry) => isVisibleAdvertisement(entry));
+            if (visibleAd) {
+                grouped.top_banner = normalizeAdvertisement(visibleAd);
+                grouped.between_articles = normalizeAdvertisement(visibleAd);
+                grouped.footer_banner = normalizeAdvertisement(visibleAd);
+            }
+        }
+
+        return grouped;
+    }
+
+    const list = Array.isArray(payload) ? payload : (Array.isArray(payload.results) ? payload.results : []);
+    const visibleAds = (list || []).filter((ad) => isVisibleAdvertisement(ad));
+    const fallbackAd = visibleAds[0] || null;
+
+    if (visibleAds.length) {
+        visibleAds.forEach((ad) => {
             const position = normalizeAdPosition(ad?.position);
             if (position && grouped[position] === null) {
-                grouped[position] = ad;
+                grouped[position] = normalizeAdvertisement(ad);
+            }
+        });
+
+        positions.forEach((position) => {
+            if (grouped[position] === null && fallbackAd) {
+                grouped[position] = normalizeAdvertisement(fallbackAd);
             }
         });
         return grouped;
     }
 
-    positions.forEach((p) => {
-        const v = payload[p];
-        const ad = Array.isArray(v) ? (v.find(isVisibleAdvertisement) || null) : (isVisibleAdvertisement(v) ? v : null);
-        grouped[p] = ad;
-    });
-
     return grouped;
+}
+
+function normalizeAdvertisement(ad) {
+    if (!ad) return null;
+
+    const title = ad.title || ad.name || ad.campaign_name || 'Advertisement';
+    const image = ad.image || ad.image_url || ad.banner || ad.media || '';
+    const targetUrl = ad.target_url || ad.redirect_url || ad.url || ad.link || '#';
+    const clientName = ad.client_name || ad.sponsor || ad.company || 'Learn more';
+
+    return {
+        ...ad,
+        title,
+        client_name: clientName,
+        image,
+        image_url: image,
+        target_url: targetUrl,
+    };
 }
 
 function isVisibleAdvertisement(ad) {

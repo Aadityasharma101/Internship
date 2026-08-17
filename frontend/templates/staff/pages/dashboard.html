@@ -19,10 +19,25 @@
         <button class="btn-secondary-outline" id="refreshDashboardBtn" type="button">
             <i class="fa-solid fa-rotate-right"></i> Refresh
         </button>
+        <a class="btn-secondary-outline" href="{% url 'frontend:staff_profile' %}">
+            <i class="fa-solid fa-user"></i> Profile
+        </a>
+        <a class="btn-secondary-outline" href="{% url 'frontend:staff_advertisements' %}">
+            <i class="fa-solid fa-bullhorn"></i> Advertisements
+        </a>
         <a class="btn-add" href="{% url 'frontend:staff_articles' %}?new=1">
             <i class="fa-solid fa-plus"></i> Add Article
         </a>
     </div>
+</div>
+
+<div class="dashboard-quick-actions" style="margin-bottom: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a class="btn-secondary-outline" href="{% url 'frontend:staff_profile' %}">
+        <i class="fa-solid fa-user"></i> Profile
+    </a>
+    <a class="btn-secondary-outline" href="{% url 'frontend:staff_advertisements' %}">
+        <i class="fa-solid fa-bullhorn"></i> Advertisements
+    </a>
 </div>
 
 <div class="resource-summary">
@@ -39,7 +54,7 @@
         <div class="panel-header">
             <div>
                 <h3>Recent Articles</h3>
-                <p>Latest work from your account.</p>
+                <p>Latest articles from the remote database.</p>
             </div>
             <a href="{% url 'frontend:staff_articles' %}">View all</a>
         </div>
@@ -60,7 +75,32 @@
         </div>
     </section>
 
-    
+</section>
+
+    <section class="dashboard-panel">
+        <div class="panel-header">
+            <div>
+                <h3>Recent Advertisements</h3>
+                <p>Latest advertisements saved in the system.</p>
+            </div>
+            <a href="{% url 'frontend:staff_advertisements' %}">View all</a>
+        </div>
+        <div class="table-wrapper">
+            <table class="resource-table dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Position</th>
+                        <th>Status</th>
+                        <th>Active Dates</th>
+                    </tr>
+                </thead>
+                <tbody id="recentAdsBody">
+                    <tr class="loading-row"><td colspan="4">Loading recent advertisements...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
 {% endblock %}
 

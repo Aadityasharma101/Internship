@@ -4,29 +4,83 @@
 // ============================================================
 
 const DEFAULT_API_BASE = 'https://news-portal-hvgs.onrender.com';
+let ADS_REFRESH_TIMER = null;
+
+function refreshAdvertisements() {
+    if (!getAdsEndpoint()) return;
+    initAdvertisements().catch(() => { });
+}
+
+function startAdvertisementPolling(intervalMs = 15000) {
+    if (ADS_REFRESH_TIMER) {
+        window.clearInterval(ADS_REFRESH_TIMER);
+    }
+
+    if (!getAdsEndpoint()) return;
+    ADS_REFRESH_TIMER = window.setInterval(() => {
+        refreshAdvertisements();
+    }, intervalMs);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initActiveNav();
     initLiveNavbar();
     // Fetch ads only when an endpoint is configured; missing ad routes create noisy console failures.
     if (getAdsEndpoint()) {
-        initAdvertisements().catch(() => { });
-        setInterval(() => initAdvertisements().catch(() => { }), 90000);
+        refreshAdvertisements();
     }
-    setInterval(initLiveNavbar, 20000);
+});
+
+window.addEventListener('focus', () => {
+    refreshAdvertisements();
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        refreshAdvertisements();
+    }
+});
+
+window.addEventListener('online', () => {
+    refreshAdvertisements();
+});
+
+window.NewsPortalApi?.onDataChanged?.((event) => {
+    if (event?.type === 'advertisements' || event?.type === 'articles') {
+        refreshAdvertisements();
+    }
 });
 
 // ============================================================
 // API BASE
 // ============================================================
 function getApiBase() {
-    const base = document.body?.dataset?.apiBase || DEFAULT_API_BASE;
-    return base.replace(/\/$/, '');
+    const configured = (typeof window !== 'undefined' && window.NEWS_PORTAL_API_BASE) ? String(window.NEWS_PORTAL_API_BASE) : null;
+    const bodyBase = document.body?.dataset?.apiBase || '';
+    let base = configured || bodyBase || DEFAULT_API_BASE;
+    base = base.replace(/\/+$/, '');
+    // Ensure the API base includes the '/api' segment
+    if (!/\/api(\/|$)/i.test(base)) {
+        base = base + '/api';
+    }
+    return base;
 }
 
 function buildApiUrl(endpoint) {
-    const base = getApiBase();
+    if (!endpoint) return '';
+
     const clean = endpoint.replace(/^\//, '');
+    const isLocalAdsEndpoint = /^(api\/ads|ads|advertisements)\//i.test(clean);
+
+    if (isLocalAdsEndpoint) {
+        return new URL(`/${clean}`, window.location.origin).toString();
+    }
+
+    if (/^https?:\/\//i.test(endpoint)) {
+        return endpoint;
+    }
+
+    const base = getApiBase();
     return `${base}/${clean}`;
 }
 
@@ -137,14 +191,27 @@ function initActiveNav() {
     });
 }
 
+function navigateToCategory(category) {
+    const url = new URL(window.location.origin);
+    url.pathname = '/';
+    if (category && category !== 'all') {
+        url.searchParams.set('category', category);
+    }
+    window.location.href = url.toString();
+}
+
 function renderCategoryChips(container, categories) {
     container.innerHTML = '';
     if (!categories.length) return;
 
-    categories.slice(0, 6).forEach((cat) => {
-        const chip = document.createElement('span');
+    categories.forEach((cat) => {
+        const label = cat.name || cat.title || cat.label || cat.slug || 'Category';
+        const value = encodeURIComponent(cat.slug || label);
+        const chip = document.createElement('a');
+        chip.href = `/?category=${value}`;
         chip.className = 'category-chip';
-        chip.textContent = cat.name || cat.title || cat.label || cat.slug || 'Category';
+        chip.textContent = label;
+        chip.setAttribute('data-category', value);
         container.appendChild(chip);
     });
 }
@@ -156,14 +223,18 @@ function renderCategoryChips(container, categories) {
 // ============================================================
 
 function getAdsEndpoint() {
-    return document.body?.dataset?.adsEndpoint?.trim() || '';
+    const configured = document.body?.dataset?.adsEndpoint?.trim() || '';
+    if (configured) return configured;
+    return '/api/ads/';
 }
 
 async function fetchAdvertisements() {
     const endpoint = getAdsEndpoint();
     if (!endpoint) return null;
-    const url = /^https?:\/\//i.test(endpoint) ? endpoint : buildApiUrl(endpoint);
-    return fetchJson(url, { timeoutMs: 8000 });
+    const url = buildApiUrl(endpoint);
+    // Add cache buster to force fresh ads from server
+    const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + '_=' + Date.now();
+    return fetchJson(cacheBusterUrl, { timeoutMs: 8000 });
 }
 
 async function initAdvertisements() {
@@ -173,20 +244,53 @@ async function initAdvertisements() {
     let payload;
     try {
         payload = await fetchAdvertisements();
-    } catch {
+    } catch (error) {
+        console.warn('Advertisement fetch failed:', error);
         payload = null;
     }
 
-    // payload === null → no ads → all slots stay display:none (no is-empty class added)
     if (!payload) return;
 
     const adsByPosition = normalizeAdsPayload(payload);
+    let rendered = false;
+
     adSlots.forEach((slot) => {
         const position = slot.dataset.adSlot;
-        const ad = adsByPosition[position];
-        if (ad) renderAdSlot(slot, ad, position);
-        // If no ad for this slot — do nothing; slot stays hidden
+        const ad = adsByPosition[position] || getFallbackAdForSlot(position, adsByPosition, payload);
+        if (ad) {
+            renderAdSlot(slot, ad, position);
+            rendered = true;
+        }
     });
+
+    if (!rendered) {
+        console.warn('No visible advertisement could be rendered for the current page.', payload);
+    }
+}
+
+function getFallbackAdForSlot(position, adsByPosition, payload) {
+    if (adsByPosition[position]) {
+        return adsByPosition[position];
+    }
+
+    if (position === 'between_articles') {
+        return adsByPosition.top_banner || adsByPosition.footer_banner || null;
+    }
+
+    if (position === 'sidebar') {
+        return adsByPosition.top_banner || adsByPosition.footer_banner || null;
+    }
+
+    if (position === 'footer_banner') {
+        return adsByPosition.footer_banner || adsByPosition.top_banner || null;
+    }
+
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        const remoteAd = payload[position] || payload.top_banner || payload.footer || payload.in_article || null;
+        return remoteAd ? normalizeAdvertisement(remoteAd) : null;
+    }
+
+    return null;
 }
 
 function normalizeAdsPayload(payload) {
@@ -195,27 +299,72 @@ function normalizeAdsPayload(payload) {
 
     if (!payload) return grouped;
 
-    if (Array.isArray(payload)) {
-        payload.forEach((ad) => {
-            if (!isVisibleAdvertisement(ad)) {
-                return;
-            }
+    const objectPayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
+    const list = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.results) ? payload.results : []);
+    const visibleAds = (list || []).filter((ad) => isVisibleAdvertisement(ad));
 
-            const position = normalizeAdPosition(ad?.position);
-            if (position && grouped[position] === null) grouped[position] = ad;
+    if (objectPayload) {
+        const objectAds = [];
+        positions.forEach((position) => {
+            const slotValue = objectPayload[position];
+            const candidate = Array.isArray(slotValue)
+                ? (slotValue.find((entry) => isVisibleAdvertisement(entry)) || null)
+                : (isVisibleAdvertisement(slotValue) ? slotValue : null);
+
+            if (candidate) {
+                objectAds.push(candidate);
+            }
         });
-        return grouped;
+
+        if (objectAds.length) {
+            objectAds.forEach((ad) => {
+                const normalizedPosition = normalizeAdPosition(ad?.position || ad?.placement || ad?.slot);
+                if (normalizedPosition && grouped[normalizedPosition] === null) {
+                    grouped[normalizedPosition] = normalizeAdvertisement(ad);
+                }
+            });
+        }
     }
 
-    if (Array.isArray(payload.results)) return normalizeAdsPayload(payload.results);
+    if (visibleAds.length) {
+        visibleAds.forEach((ad) => {
+            const position = normalizeAdPosition(ad?.position || ad?.placement || ad?.slot);
+            if (position && grouped[position] === null) {
+                grouped[position] = normalizeAdvertisement(ad);
+            }
+        });
+    }
 
-    positions.forEach((p) => {
-        const v = payload[p];
-        const ad = Array.isArray(v) ? (v.find(isVisibleAdvertisement) || null) : (isVisibleAdvertisement(v) ? v : null);
-        grouped[p] = ad;
-    });
+    if (!visibleAds.length && objectPayload?.results) {
+        const fallbackAd = (Array.isArray(objectPayload.results) ? objectPayload.results : []).find((entry) => isVisibleAdvertisement(entry));
+        if (fallbackAd) {
+            grouped.top_banner = normalizeAdvertisement(fallbackAd);
+            grouped.between_articles = normalizeAdvertisement(fallbackAd);
+            grouped.footer_banner = normalizeAdvertisement(fallbackAd);
+        }
+    }
 
     return grouped;
+}
+
+function normalizeAdvertisement(ad) {
+    if (!ad) return null;
+
+    const title = ad.title || ad.name || ad.campaign_name || 'Advertisement';
+    const image = ad.image || ad.image_url || ad.banner || ad.media || '';
+    const targetUrl = ad.target_url || ad.redirect_url || ad.url || ad.link || '#';
+    const clientName = ad.client_name || ad.sponsor || ad.company || 'Learn more';
+
+    return {
+        ...ad,
+        title,
+        client_name: clientName,
+        image,
+        image_url: image,
+        target_url: targetUrl,
+    };
 }
 
 function isVisibleAdvertisement(ad) {
@@ -248,16 +397,28 @@ function isVisibleAdvertisement(ad) {
 function normalizeAdPosition(value) {
     const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
 
-    if (raw === 'in_article') {
+    if (!raw) {
         return 'between_articles';
     }
 
-    if (raw === 'footer') {
-        return 'footer_banner';
-    }
+    const aliases = {
+        in_article: 'between_articles',
+        between_articles: 'between_articles',
+        inline: 'between_articles',
+        article_strip: 'between_articles',
+        article: 'between_articles',
+        footer: 'footer_banner',
+        footer_banner: 'footer_banner',
+        top_banner: 'top_banner',
+        top: 'top_banner',
+        sidebar: 'sidebar',
+        sidebar_box: 'sidebar',
+        side: 'sidebar',
+        popup: 'popup',
+    };
 
-    if (['top_banner', 'sidebar', 'between_articles', 'footer_banner', 'popup'].includes(raw)) {
-        return raw;
+    if (aliases[raw]) {
+        return aliases[raw];
     }
 
     if (raw.includes('top')) {
@@ -270,6 +431,10 @@ function normalizeAdPosition(value) {
 
     if (raw.includes('footer')) {
         return 'footer_banner';
+    }
+
+    if (raw.includes('article') || raw.includes('strip')) {
+        return 'between_articles';
     }
 
     return 'between_articles';

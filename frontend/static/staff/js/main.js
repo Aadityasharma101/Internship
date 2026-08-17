@@ -41,9 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    const logoutButton = document.getElementById('staffLogoutButton');
+    const logoutButtons = document.querySelectorAll('[data-staff-logout-button]');
 
-    function handleLogout(event) {
+    async function handleLogout(event) {
         if (event) {
             event.preventDefault();
         }
@@ -53,11 +53,61 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        try {
+            await fetch('/auth/logout/', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch {
+            // Ignore server-side logout errors and continue with client cleanup.
+        }
+
         window.NewsPortalSession?.clear();
-        window.location.href = '/login/';
+        window.location.replace('/');
     }
 
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
+    logoutButtons.forEach((button) => {
+        button.addEventListener('click', handleLogout);
+    });
+
+    // Ensure staff 'Manage' links exist in the sidebar when the template doesn't include them
+    function ensureManageLinks() {
+        try {
+            const sidebarMenu = document.querySelector('.sidebar-menu');
+            if (!sidebarMenu) return;
+
+            // don't duplicate links if already present
+            if (sidebarMenu.querySelector("a[href='/staff/advertisements/']") || sidebarMenu.querySelector("a[href='/staff/profile/']")) {
+                return;
+            }
+
+            const section = document.createElement('div');
+            section.className = 'menu-section';
+            section.textContent = 'MANAGE';
+
+            const ul = document.createElement('ul');
+            ul.className = 'menu-list';
+
+            const liAds = document.createElement('li');
+            liAds.className = 'menu-item';
+            liAds.innerHTML = '<a href="/staff/advertisements/"><i class="fa-solid fa-bullhorn"></i> Advertisements</a>';
+
+            const liProfile = document.createElement('li');
+            liProfile.className = 'menu-item';
+            liProfile.innerHTML = '<a href="/staff/profile/"><i class="fa-solid fa-user"></i> Profile</a>';
+
+            ul.appendChild(liAds);
+            ul.appendChild(liProfile);
+
+            sidebarMenu.appendChild(section);
+            sidebarMenu.appendChild(ul);
+        } catch (e) {
+            // fail silently
+        }
     }
+
+    ensureManageLinks();
 });

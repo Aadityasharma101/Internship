@@ -51,7 +51,7 @@
         els.visible.textContent = `${filtered.length} comment${filtered.length === 1 ? '' : 's'} shown`;
 
         if (!filtered.length) {
-            Utils.setTableMessage(els.tbody, 6, query ? 'No comments match your search.' : 'No comments found for your articles.');
+            Utils.setTableMessage(els.tbody, 6, query ? 'No comments match your search.' : 'No comments found.');
             return;
         }
 
@@ -122,7 +122,7 @@
                 }
             }));
 
-            state.comments = Utils.sortByNewest(state.user ? result.data.results.filter((comment) => CommentService.commentMatchesUser(comment, state.user)) : result.data.results, ['created_at', 'updated_at']);
+            state.comments = Utils.sortByNewest(result.data.results, ['created_at', 'updated_at']);
             renderSummary(state.comments);
             renderComments();
         } catch (error) {

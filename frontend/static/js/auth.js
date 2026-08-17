@@ -135,7 +135,7 @@ function getPortalDashboardPath(user) {
         return '/users/';
     }
     if (isPortalStaff(user)) {
-        return '/dashboard/';
+        return '/staff/';
     }
     return '/profile/';
 }
@@ -276,6 +276,8 @@ window.NewsPortalSession = {
     clear: clearPortalSession,
     storeTokens: storePortalTokens,
     storeUser: storePortalUser,
+    getStoredAccessToken: getStoredAccessToken,
+    getStoredRefreshToken: getStoredRefreshToken,
     getAccessToken: getPortalAccessToken,
     fetchCurrentUser: fetchCurrentPortalUser,
     getStoredUser: getStoredPortalUser,

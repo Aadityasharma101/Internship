@@ -354,8 +354,27 @@
             Api.notifyDataChanged?.('advertisements', { action: id ? 'update' : 'create', id: savedAd?.id || id || null });
             await loadAds();
         } catch (error) {
-            console.error('Unable to save advertisement:', error);
-            els.status.textContent = 'Unable to save advertisement. Check required fields, login, and permissions.';
+            console.error('Unable to save advertisement:', error, error?.response);
+            // Prefer showing server validation/error details when available
+            let msg = 'Unable to save advertisement. Check required fields, login, and permissions.';
+            try {
+                if (error?.response?.data) {
+                    if (typeof error.response.data === 'string') {
+                        msg = error.response.data;
+                    } else if (typeof error.response.data === 'object') {
+                        // show first validation error or stringify
+                        const firstKey = Object.keys(error.response.data)[0];
+                        const val = error.response.data[firstKey];
+                        msg = Array.isArray(val) ? String(val.join('; ')) : String(val || JSON.stringify(error.response.data));
+                    }
+                } else if (error?.message) {
+                    msg = error.message;
+                }
+            } catch (e) {
+                // ignore parsing errors
+            }
+
+            els.status.textContent = msg;
         } finally {
             els.save.disabled = false;
             els.toggle.disabled = false;
@@ -386,6 +405,20 @@
         } catch (error) {
             console.error('Unable to delete advertisement:', error);
             window.alert('Unable to delete this advertisement right now.');
+        }
+    }
+
+    function openFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const editId = params.get('edit');
+
+        if (!editId) {
+            return;
+        }
+
+        const ad = state.ads.find((item) => String(item.id) === String(editId));
+        if (ad) {
+            openEditModal(ad);
         }
     }
 
@@ -458,7 +491,10 @@
         }
     });
 
-    document.addEventListener('DOMContentLoaded', loadAds);
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadAds();
+        openFromQuery();
+    });
     window.addEventListener('pageshow', loadAds);
     Api.onDataChanged?.((event) => {
         if (event?.type === 'advertisements') {

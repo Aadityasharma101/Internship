@@ -1,6 +1,9 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/comments/', '/articles/comments/'];
+    const LIST_ENDPOINTS = [
+        'https://news-portal-hvgs.onrender.com/api/comments/',
+        'https://news-portal-hvgs.onrender.com/api/articles/comments/'
+    ];
 
     function normalizeComment(comment) {
         const status = String(Api.getValue(comment, ['status', 'state'], Api.getValue(comment, ['is_approved'], false) ? 'approved' : 'pending')).toLowerCase();
@@ -126,7 +129,10 @@
             rejected: status === 'rejected'
         };
 
-        const bases = ['/comments/', '/articles/comments/'];
+        const bases = [
+            'https://news-portal-hvgs.onrender.com/api/comments/',
+            'https://news-portal-hvgs.onrender.com/api/articles/comments/'
+        ];
 
         return Api.firstSuccessful(bases.map((base) => `${base}${id}/`), async (endpoint) => {
             try {
@@ -156,7 +162,10 @@
     }
 
     async function deleteComment(id, options = {}) {
-        return Api.firstSuccessful([`/comments/${id}/`, `/articles/comments/${id}/`], (endpoint) => Api.request('DELETE', endpoint, options));
+        return Api.firstSuccessful([
+            `https://news-portal-hvgs.onrender.com/api/comments/${id}/`,
+            `https://news-portal-hvgs.onrender.com/api/articles/comments/${id}/`
+        ], (endpoint) => Api.request('DELETE', endpoint, options));
     }
 
     window.NewsPortalCommentService = {

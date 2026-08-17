@@ -1,20 +1,50 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/api/ads/', '/ads/', '/advertisements/', '/advertise/'];
+    // Prefer local Django endpoints for ad operations so staff flow resolves on this site.
+    const REMOTE_BASE = 'https://news-portal-hvgs.onrender.com';
+    const AUTH_LIST_ENDPOINTS = [
+        '/remote/api/ads/all/',
+        '/remote/api/ads/list/',
+        '/remote/api/ads/'
+    ];
+    const LIST_ENDPOINTS = [
+        '/api/ads/',
+        '/portal/ads/',
+        `${REMOTE_BASE}/api/ads/`,
+        `${REMOTE_BASE}/api/advertisements/`,
+        `${REMOTE_BASE}/ads/`,
+        `${REMOTE_BASE}/advertisements/`,
+        `${REMOTE_BASE}/advertise/`
+    ];
+    const CREATE_ENDPOINTS = [
+        '/api/ads/',
+        '/portal/ads/',
+        `${REMOTE_BASE}/api/ads/`,
+        `${REMOTE_BASE}/api/advertisements/`,
+        `${REMOTE_BASE}/ads/`
+    ];
     const POSITION_MAP = {
         top_banner: 'Top Banner',
-        sidebar: 'Sidebar',
-        between_articles: 'Between Articles',
-        in_article: 'Between Articles',
+        sidebar: 'Sidebar Box',
+        between_articles: 'In-Article Strip',
+        in_article: 'In-Article Strip',
+        article_strip: 'In-Article Strip',
         footer_banner: 'Footer Banner',
-        footer: 'Footer Banner'
+        footer: 'Footer Banner',
+        popup: 'Popup'
     };
 
     function normalizePosition(value) {
         const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
 
         if (POSITION_MAP[raw]) {
-            return raw === 'in_article' ? 'between_articles' : raw === 'footer' ? 'footer_banner' : raw;
+            if (raw === 'in_article' || raw === 'article_strip') {
+                return 'between_articles';
+            }
+            if (raw === 'footer') {
+                return 'footer_banner';
+            }
+            return raw;
         }
 
         if (raw.includes('top')) {
@@ -27,6 +57,10 @@
 
         if (raw.includes('footer')) {
             return 'footer_banner';
+        }
+
+        if (raw.includes('article') || raw.includes('strip')) {
+            return 'between_articles';
         }
 
         return 'between_articles';
@@ -121,6 +155,77 @@
         };
     }
 
+    function isAdvertisementRecord(value) {
+        return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (
+            Api.getValue(value, ['id'], null) ||
+            Api.getValue(value, ['title', 'name', 'campaign_name'], '') ||
+            Api.getValue(value, ['image', 'image_url', 'banner', 'media'], '')
+        ));
+    }
+
+    function collectAdvertisementRecords(value, records = []) {
+        if (!value) {
+            return records;
+        }
+
+        if (Array.isArray(value)) {
+            value.forEach((entry) => collectAdvertisementRecords(entry, records));
+            return records;
+        }
+
+        if (isAdvertisementRecord(value)) {
+            records.push(value);
+        }
+
+        return records;
+    }
+
+    function normalizeAdvertisementPayload(payload) {
+        if (Array.isArray(payload)) {
+            return {
+                results: payload.map(normalizeAdvertisement),
+                count: payload.length,
+                next: null,
+                previous: null
+            };
+        }
+
+        const listPayload = Api.normalizeList(payload);
+        if (Array.isArray(listPayload.results) && listPayload.results.length) {
+            return {
+                ...listPayload,
+                results: listPayload.results.map(normalizeAdvertisement)
+            };
+        }
+
+        const slotKeys = ['top_banner', 'sidebar', 'between_articles', 'in_article', 'article_strip', 'footer_banner', 'footer', 'popup'];
+        const slotRecords = [];
+        if (payload && typeof payload === 'object') {
+            slotKeys.forEach((key) => collectAdvertisementRecords(payload[key], slotRecords));
+            collectAdvertisementRecords(payload.ads, slotRecords);
+            collectAdvertisementRecords(payload.advertisements, slotRecords);
+        }
+
+        const deduped = [];
+        const seen = new Set();
+        slotRecords.forEach((ad) => {
+            const key = Api.getValue(ad, ['id'], '') || `${Api.getValue(ad, ['title', 'name'], '')}-${Api.getValue(ad, ['position', 'placement', 'slot'], '')}`;
+            if (!key || seen.has(String(key))) {
+                return;
+            }
+
+            seen.add(String(key));
+            deduped.push(normalizeAdvertisement(ad));
+        });
+
+        return {
+            results: deduped,
+            count: deduped.length,
+            next: null,
+            previous: null
+        };
+    }
+
     function groupAdvertisements(ads) {
         const grouped = {
             top_banner: [],
@@ -143,13 +248,21 @@
     }
 
     async function loadAdvertisements(page = 1, options = {}) {
-        const result = await Api.loadList(LIST_ENDPOINTS, page, options);
+        const endpoints = options.auth === false
+            ? LIST_ENDPOINTS
+            : [...AUTH_LIST_ENDPOINTS, ...LIST_ENDPOINTS];
+        const result = await Api.firstSuccessful(endpoints, (endpoint) => Api.request('GET', endpoint, {
+            ...options,
+            params: {
+                ...(options.params || {}),
+                page
+            }
+        }));
+        const normalized = normalizeAdvertisementPayload(result.response);
+
         return {
             endpoint: result.endpoint,
-            data: {
-                ...result.data,
-                results: result.data.results.map(normalizeAdvertisement)
-            }
+            data: normalized
         };
     }
 
@@ -159,7 +272,7 @@
             auth: false
         }));
 
-        const normalized = Api.normalizeList(result.response);
+        const normalized = normalizeAdvertisementPayload(result.response);
 
         return {
             endpoint: result.endpoint,
@@ -171,7 +284,8 @@
     }
 
     async function createAdvertisement(payload, options = {}) {
-        return Api.createItem(LIST_ENDPOINTS, payload, options);
+        const result = await Api.createItem(CREATE_ENDPOINTS, payload, options);
+        return result?.response || result;
     }
 
     async function updateAdvertisement(id, payload, options = {}) {

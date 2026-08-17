@@ -18,7 +18,12 @@
     {% block extra_css %}{% endblock %}
 </head>
 
-<body>
+<body data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}">
+<!-- STAFF_BASE_MODIFIED_V2 -->
+<script>
+    window.API_BASE = window.API_BASE || document.body?.dataset?.apiBase || '';
+    window.API_BASE_URL = window.API_BASE_URL || window.API_BASE;
+</script>
 
 <div class="admin-container">
 
@@ -67,9 +72,23 @@
                         <i class="fa-solid fa-newspaper"></i> Articles
                     </a>
                 </li>
-
-                {# Create Article link removed per request #}
             </ul>
+
+            <div class="menu-section">MANAGE</div>
+            <ul class="menu-list">
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_advertisements' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_advertisements' %}">
+                        <i class="fa-solid fa-bullhorn"></i> Advertisements
+                    </a>
+                </li>
+                <li class="menu-item {% if request.resolver_match.url_name == 'staff_profile' %}active{% endif %}">
+                    <a href="{% url 'frontend:staff_profile' %}">
+                        <i class="fa-solid fa-user"></i> Profile
+                    </a>
+                </li>
+            </ul>
+
+            {# Create Article link removed per request #}
 
         </div>
 
@@ -91,6 +110,12 @@
                 <span class="user-role">Staff</span>
             </div>
 
+        </div>
+
+        <div class="sidebar-footer">
+            <button id="staffLogoutButton" class="btn-secondary-outline sidebar-logout-btn" type="button" data-staff-logout-button>
+                <i class="fa-solid fa-power-off"></i> Logout
+            </button>
         </div>
 
     </aside>
@@ -125,7 +150,7 @@
                     <i class="fa-solid fa-plus"></i>
                 </button>
 
-                <button class="nav-icon-btn">
+                <button class="nav-icon-btn" type="button" data-staff-logout-button>
                     <i class="fa-solid fa-power-off"></i>
                 </button>
 
@@ -147,6 +172,11 @@
 <script src="{% static 'js/auth.js' %}?v=3"></script>
 <script src="{% static 'js/axios.js' %}?v=4"></script>
 <script src="{% static 'admin/js/resource_helpers.js' %}"></script>
+<script src="{% static 'js/services/portal-api.js' %}?v=1"></script>
+<script src="{% static 'js/services/articleService.js' %}?v=3"></script>
+<script src="{% static 'js/services/commentService.js' %}?v=1"></script>
+<script src="{% static 'js/services/advertisementService.js' %}?v=1"></script>
+<script src="{% static 'staff/js/staff-utils.js' %}?v=1"></script>
 <script src="{% static 'staff/js/main.js' %}?v=3"></script>
 {% block extra_js %}{% endblock %}
 

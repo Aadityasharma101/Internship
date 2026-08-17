@@ -1,8 +1,10 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const LIST_ENDPOINTS = ['/articles/feed/'];
-    const AUTH_LIST_ENDPOINTS = ['/articles/reporter/articles/', '/articles/feed/'];
-    const CREATE_ENDPOINTS = ['/articles/create/'];
+    const REMOTE_API_BASE = (window.document?.body?.dataset?.apiBase) || 'https://news-portal-hvgs.onrender.com/api';
+    const ARTICLE_API_BASE = `${String(REMOTE_API_BASE).replace(/\/+$/,'')}/articles`;
+    const LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/feed/`, `${ARTICLE_API_BASE}/`];
+    const AUTH_LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/reporter/articles/`, `${ARTICLE_API_BASE}/feed/`, `${ARTICLE_API_BASE}/`];
+    const CREATE_ENDPOINTS = [`${ARTICLE_API_BASE}/`];
 
     function normalizeStatus(article) {
         const rawStatus = Api.getValue(article, ['status', 'state', 'publication_status'], '');
@@ -15,7 +17,7 @@
             return String(rawStatus).toLowerCase();
         }
 
-        return 'draft';
+        return Api.getValue(article, ['published_at', 'publish_date', 'published_on'], '') ? 'published' : 'draft';
     }
 
     function normalizeArticle(article) {
@@ -90,29 +92,52 @@
     }
 
     async function updateArticle(id, payload, options = {}) {
-        return Api.updateItem('/articles/', id, payload, options);
+        const detailEndpoints = [
+            `${ARTICLE_API_BASE}/${id}/update/`,
+            `${ARTICLE_API_BASE}/${id}/`,
+            `/api/articles/${id}/update/`,
+            `/api/articles/${id}/`
+        ];
+
+        return Api.firstSuccessful(detailEndpoints, async (endpoint) => {
+            try {
+                return await Api.request('PATCH', endpoint, {
+                    ...options,
+                    data: payload
+                });
+            } catch (error) {
+                if (error?.response?.status === 405) {
+                    return Api.request('PUT', endpoint, {
+                        ...options,
+                        data: payload
+                    });
+                }
+
+                throw error;
+            }
+        });
     }
 
     async function deleteArticle(id, options = {}) {
-        return Api.deleteItem('/articles/', id, options);
+        const detailEndpoints = [
+            `${ARTICLE_API_BASE}/${id}/delete/`,
+            `${ARTICLE_API_BASE}/${id}/`,
+            `/api/articles/${id}/delete/`,
+            `/api/articles/${id}/`
+        ];
+
+        return Api.firstSuccessful(detailEndpoints, (endpoint) => Api.request('DELETE', endpoint, options));
     }
 
     async function publishArticle(id, options = {}) {
-        return updateArticle(id, {
-            status: 'published',
-            is_published: true,
-            published: true,
-            published_at: new Date().toISOString(),
-            publish_date: new Date().toISOString()
-        }, options);
+        return Api.request('POST', `${ARTICLE_API_BASE}/${id}/publish/`, {
+            ...options,
+            data: {}
+        });
     }
 
     async function saveDraftArticle(id, options = {}) {
-        return updateArticle(id, {
-            status: 'draft',
-            is_published: false,
-            published: false
-        }, options);
+        return updateArticle(id, {}, options);
     }
 
     window.NewsPortalArticleService = {

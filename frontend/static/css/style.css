@@ -398,7 +398,8 @@ button, input, textarea, select { font: inherit; }
     font-weight: 600;
     white-space: nowrap;
     transition: background var(--transition), color var(--transition);
-    cursor: default;
+    cursor: pointer;
+    text-decoration: none;
 }
 .category-chip:hover {
     background: var(--brand-light);
@@ -442,6 +443,32 @@ button, input, textarea, select { font: inherit; }
 .main-content {
     min-height: 65vh;
 }
+
+/* Staff toast notifications */
+.staff-toast-container {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9999;
+}
+.staff-toast {
+    background: rgba(17,24,39,0.95);
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(17,24,39,0.2);
+    min-width: 180px;
+    max-width: 320px;
+    font-weight: 600;
+    transform-origin: right bottom;
+    transition: transform 0.28s ease, opacity 0.28s ease;
+}
+.staff-toast--success { background: linear-gradient(90deg, #10B981, #059669); }
+.staff-toast--info { background: linear-gradient(90deg, #2563EB, #1E40AF); }
+.staff-toast--hide { opacity: 0; transform: translateY(8px) scale(0.98); }
 
 .page-shell {
     background: linear-gradient(180deg, #ffffff 0%, var(--surface-2) 100%);
@@ -668,13 +695,8 @@ button, input, textarea, select { font: inherit; }
     background: #fff;
 }
 
-.ad-slot:not(.has-ad)::before {
-    content: 'Advertisement slot';
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+.ad-slot:not(.has-ad) {
+    display: none;
 }
 
 /* ad-band remains visible so the slot placement is obvious */

@@ -10,8 +10,6 @@ import json
 import re
 import requests
 
-from .models import Advertisement
-
 NEWS_REMOTE_ORIGIN = getattr(settings, 'API_BASE_URL', 'https://news-portal-hvgs.onrender.com').rstrip('/')
 if NEWS_REMOTE_ORIGIN.endswith('/api'):
     NEWS_REMOTE_ORIGIN = NEWS_REMOTE_ORIGIN[:-4]
@@ -154,23 +152,10 @@ def _proxy_remote_request(request, path):
     return django_response
 
 
-def _local_ads_payload(request):
-    ads = Advertisement.objects.filter(is_active=True).order_by('-created_at')
-    results = [ad.to_api_dict() for ad in ads]
-    return {
-        'count': len(results),
-        'results': results,
-        'next': None,
-        'previous': None,
-    }
-
 @csrf_exempt
 def ads_api(request):
     if request.method == 'GET':
-        try:
-            return JsonResponse(_local_ads_payload(request))
-        except Exception:
-            return _proxy_remote_request(request, 'api/ads/')
+        return _proxy_remote_request(request, 'api/ads/')
 
     if request.method == 'POST':
         return _proxy_remote_request(request, 'api/ads/')
@@ -251,6 +236,11 @@ def portal_reporter_articles(request):
 @csrf_exempt
 def portal_articles_trending(request):
     return api_proxy(request, 'api/articles/trending/')
+
+
+@csrf_exempt
+def portal_articles_categories(request):
+    return api_proxy(request, 'api/articles/categories/')
 
 
 @csrf_exempt
@@ -377,6 +367,30 @@ def _decode_jwt_payload(token):
         return {}
 
 
+def _normalize_role_name(role):
+    if isinstance(role, dict):
+        return str(role.get('role_name') or role.get('name') or role.get('title') or '').strip().lower()
+    if isinstance(role, str):
+        return role.strip().lower()
+    return ''
+
+
+def _resolve_next_path_for_user(user):
+    role_name = _normalize_role_name(user.get('role'))
+
+    if bool(user.get('is_superuser')) or role_name in {'admin', 'super_admin', 'superadmin'}:
+        return reverse('frontend:users')
+
+    if bool(user.get('is_staff')) or role_name == 'staff':
+        return _staff_articles_path()
+
+    return reverse('frontend:profile')
+
+
+def _staff_articles_path():
+    return reverse('frontend:staff_articles')
+
+
 @csrf_exempt
 def auth_login(request):
     """Forward authentication requests directly to the remote API."""
@@ -399,10 +413,36 @@ def auth_login(request):
         return JsonResponse({'detail': str(error)}, status=502)
 
     try:
-        return JsonResponse(resp.json(), status=resp.status_code)
+        payload = resp.json()
     except Exception:
         content_type = resp.headers.get('Content-Type', 'application/octet-stream')
         return HttpResponse(resp.content, status=resp.status_code, content_type=content_type)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({'detail': 'Unexpected authentication response'}, status=resp.status_code)
+
+    access_token = payload.get('access') or ''
+    if access_token:
+        try:
+            user_resp = requests.get(
+                _join_remote_path(NEWS_API_BASE, 'users/me/'),
+                headers={
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {access_token}',
+                },
+                timeout=15,
+            )
+            if user_resp.status_code < 400:
+                user_payload = user_resp.json() or {}
+                role_name = _normalize_role_name(user_payload.get('role'))
+                if role_name:
+                    payload['role'] = role_name
+                payload['user'] = user_payload
+                payload['next'] = _resolve_next_path_for_user(user_payload)
+        except requests.RequestException:
+            pass
+
+    return JsonResponse(payload, status=resp.status_code)
 
 
 @csrf_exempt
@@ -436,14 +476,13 @@ def require_remote_login(view_func):
     return _wrapped
 
 def dashboard(request):
-    """Staff dashboard overview page."""
-    context = {}
-    return render(request, 'staff/pages/dashboard.html', context)
+    """Redirect the old staff dashboard overview to the articles page."""
+    return redirect(_staff_articles_path())
 
 
 def staff_dashboard(request):
-    """Staff dashboard view (alias for /staff/)."""
-    return dashboard(request)
+    """Redirect the old /staff/ landing page to the articles page."""
+    return redirect(_staff_articles_path())
 
 
 @csrf_exempt
@@ -532,3 +571,4 @@ def staff_advertisements(request):
 def staff_profile(request):
     context = {}
     return render(request, 'staff/pages/profile.html', context)
+ 

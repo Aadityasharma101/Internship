@@ -1,5 +1,7 @@
 (function (window) {
-    const DEFAULT_API_ORIGIN = 'https://news-portal-hvgs.onrender.com';
+    // Default to the remote API base including the `/api` prefix so calls
+    // to paths like 'articles/' resolve to 'https://news-portal-hvgs.onrender.com/api/articles/'.
+    const DEFAULT_API_ORIGIN = 'https://news-portal-hvgs.onrender.com/api';
 
     function getApiOrigin(path = '') {
         const rawPath = String(path || '').trim();
@@ -12,6 +14,20 @@
         const configuredBase = window.NEWS_PORTAL_API_BASE || bodyBase || DEFAULT_API_ORIGIN;
         const localOrigin = window.location?.origin || '';
 
+        // If a specific API base is configured via global `NEWS_PORTAL_API_BASE`
+        // or `data-api-base` on the body element, prefer that over the page origin.
+        if (window.NEWS_PORTAL_API_BASE || bodyBase) {
+            let base = String(configuredBase).replace(/\/$/, '');
+            // If the caller is requesting API-style paths (e.g. 'articles/...'),
+            // ensure the base includes the '/api' prefix so the final URL
+            // becomes '{base}/api/articles/...' when the configured base omitted it.
+            if (/^(articles|api|remote|staff)\b/i.test(rawPath) && !/\/api(\/|$)/i.test(base)) {
+                base = base.replace(/\/$/, '') + '/api';
+            }
+            return base;
+        }
+
+        // Otherwise, fall back to local origin for absolute/relative paths when available.
         if (!rawPath || rawPath.startsWith('/') || rawPath.startsWith('articles/') || rawPath.startsWith('api/') || rawPath.startsWith('remote/') || rawPath.startsWith('staff/') || rawPath.startsWith('auth/')) {
             return localOrigin || String(configuredBase).replace(/\/$/, '');
         }
@@ -65,7 +81,17 @@
         }
 
         const cleanPath = rawPath.replace(/^\/+/, '');
-        return appendParams(`${getApiOrigin(rawPath)}/${cleanPath}`, params);
+        const origin = String(getApiOrigin(rawPath)).replace(/\/+$/, '');
+
+        // If callers pass short resource names (e.g. 'feed/', 'trending/', 'categories/')
+        // and the origin does not already include an 'articles' segment, assume
+        // these refer to the articles collection and prefix with 'articles/'.
+        let finalPath = cleanPath;
+        if (/^(feed|trending|categories|comments|reporter)\b/i.test(cleanPath) && !/\/articles(\/|$)/i.test(origin) && !/^articles\//i.test(cleanPath)) {
+            finalPath = `articles/${cleanPath}`;
+        }
+
+        return appendParams(`${origin}/${finalPath}`, params);
     }
 
     function isFormData(value) {
@@ -174,12 +200,25 @@
 
     async function parseResponse(response) {
         const contentType = response.headers.get('content-type') || '';
-
+        // Some APIs return an empty body with a JSON content-type (e.g. 201 Created with no payload).
+        // Attempt to parse JSON but fall back to text if parsing fails or body is empty.
         if (contentType.includes('application/json')) {
-            return response.json();
+            try {
+                return await response.json();
+            } catch (e) {
+                try {
+                    return await response.text();
+                } catch {
+                    return null;
+                }
+            }
         }
 
-        return response.text();
+        try {
+            return await response.text();
+        } catch {
+            return null;
+        }
     }
 
     async function getAuthToken() {
@@ -200,6 +239,8 @@
         const requestUrl = options.fresh === false ? url : withFreshParam(url);
 
         try {
+            // keep minimal logs; errors will be surfaced when thrown
+
             const response = await fetch(requestUrl, {
                 method: options.method || 'GET',
                 headers: {
@@ -239,7 +280,11 @@
         const auth = options.auth !== false;
         const headers = { ...(options.headers || {}) };
 
-        if (auth && !isLocalRoute(path) && window.api && typeof window.api.request === 'function') {
+        // When data is FormData, avoid using the axios `window.api` instance
+        // because the axios instance sets `Content-Type: application/json` by
+        // default which breaks multipart form uploads. Use fetch in that case
+        // so the browser can set the proper multipart boundary header.
+        if (auth && !isLocalRoute(path) && window.api && typeof window.api.request === 'function' && !isFormData(options.data)) {
             const response = await window.api.request({
                 method,
                 url,
@@ -248,6 +293,9 @@
                 params: options.params
             });
             return response.data;
+        }
+        if (isFormData(options.data)) {
+            console.debug('portal-api: sending FormData via fetch (skipping axios) ->', url);
         }
 
         const requestHeaders = { ...headers };

@@ -55,8 +55,15 @@ window.NewsPortalApi?.onDataChanged?.((event) => {
 // API BASE
 // ============================================================
 function getApiBase() {
-    const base = document.body?.dataset?.apiBase || DEFAULT_API_BASE;
-    return base.replace(/\/$/, '');
+    const configured = (typeof window !== 'undefined' && window.NEWS_PORTAL_API_BASE) ? String(window.NEWS_PORTAL_API_BASE) : null;
+    const bodyBase = document.body?.dataset?.apiBase || '';
+    let base = configured || bodyBase || DEFAULT_API_BASE;
+    base = base.replace(/\/+$/, '');
+    // Ensure the API base includes the '/api' segment
+    if (!/\/api(\/|$)/i.test(base)) {
+        base = base + '/api';
+    }
+    return base;
 }
 
 function buildApiUrl(endpoint) {
@@ -184,14 +191,27 @@ function initActiveNav() {
     });
 }
 
+function navigateToCategory(category) {
+    const url = new URL(window.location.origin);
+    url.pathname = '/';
+    if (category && category !== 'all') {
+        url.searchParams.set('category', category);
+    }
+    window.location.href = url.toString();
+}
+
 function renderCategoryChips(container, categories) {
     container.innerHTML = '';
     if (!categories.length) return;
 
-    categories.slice(0, 6).forEach((cat) => {
-        const chip = document.createElement('span');
+    categories.forEach((cat) => {
+        const label = cat.name || cat.title || cat.label || cat.slug || 'Category';
+        const value = encodeURIComponent(cat.slug || label);
+        const chip = document.createElement('a');
+        chip.href = `/?category=${value}`;
         chip.className = 'category-chip';
-        chip.textContent = cat.name || cat.title || cat.label || cat.slug || 'Category';
+        chip.textContent = label;
+        chip.setAttribute('data-category', value);
         container.appendChild(chip);
     });
 }
@@ -212,7 +232,9 @@ async function fetchAdvertisements() {
     const endpoint = getAdsEndpoint();
     if (!endpoint) return null;
     const url = buildApiUrl(endpoint);
-    return fetchJson(url, { timeoutMs: 8000 });
+    // Add cache buster to force fresh ads from server
+    const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + '_=' + Date.now();
+    return fetchJson(cacheBusterUrl, { timeoutMs: 8000 });
 }
 
 async function initAdvertisements() {
@@ -234,7 +256,7 @@ async function initAdvertisements() {
 
     adSlots.forEach((slot) => {
         const position = slot.dataset.adSlot;
-        const ad = adsByPosition[position];
+        const ad = adsByPosition[position] || getFallbackAdForSlot(position, adsByPosition, payload);
         if (ad) {
             renderAdSlot(slot, ad, position);
             rendered = true;
@@ -246,6 +268,31 @@ async function initAdvertisements() {
     }
 }
 
+function getFallbackAdForSlot(position, adsByPosition, payload) {
+    if (adsByPosition[position]) {
+        return adsByPosition[position];
+    }
+
+    if (position === 'between_articles') {
+        return adsByPosition.top_banner || adsByPosition.footer_banner || null;
+    }
+
+    if (position === 'sidebar') {
+        return adsByPosition.top_banner || adsByPosition.footer_banner || null;
+    }
+
+    if (position === 'footer_banner') {
+        return adsByPosition.footer_banner || adsByPosition.top_banner || null;
+    }
+
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        const remoteAd = payload[position] || payload.top_banner || payload.footer || payload.in_article || null;
+        return remoteAd ? normalizeAdvertisement(remoteAd) : null;
+    }
+
+    return null;
+}
+
 function normalizeAdsPayload(payload) {
     const positions = ['top_banner', 'sidebar', 'between_articles', 'in_article', 'footer_banner', 'footer', 'popup'];
     const grouped = Object.fromEntries(positions.map((p) => [p, null]));
@@ -253,8 +300,13 @@ function normalizeAdsPayload(payload) {
     if (!payload) return grouped;
 
     const objectPayload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
+    const list = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.results) ? payload.results : []);
+    const visibleAds = (list || []).filter((ad) => isVisibleAdvertisement(ad));
 
     if (objectPayload) {
+        const objectAds = [];
         positions.forEach((position) => {
             const slotValue = objectPayload[position];
             const candidate = Array.isArray(slotValue)
@@ -262,45 +314,36 @@ function normalizeAdsPayload(payload) {
                 : (isVisibleAdvertisement(slotValue) ? slotValue : null);
 
             if (candidate) {
-                grouped[position] = normalizeAdvertisement(candidate);
+                objectAds.push(candidate);
             }
         });
 
-        const fallbackCandidate = positions
-            .map((position) => objectPayload[position])
-            .find((entry) => isVisibleAdvertisement(entry));
-
-        if (!fallbackCandidate && objectPayload.results) {
-            const list = Array.isArray(objectPayload.results) ? objectPayload.results : [];
-            const visibleAd = list.find((entry) => isVisibleAdvertisement(entry));
-            if (visibleAd) {
-                grouped.top_banner = normalizeAdvertisement(visibleAd);
-                grouped.between_articles = normalizeAdvertisement(visibleAd);
-                grouped.footer_banner = normalizeAdvertisement(visibleAd);
-            }
+        if (objectAds.length) {
+            objectAds.forEach((ad) => {
+                const normalizedPosition = normalizeAdPosition(ad?.position || ad?.placement || ad?.slot);
+                if (normalizedPosition && grouped[normalizedPosition] === null) {
+                    grouped[normalizedPosition] = normalizeAdvertisement(ad);
+                }
+            });
         }
-
-        return grouped;
     }
-
-    const list = Array.isArray(payload) ? payload : (Array.isArray(payload.results) ? payload.results : []);
-    const visibleAds = (list || []).filter((ad) => isVisibleAdvertisement(ad));
-    const fallbackAd = visibleAds[0] || null;
 
     if (visibleAds.length) {
         visibleAds.forEach((ad) => {
-            const position = normalizeAdPosition(ad?.position);
+            const position = normalizeAdPosition(ad?.position || ad?.placement || ad?.slot);
             if (position && grouped[position] === null) {
                 grouped[position] = normalizeAdvertisement(ad);
             }
         });
+    }
 
-        positions.forEach((position) => {
-            if (grouped[position] === null && fallbackAd) {
-                grouped[position] = normalizeAdvertisement(fallbackAd);
-            }
-        });
-        return grouped;
+    if (!visibleAds.length && objectPayload?.results) {
+        const fallbackAd = (Array.isArray(objectPayload.results) ? objectPayload.results : []).find((entry) => isVisibleAdvertisement(entry));
+        if (fallbackAd) {
+            grouped.top_banner = normalizeAdvertisement(fallbackAd);
+            grouped.between_articles = normalizeAdvertisement(fallbackAd);
+            grouped.footer_banner = normalizeAdvertisement(fallbackAd);
+        }
     }
 
     return grouped;
@@ -354,16 +397,28 @@ function isVisibleAdvertisement(ad) {
 function normalizeAdPosition(value) {
     const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
 
-    if (raw === 'in_article') {
+    if (!raw) {
         return 'between_articles';
     }
 
-    if (raw === 'footer') {
-        return 'footer_banner';
-    }
+    const aliases = {
+        in_article: 'between_articles',
+        between_articles: 'between_articles',
+        inline: 'between_articles',
+        article_strip: 'between_articles',
+        article: 'between_articles',
+        footer: 'footer_banner',
+        footer_banner: 'footer_banner',
+        top_banner: 'top_banner',
+        top: 'top_banner',
+        sidebar: 'sidebar',
+        sidebar_box: 'sidebar',
+        side: 'sidebar',
+        popup: 'popup',
+    };
 
-    if (['top_banner', 'sidebar', 'between_articles', 'footer_banner', 'popup'].includes(raw)) {
-        return raw;
+    if (aliases[raw]) {
+        return aliases[raw];
     }
 
     if (raw.includes('top')) {
@@ -376,6 +431,10 @@ function normalizeAdPosition(value) {
 
     if (raw.includes('footer')) {
         return 'footer_banner';
+    }
+
+    if (raw.includes('article') || raw.includes('strip')) {
+        return 'between_articles';
     }
 
     return 'between_articles';

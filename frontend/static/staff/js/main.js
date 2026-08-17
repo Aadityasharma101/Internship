@@ -41,9 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    const logoutButton = document.getElementById('staffLogoutButton');
+    const logoutButtons = document.querySelectorAll('[data-staff-logout-button]');
 
-    function handleLogout(event) {
+    async function handleLogout(event) {
         if (event) {
             event.preventDefault();
         }
@@ -53,13 +53,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        try {
+            await fetch('/auth/logout/', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch {
+            // Ignore server-side logout errors and continue with client cleanup.
+        }
+
         window.NewsPortalSession?.clear();
-        window.location.href = '/login/';
+        window.location.replace('/');
     }
 
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
-    }
+    logoutButtons.forEach((button) => {
+        button.addEventListener('click', handleLogout);
+    });
 
     // Ensure staff 'Manage' links exist in the sidebar when the template doesn't include them
     function ensureManageLinks() {

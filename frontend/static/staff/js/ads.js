@@ -408,6 +408,20 @@
         }
     }
 
+    function openFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const editId = params.get('edit');
+
+        if (!editId) {
+            return;
+        }
+
+        const ad = state.ads.find((item) => String(item.id) === String(editId));
+        if (ad) {
+            openEditModal(ad);
+        }
+    }
+
     els.tbody.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-action]');
 
@@ -477,7 +491,10 @@
         }
     });
 
-    document.addEventListener('DOMContentLoaded', loadAds);
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadAds();
+        openFromQuery();
+    });
     window.addEventListener('pageshow', loadAds);
     Api.onDataChanged?.((event) => {
         if (event?.type === 'advertisements') {

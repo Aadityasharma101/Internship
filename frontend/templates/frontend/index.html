@@ -5,7 +5,7 @@
 {% block meta_description %}Stay informed with the latest breaking news, live updates, and in-depth analysis from around the world.{% endblock %}
 
 {% block content %}
-<div class="page-shell" data-api-base="{{ request.scheme }}://{{ request.get_host }}">
+<div class="page-shell" data-api-base="{{ API_BASE }}" data-media-base="{{ API_MEDIA_BASE }}">
 
     <section class="breaking-news-banner" aria-live="polite" aria-label="Breaking news">
         <div class="container breaking-news-inner">
@@ -35,16 +35,16 @@
             </div>
             <div class="hero-support">
                 <div class="hero-support-card">
-                    <span class="hero-preview-label">Why it feels different</span>
-                    <h3 class="hero-support-title">A modern newsroom layout, designed for focus and clarity.</h3>
-                    <p class="hero-support-copy">Every story is surfaced with strong hierarchy, generous spacing, and a calm editorial rhythm.</p>
+                    <span class="hero-preview-label">Breaking News First</span>
+                    <h3 class="hero-support-title">Stay ahead with real-time coverage.</h3>
+                    <p class="hero-support-copy">Get breaking news, in-depth analysis, and trending stories as they unfold. Our newsroom works around the clock to bring you the stories that matter.</p>
                 </div>
                 <div class="hero-support-card hero-support-card--secondary">
-                    <span class="hero-preview-label">What’s live now</span>
+                    <span class="hero-preview-label">Explore By Category</span>
                     <ul class="hero-preview-list">
-                        <li>Featured coverage front and center</li>
-                        <li>Trending headlines in a polished sidebar</li>
-                        <li>Category sections updated from the live feed</li>
+                        <li>National & International news</li>
+                        <li>Politics & Business updates</li>
+                        <li>Entertainment & Sports coverage</li>
                     </ul>
                 </div>
             </div>
@@ -81,6 +81,9 @@
                     <div id="trending-news-grid" class="top-stories-list loading-state">
                         <div class="loading-spinner" style="width:20px;height:20px;border-width:2px;"></div>
                     </div>
+                </div>
+                <div class="sidebar-widget sidebar-widget--compact">
+                    {% include 'frontend/components/advertisement_slot.html' with position='sidebar' class_name='ad-slot--sidebar' %}
                 </div>
                 <div class="sidebar-widget sidebar-widget--compact sidebar-widget--bg">
                     <span class="sidebar-preview-label">Editorial note</span>

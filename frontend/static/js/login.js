@@ -2,6 +2,22 @@ const LOGIN_API_URL = "/auth/login/";
 const LOGIN_SUCCESS_REDIRECT = "/";
 const REDIRECT_DELAY = 1500;
 
+async function redirectAuthenticatedUser() {
+    const accessToken = window.NewsPortalSession?.getStoredAccessToken?.();
+    if (!accessToken) {
+        return;
+    }
+
+    try {
+        const user = await window.NewsPortalSession?.fetchCurrentUser?.();
+        if (user) {
+            window.location.replace(LOGIN_SUCCESS_REDIRECT);
+        }
+    } catch {
+        window.NewsPortalSession?.clear?.();
+    }
+}
+
 const form = document.getElementById("loginForm");
 const submitBtn = document.getElementById("submitBtn");
 const formMessage = document.getElementById("formMessage");
@@ -91,6 +107,8 @@ function getBackendMessage(data) {
         })
         .join(" ") || "Login failed. Please try again.";
 }
+
+redirectAuthenticatedUser();
 
 if (form) {
     form.addEventListener("submit", async (event) => {

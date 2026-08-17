@@ -4,10 +4,24 @@
     const Utils = window.StaffUtils;
 
     const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
-    const articleApiBase = '/remote/api/articles';
+    // Prefer global `NEWS_PORTAL_API_BASE` if set, otherwise fall back to server-provided data-api-base
+    // or the known remote default. Ensure the base includes the '/api' segment.
+    let REMOTE_API_BASE = '';
+    if (typeof window !== 'undefined') {
+        REMOTE_API_BASE = (window.NEWS_PORTAL_API_BASE || window.document?.body?.dataset?.apiBase || 'https://news-portal-hvgs.onrender.com/api');
+        REMOTE_API_BASE = String(REMOTE_API_BASE).replace(/\/+$/, '');
+        if (!/\/api(\/|$)/i.test(REMOTE_API_BASE)) {
+            REMOTE_API_BASE = REMOTE_API_BASE + '/api';
+        }
+    }
+    const articleApiBase = `${REMOTE_API_BASE.replace(/\/+$/,'')}/articles`;
+    // Standard REST endpoints: list/feed, detail, create (POST to /articles/)
     const publicListEndpoints = [`${articleApiBase}/feed/`, `${articleApiBase}/`];
-    const reporterListEndpoints = [`${articleApiBase}/reporter/articles/`];
-    const createEndpoints = [`${articleApiBase}/create/`];
+    const reporterListEndpoints = [`${articleApiBase}/reporter/articles/`, `${articleApiBase}/`];
+    // Try the explicit 'create' action endpoint first (some API deployments
+    // require POST to '/articles/create/') and fall back to the collection
+    // root '/articles/' for compatibility.
+    const createEndpoints = [`${articleApiBase}/create/`, `${articleApiBase}/`];
     const statusActionMap = {
         submitted: 'submit',
         under_review: 'start-review',
@@ -326,7 +340,6 @@
     }
 
     function collectPayload(statusOverride = null) {
-        const formData = new FormData();
         const status = normalizeCreateStatus(
             statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'submitted'
         );
@@ -335,34 +348,53 @@
         const body = els.body.value.trim();
         const summary = els.description.value.trim() || body.slice(0, 500);
 
-        formData.append('title', els.title.value.trim());
-        formData.append('body', body);
-        formData.append('summary', summary);
+        // If an image file is attached, use FormData so binary upload is supported.
+        if (state.imageFile) {
+            const formData = new FormData();
+            formData.append('title', els.title.value.trim());
+            formData.append('body', body);
+            formData.append('summary', summary);
+
+            if (categoryValue) {
+                if (/^\d+$/.test(categoryValue)) {
+                    formData.append('category_id', String(Number(categoryValue)));
+                } else {
+                    formData.append('category_name', categoryValue);
+                }
+            }
+
+            formData.append('image', state.imageFile);
+
+            return { data: formData, desiredStatus: status, isForm: true };
+        }
+
+        // Otherwise send a plain object (JSON) — many APIs expect JSON for
+        // non-file requests and stricter validation may reject multipart.
+        const payload = {
+            title: els.title.value.trim(),
+            body,
+            summary
+        };
 
         if (categoryValue) {
             if (/^\d+$/.test(categoryValue)) {
-                formData.append('category_id', String(Number(categoryValue)));
+                payload.category_id = Number(categoryValue);
             } else {
-                formData.append('category_name', categoryValue);
+                payload.category_name = categoryValue;
             }
         }
 
-        if (state.imageFile) {
-            formData.append('image', state.imageFile);
-        } else if (state.imageCleared) {
-            formData.append('image', '');
+        if (state.imageCleared) {
+            payload.image = '';
         } else if (imageUrl) {
-            formData.append('image', imageUrl);
+            payload.image = imageUrl;
         }
 
-        return {
-            data: formData,
-            desiredStatus: status
-        };
+        return { data: payload, desiredStatus: status, isForm: false };
     }
 
     async function appendCurrentStaffAuthor(formData) {
-        if (!hasAuth || formData.has('author_name')) {
+        if (!hasAuth) {
             return;
         }
 
@@ -374,8 +406,17 @@
             ].filter(Boolean).join(' ').trim()
                 || Api.getValue(user, ['full_name', 'name', 'username', 'email'], '');
 
-            if (name) {
-                formData.append('author_name', name);
+            if (!name) return;
+
+            // Support both FormData and plain object payloads.
+            if (formData instanceof FormData || (typeof FormData !== 'undefined' && formData instanceof FormData)) {
+                if (!formData.has('author_name')) {
+                    formData.append('author_name', name);
+                }
+            } else if (typeof formData === 'object' && formData !== null) {
+                if (!formData.author_name) {
+                    formData.author_name = name;
+                }
             }
         } catch {}
     }
@@ -407,25 +448,85 @@
             return;
         }
 
+        // Log intent and key payload info for debugging in DevTools
+        // minimal logging: keep silent unless errors occur
+
         els.save.disabled = true;
         els.status.textContent = id ? 'Saving article...' : 'Creating article...';
 
         try {
             let savedArticle = null;
             if (id) {
-                savedArticle = await Api.request('PATCH', `${articleApiBase}/${id}/update/`, { data: payload.data, auth: true });
-                savedArticle = await applyArticleStatus(savedArticle || { id }, payload.desiredStatus);
+                savedArticle = await ArticleService.updateArticle(id, payload.data, { auth: true });
+                try {
+                    savedArticle = await applyArticleStatus(savedArticle || { id }, payload.desiredStatus);
+                } catch (statusError) {
+                    console.warn('Failed to apply desired status after update:', statusError);
+                    // keep savedArticle as returned from update; do not fail the whole flow
+                }
             } else {
                 await appendCurrentStaffAuthor(payload.data);
-                savedArticle = await Api.request('POST', createEndpoints[0], { data: payload.data, auth: true, timeoutMs: 30000 });
-                savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
+                // create attempt
+                    try {
+                        savedArticle = await Api.request('POST', createEndpoints[0], { data: payload.data, auth: true, timeoutMs: 30000 });
+                    } catch (createError) {
+                        console.warn('Staff: create failed', createError?.response || createError);
+                        // If the create failed due to validation (400) and we used FormData (image attached),
+                        // try creating without the image (JSON) and then upload the image via PATCH.
+                        if (createError?.response?.status === 400 && payload.isForm && state.imageFile) {
+                            try {
+                                // build JSON payload from FormData entries excluding image
+                                const jsonPayload = {};
+                                try {
+                                    for (const [k, v] of payload.data.entries()) {
+                                        if (k === 'image') continue;
+                                        // coerce single-value File/Blob references to strings where appropriate
+                                        jsonPayload[k] = (v instanceof File || (typeof Blob !== 'undefined' && v instanceof Blob)) ? '' : v;
+                                    }
+                                } catch (e) {
+                                    console.warn('Staff: failed to serialize FormData to JSON', e);
+                                }
+
+                                await appendCurrentStaffAuthor(jsonPayload);
+                                savedArticle = await Api.request('POST', createEndpoints[0], { data: jsonPayload, auth: true, timeoutMs: 30000 });
+
+                                // attempt to upload image via update
+                                try {
+                                    const imgForm = new FormData();
+                                    imgForm.append('image', state.imageFile);
+                                    await ArticleService.updateArticle(savedArticle?.id, imgForm, { auth: true });
+                                } catch (imgErr) {
+                                    console.warn('Staff: image upload after create failed', imgErr);
+                                }
+
+                            } catch (retryError) {
+                                console.error('Staff: retry create without image failed', retryError);
+                                throw createError;
+                            }
+                        } else {
+                            throw createError;
+                        }
+                    }
+                try {
+                    savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
+                } catch (statusError) {
+                    console.warn('Failed to apply desired status after create:', statusError);
+                    // creation succeeded; continue and show success to user
+                }
             }
 
+            // show a success toast so the user gets immediate feedback
+            if (id) {
+                showToast('Article updated successfully.', 'success');
+            } else {
+                showToast('Article created successfully.', 'success');
+            }
             closeModal();
             Api.notifyDataChanged?.('articles', { action: id ? 'update' : 'create', id: savedArticle?.id || id || null });
             await loadArticles(1);
         } catch (error) {
             console.error('Unable to save article:', error);
+            try { console.error('Staff save error response', error?.response || error); } catch (e) {}
             const apiDetail = error?.response?.data?.detail || error?.response?.data?.message || '';
             els.status.textContent = apiDetail || 'Unable to save article. Check required fields and permissions.';
         } finally {
@@ -439,7 +540,7 @@
         }
 
         try {
-            await Api.request('DELETE', `${articleApiBase}/${article.id}/delete/`, { auth: true });
+            await ArticleService.deleteArticle(article.id, { auth: true });
             Api.notifyDataChanged?.('articles', { action: 'delete', id: article.id });
             await loadArticles(1);
         } catch (error) {
@@ -658,6 +759,31 @@
         await loadArticles();
         openFromQuery();
     });
+
+    // Simple toast helper
+    function showToast(message, type = 'info', timeout = 3000) {
+        try {
+            const existing = document.getElementById('staff-toast-container') || (() => {
+                const el = document.createElement('div');
+                el.id = 'staff-toast-container';
+                el.className = 'staff-toast-container';
+                document.body.appendChild(el);
+                return el;
+            })();
+
+            const t = document.createElement('div');
+            t.className = `staff-toast staff-toast--${type}`;
+            t.textContent = message;
+            existing.appendChild(t);
+
+            window.setTimeout(() => {
+                t.classList.add('staff-toast--hide');
+                window.setTimeout(() => t.remove(), 350);
+            }, timeout);
+        } catch (e) {
+            console.warn('Toast failed', e);
+        }
+    }
 
     window.addEventListener('pageshow', () => loadArticles(state.page));
     Api.onDataChanged?.((event) => {

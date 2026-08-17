@@ -1,9 +1,10 @@
 (function (window) {
     const Api = window.NewsPortalApi;
-    const ARTICLE_API_BASE = '/remote/api/articles';
-    const LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/feed/`];
-    const AUTH_LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/reporter/articles/`, `${ARTICLE_API_BASE}/feed/`];
-    const CREATE_ENDPOINTS = [`${ARTICLE_API_BASE}/create/`];
+    const REMOTE_API_BASE = (window.document?.body?.dataset?.apiBase) || 'https://news-portal-hvgs.onrender.com/api';
+    const ARTICLE_API_BASE = `${String(REMOTE_API_BASE).replace(/\/+$/,'')}/articles`;
+    const LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/feed/`, `${ARTICLE_API_BASE}/`];
+    const AUTH_LIST_ENDPOINTS = [`${ARTICLE_API_BASE}/reporter/articles/`, `${ARTICLE_API_BASE}/feed/`, `${ARTICLE_API_BASE}/`];
+    const CREATE_ENDPOINTS = [`${ARTICLE_API_BASE}/`];
 
     function normalizeStatus(article) {
         const rawStatus = Api.getValue(article, ['status', 'state', 'publication_status'], '');
@@ -91,14 +92,41 @@
     }
 
     async function updateArticle(id, payload, options = {}) {
-        return Api.request('PATCH', `${ARTICLE_API_BASE}/${id}/update/`, {
-            ...options,
-            data: payload
+        const detailEndpoints = [
+            `${ARTICLE_API_BASE}/${id}/update/`,
+            `${ARTICLE_API_BASE}/${id}/`,
+            `/api/articles/${id}/update/`,
+            `/api/articles/${id}/`
+        ];
+
+        return Api.firstSuccessful(detailEndpoints, async (endpoint) => {
+            try {
+                return await Api.request('PATCH', endpoint, {
+                    ...options,
+                    data: payload
+                });
+            } catch (error) {
+                if (error?.response?.status === 405) {
+                    return Api.request('PUT', endpoint, {
+                        ...options,
+                        data: payload
+                    });
+                }
+
+                throw error;
+            }
         });
     }
 
     async function deleteArticle(id, options = {}) {
-        return Api.request('DELETE', `${ARTICLE_API_BASE}/${id}/delete/`, options);
+        const detailEndpoints = [
+            `${ARTICLE_API_BASE}/${id}/delete/`,
+            `${ARTICLE_API_BASE}/${id}/`,
+            `/api/articles/${id}/delete/`,
+            `/api/articles/${id}/`
+        ];
+
+        return Api.firstSuccessful(detailEndpoints, (endpoint) => Api.request('DELETE', endpoint, options));
     }
 
     async function publishArticle(id, options = {}) {

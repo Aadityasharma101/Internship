@@ -89,6 +89,15 @@ class PortalArticlesProxyTests(TestCase):
 
 
 class StaffArticleCreateTests(TestCase):
+    def test_staff_dashboard_redirects_to_articles_page(self):
+        response = self.client.get(reverse('frontend:staff'))
+
+        self.assertRedirects(
+            response,
+            reverse('frontend:staff_articles'),
+            fetch_redirect_response=False,
+        )
+
     @patch('frontend.views.requests.request')
     def test_staff_add_article_proxies_to_documented_create_api(self, mock_request):
         mock_request.return_value = MockApiResponse(201, {
@@ -231,7 +240,7 @@ class AuthLoginTests(TestCase):
 
     @patch('frontend.views.requests.get')
     @patch('frontend.views.requests.post')
-    def test_staff_login_redirects_to_staff_dashboard(self, mock_post, mock_get):
+    def test_staff_login_redirects_to_articles_page(self, mock_post, mock_get):
         access_token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDgwMDAsInJvbGUiOiJzdGFmZiJ9.signature'
         refresh_token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDgwMDAsInR5cGUiOiJyZWZyZXNoIn0.signature'
         mock_post.return_value = MockApiResponse(200, {
@@ -252,5 +261,5 @@ class AuthLoginTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload['next'], reverse('frontend:staff'))
+        self.assertEqual(payload['next'], reverse('frontend:staff_articles'))
         self.assertEqual(payload['role'], 'staff')

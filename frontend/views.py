@@ -244,6 +244,11 @@ def portal_articles_categories(request):
 
 
 @csrf_exempt
+def portal_my_bookmarks(request):
+    return api_proxy(request, 'api/articles/my-bookmarks/')
+
+
+@csrf_exempt
 def portal_articles_create(request):
     return api_proxy(request, 'api/articles/create/')
 
@@ -261,6 +266,16 @@ def portal_article_update(request, article_id):
 @csrf_exempt
 def portal_article_delete(request, article_id):
     return api_proxy(request, f'api/articles/{article_id}/delete/')
+
+
+@csrf_exempt
+def portal_article_reaction(request, article_id):
+    return api_proxy(request, f'api/articles/{article_id}/react/')
+
+
+@csrf_exempt
+def portal_article_reactions(request, article_id):
+    return api_proxy(request, f'api/articles/{article_id}/reactions/')
 
 
 @csrf_exempt
@@ -350,6 +365,65 @@ def _get_bearer_token(request):
     if len(parts) == 2 and parts[0].lower() == 'bearer':
         return parts[1]
     return ''
+
+
+@csrf_exempt
+def bookmark_status(request):
+    """Return totals for articles and the current user's saved state, if signed in."""
+    if request.method != 'GET':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    raw_ids = request.GET.getlist('article_id')
+    # With no article filters this is the authenticated admin list endpoint.
+    # It is intentionally delegated to the API service that owns Bookmark.
+    if not raw_ids:
+        return _proxy_remote_request(request, 'api/bookmarks/')
+
+    try:
+        article_ids = list(dict.fromkeys(int(article_id) for article_id in raw_ids if int(article_id) > 0))[:100]
+    except (TypeError, ValueError):
+        return JsonResponse({'detail': 'article_id must be a positive integer.'}, status=400)
+
+    token = _get_bearer_token(request)
+    result = {}
+    for article_id in article_ids:
+        # The article/detail API owns the authoritative total bookmark_count.
+        # This endpoint is only used to resolve the current user's state.
+        item = {'is_bookmarked': False}
+        if token:
+            try:
+                response = requests.get(
+                    _remote_url_for_path(f'api/articles/{article_id}/bookmarks/'),
+                    headers={'Accept': 'application/json', 'Authorization': f'Bearer {token}'},
+                    timeout=15,
+                )
+                if response.ok:
+                    remote = response.json()
+                    if isinstance(remote, dict):
+                        state_keys = ('is_bookmarked', 'bookmarked', 'is_saved', 'user_has_bookmarked')
+                        explicit_state = next((remote[key] for key in state_keys if key in remote), None)
+                        # The existing endpoint returns the bookmarked article
+                        # representation; a successful representation means
+                        # this user has a bookmark unless it explicitly says no.
+                        item['is_bookmarked'] = bool(remote) if explicit_state is None else bool(explicit_state)
+                    elif isinstance(remote, list):
+                        item['is_bookmarked'] = bool(remote)
+            except (requests.RequestException, ValueError, TypeError):
+                pass
+        result[str(article_id)] = item
+
+    return JsonResponse({'bookmarks': result})
+
+
+@csrf_exempt
+def toggle_bookmark(request, article_id):
+    """Proxy the remote bookmark toggle so Render admin sees the saved record."""
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+    if not _get_bearer_token(request):
+        return JsonResponse({'detail': 'Authentication required.'}, status=401)
+    return _proxy_remote_request(request, f'api/articles/{article_id}/bookmarks/')
 
 
 def _decode_jwt_payload(token):
@@ -544,8 +618,7 @@ def tags(request):
 
 
 def bookmarks(request):
-    context = {}
-    return render(request, 'admin/pages/bookmarks.html', context)
+    return render(request, 'frontend/pages/bookmarks.html')
 
 
 def comments(request):

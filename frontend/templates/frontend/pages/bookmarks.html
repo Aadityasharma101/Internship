@@ -1,0 +1,28 @@
+{% extends 'frontend/base.html' %}
+{% load static %}
+
+{% block title %}My Bookmarks | News Portal{% endblock %}
+{% block meta_description %}Articles saved by you for later reading.{% endblock %}
+
+{% block content %}
+<section class="saved-page">
+    <div class="container saved-shell">
+        <div class="saved-heading">
+            <div>
+                <p class="section-kicker">Your reading list</p>
+                <h1>My Bookmarks</h1>
+                <p>Articles you've saved for later.</p>
+            </div>
+            <span class="saved-total" id="savedTotal">0 saved</span>
+        </div>
+        <div id="savedMessage" class="saved-message" role="status" aria-live="polite"></div>
+        <div id="savedGrid" class="saved-grid" aria-live="polite">
+            <div class="saved-loading">Loading your saved articles...</div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/my-bookmarks.js' %}?v=2"></script>
+{% endblock %}

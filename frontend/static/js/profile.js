@@ -43,6 +43,7 @@
         setMessage('', '');
     }
 
+
     document.addEventListener('DOMContentLoaded', async () => {
         try {
             const user = await window.NewsPortalSession.fetchCurrentUser();

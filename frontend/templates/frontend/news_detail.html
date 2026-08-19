@@ -98,6 +98,10 @@
             <span style="margin-left:1rem;">Published: {{ article.published_at }}</span>
             {% endif %}
         </div>
+        <div class="article-actions" aria-label="Article actions">
+            <div id="article-reaction-control" class="article-reaction-control"></div>
+            <div id="article-bookmark-control" class="article-bookmark-control"></div>
+        </div>
         <div class="article-body" id="article-body">
             <p>Article content unavailable at the moment.</p>
         </div>
@@ -255,6 +259,14 @@
     document.addEventListener('DOMContentLoaded', function() {
         getArticleDetail();
         loadComments();
+        if (articleId && window.ArticleBookmarks) {
+            const bookmarkArticle = { id: articleId, title: articleData?.title || document.querySelector('.article-title')?.textContent || '', bookmark_count: articleData?.bookmark_count || articleData?.bookmarks_count || 0 };
+            document.getElementById('article-bookmark-control').innerHTML = window.ArticleBookmarks.renderButton(bookmarkArticle);
+            window.ArticleBookmarks.hydrate([bookmarkArticle]);
+            const reactionArticle = { id: articleId, user_has_reacted: articleData?.user_has_reacted, reactions_total: articleData?.reactions_total, reactions_breakdown: articleData?.reactions_breakdown };
+            document.getElementById('article-reaction-control').innerHTML = window.ArticleReactions?.renderControl?.(reactionArticle) || '';
+            window.ArticleReactions?.load?.([articleId]);
+        }
     });
 })();
 </script>

@@ -202,6 +202,13 @@ async function initializeHomepage(apiBase) {
         ]);
         console.log('✓ All article details loaded');
 
+        await window.ArticleBookmarks?.hydrate?.([
+            featuredArticle, ...latestArticles, ...trendingCards, ...editorialArticles, ...videoArticles,
+        ].filter(Boolean));
+        await window.ArticleReactions?.load?.([
+            featuredArticle, ...latestArticles, ...trendingCards, ...editorialArticles, ...videoArticles,
+        ].filter(Boolean).map((article) => article.id));
+
         // Step 3: Render everything at once (no delays)
         renderFeaturedHero(featuredHero, featuredArticle, selectedCategory);
         renderNewsGrid(latestGrid, latestArticles, selectedCategory);
@@ -551,6 +558,10 @@ function renderNewsGrid(container, articles, selectedCategory = 'all') {
                     </div>
                 </div>
             </a>
+            <div class="news-card__actions" aria-label="Article actions">
+                <div class="news-card__reaction">${window.ArticleReactions?.renderControl?.(a) || ''}</div>
+                <div class="news-card__bookmark">${window.ArticleBookmarks?.renderButton?.(a) || ''}</div>
+            </div>
         </article>
     `;}).join('');
 }

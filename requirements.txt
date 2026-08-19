@@ -1,0 +1,4 @@
+Django>=4.2,<7
+requests>=2.31,<3
+django-cors-headers>=4.3,<5
+gunicorn>=21.2,<24

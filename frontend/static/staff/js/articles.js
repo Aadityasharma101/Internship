@@ -22,6 +22,7 @@
     // require POST to '/articles/create/') and fall back to the collection
     // root '/articles/' for compatibility.
     const createEndpoints = [`${articleApiBase}/create/`, `${articleApiBase}/`];
+    const SUMMARY_MAX_LENGTH = 500;
     const statusActionMap = {
         submitted: 'submit',
         under_review: 'start-review',
@@ -162,6 +163,34 @@
         return Api.escapeHtml(value);
     }
 
+    function limitSummary(value) {
+        return String(value || '').trim().slice(0, SUMMARY_MAX_LENGTH);
+    }
+
+    function getSaveErrorMessage(error) {
+        const data = error?.response?.data;
+
+        if (!data) {
+            return error?.message || 'Unable to save article. Check required fields and permissions.';
+        }
+
+        if (typeof data === 'string') {
+            return data;
+        }
+
+        if (data.detail || data.message) {
+            const detail = data.detail || data.message;
+            return Array.isArray(detail) ? detail.join(' ') : detail;
+        }
+
+        return Object.entries(data)
+            .map(([field, value]) => {
+                const message = Array.isArray(value) ? value.join(' ') : String(value);
+                return `${field.replace(/_/g, ' ')}: ${message}`;
+            })
+            .join(' ') || 'Unable to save article. Check required fields and permissions.';
+    }
+
     function renderArticleImage(article) {
         const image = getArticleImage(article);
 
@@ -279,11 +308,13 @@
         els.title.value = '';
         els.category.value = '';
         els.articleStatus.value = defaultStatus;
+        els.articleStatus.disabled = true;
         els.image.value = '';
         els.description.value = '';
         els.body.value = '';
         els.featuredArticle.checked = false;
-        els.publishedCheckbox.checked = defaultStatus === 'published';
+        els.publishedCheckbox.checked = false;
+        els.publishedCheckbox.disabled = true;
         els.status.textContent = '';
         els.modalTitle.textContent = 'Create New Article';
         els.save.textContent = 'Create Article';
@@ -308,11 +339,13 @@
         els.title.value = getArticleTitle(record) === 'Untitled article' ? '' : getArticleTitle(record);
         els.category.value = Api.getValue(record, ['category.id', 'category.name', 'category.category_name', 'category', 'category_name'], '');
         els.articleStatus.value = normalizeStatus(record);
+        els.articleStatus.disabled = false;
         els.image.value = getArticleImage(record) || '';
         els.description.value = Api.getValue(record, ['description', 'summary', 'excerpt'], '');
         els.body.value = Api.getValue(record, ['body', 'content'], '');
         els.featuredArticle.checked = isFeatured(record);
         els.publishedCheckbox.checked = isPublished(record);
+        els.publishedCheckbox.disabled = false;
         els.status.textContent = '';
         els.modalTitle.textContent = 'Edit Article';
         els.save.textContent = 'Save Changes';
@@ -340,13 +373,15 @@
     }
 
     function collectPayload(statusOverride = null) {
+        const isCreate = !els.id.value;
         const status = normalizeCreateStatus(
-            statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'submitted'
+            isCreate ? 'draft' : (statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'draft')
         );
         const imageUrl = els.image.value.trim();
         const categoryValue = els.category.value.trim();
         const body = els.body.value.trim();
-        const summary = els.description.value.trim() || body.slice(0, 500);
+        const reviewNote = els.description.value.trim();
+        const summary = limitSummary(body);
 
         // If an image file is attached, use FormData so binary upload is supported.
         if (state.imageFile) {
@@ -354,10 +389,16 @@
             formData.append('title', els.title.value.trim());
             formData.append('body', body);
             formData.append('summary', summary);
+            formData.append('published', 'false');
+            formData.append('is_published', 'false');
+            if (reviewNote) {
+                formData.append('review_note', reviewNote);
+            }
 
             if (categoryValue) {
                 if (/^\d+$/.test(categoryValue)) {
                     formData.append('category_id', String(Number(categoryValue)));
+                    formData.append('category', String(Number(categoryValue)));
                 } else {
                     formData.append('category_name', categoryValue);
                 }
@@ -373,12 +414,18 @@
         const payload = {
             title: els.title.value.trim(),
             body,
-            summary
+            summary,
+            published: false,
+            is_published: false
         };
+        if (reviewNote) {
+            payload.review_note = reviewNote;
+        }
 
         if (categoryValue) {
             if (/^\d+$/.test(categoryValue)) {
                 payload.category_id = Number(categoryValue);
+                payload.category = Number(categoryValue);
             } else {
                 payload.category_name = categoryValue;
             }
@@ -391,6 +438,62 @@
         }
 
         return { data: payload, desiredStatus: status, isForm: false };
+    }
+
+    function localUrl(path) {
+        const cleanPath = String(path || '').replace(/^\/+/, '');
+        return `${window.location.origin}/${cleanPath}`;
+    }
+
+    async function getFreshStaffToken() {
+        if (window.NewsPortalSession?.getAccessToken) {
+            try {
+                return await window.NewsPortalSession.getAccessToken();
+            } catch {
+                return null;
+            }
+        }
+
+        return localStorage.getItem('access_token') || localStorage.getItem('accessToken');
+    }
+
+    async function parseStaffResponse(response) {
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            const error = new Error(`HTTP ${response.status}`);
+            error.response = { status: response.status, data };
+            throw error;
+        }
+
+        return data;
+    }
+
+    async function createStaffDraftArticle(payload) {
+        const token = await getFreshStaffToken();
+        if (!token) {
+            const error = new Error('Please sign in again before creating an article.');
+            error.response = { status: 401, data: { detail: error.message } };
+            throw error;
+        }
+
+        const headers = {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`
+        };
+        const isForm = payload instanceof FormData;
+
+        if (!isForm) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        const response = await fetch(localUrl('/staff/add_article/'), {
+            method: 'POST',
+            headers,
+            body: isForm ? payload : JSON.stringify(payload)
+        });
+
+        return parseStaffResponse(response);
     }
 
     async function appendCurrentStaffAuthor(formData) {
@@ -468,7 +571,7 @@
                 await appendCurrentStaffAuthor(payload.data);
                 // create attempt
                     try {
-                        savedArticle = await Api.request('POST', createEndpoints[0], { data: payload.data, auth: true, timeoutMs: 30000 });
+                        savedArticle = await createStaffDraftArticle(payload.data);
                     } catch (createError) {
                         console.warn('Staff: create failed', createError?.response || createError);
                         // If the create failed due to validation (400) and we used FormData (image attached),
@@ -488,7 +591,7 @@
                                 }
 
                                 await appendCurrentStaffAuthor(jsonPayload);
-                                savedArticle = await Api.request('POST', createEndpoints[0], { data: jsonPayload, auth: true, timeoutMs: 30000 });
+                                savedArticle = await createStaffDraftArticle(jsonPayload);
 
                                 // attempt to upload image via update
                                 try {
@@ -508,7 +611,9 @@
                         }
                     }
                 try {
-                    savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
+                    if (payload.desiredStatus !== 'draft') {
+                        savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
+                    }
                 } catch (statusError) {
                     console.warn('Failed to apply desired status after create:', statusError);
                     // creation succeeded; continue and show success to user
@@ -527,8 +632,7 @@
         } catch (error) {
             console.error('Unable to save article:', error);
             try { console.error('Staff save error response', error?.response || error); } catch (e) {}
-            const apiDetail = error?.response?.data?.detail || error?.response?.data?.message || '';
-            els.status.textContent = apiDetail || 'Unable to save article. Check required fields and permissions.';
+            els.status.textContent = getSaveErrorMessage(error);
         } finally {
             els.save.disabled = false;
         }

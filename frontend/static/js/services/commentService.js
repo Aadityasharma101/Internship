@@ -5,21 +5,48 @@
         'https://news-portal-hvgs.onrender.com/api/articles/comments/'
     ];
 
+    function normalizeUserValue(value) {
+        if (!value) {
+            return {
+                name: '',
+                email: ''
+            };
+        }
+
+        if (typeof value === 'object') {
+            return {
+                name: Api.getValue(value, ['name', 'username', 'full_name', 'email'], ''),
+                email: Api.getValue(value, ['email'], '')
+            };
+        }
+
+        const label = String(value).trim();
+        return {
+            name: label,
+            email: label.includes('@') ? label : ''
+        };
+    }
+
     function normalizeComment(comment) {
-        const status = String(Api.getValue(comment, ['status', 'state'], Api.getValue(comment, ['is_approved'], false) ? 'approved' : 'pending')).toLowerCase();
+        const userValue = normalizeUserValue(Api.getValue(comment, ['user', 'author'], ''));
+        const statusValue = Api.getValue(comment, ['status', 'state'], '');
+        const approvalValue = Api.getValue(comment, ['is_approved', 'approved'], null);
+        const status = statusValue
+            ? String(statusValue).toLowerCase()
+            : (approvalValue === false ? 'pending' : (approvalValue === true ? 'approved' : 'visible'));
 
         return {
             ...comment,
             status,
             text: Api.getValue(comment, ['text', 'body', 'content', 'comment'], ''),
-            author_name: Api.getValue(comment, ['author_name', 'user_name', 'user.username', 'author.username', 'email'], 'Anonymous'),
-            author_email: Api.getValue(comment, ['user.email', 'author.email', 'email'], ''),
+            author_name: Api.getValue(comment, ['author_name', 'user_name', 'user.username', 'author.username', 'email'], userValue.name || 'Anonymous'),
+            author_email: Api.getValue(comment, ['user.email', 'author.email', 'email'], userValue.email),
             article_id: Api.getValue(comment, ['article.id', 'article_id'], ''),
             article_title: Api.getValue(comment, ['article.title', 'article_title'], 'Untitled article'),
             article_author_id: Api.getValue(comment, ['article.author.id', 'article.user.id', 'article.created_by.id'], ''),
             article_author_username: Api.getValue(comment, ['article.author.username', 'article.user.username', 'article.created_by.username'], ''),
             article_author_email: Api.getValue(comment, ['article.author.email', 'article.user.email', 'article.created_by.email'], ''),
-            is_approved: status === 'approved'
+            is_approved: status === 'approved' || status === 'visible'
         };
     }
 

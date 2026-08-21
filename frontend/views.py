@@ -17,6 +17,7 @@ import re
 import requests
 
 NEWS_API_BASE = "https://news-portal-hvgs.onrender.com/api"
+ARTICLE_SUMMARY_MAX_LENGTH = 500
 HOP_BY_HOP_HEADERS = {
     "connection",
     "keep-alive",
@@ -485,26 +486,38 @@ def news_detail(request, article_id):
             "body": article_body_text,
             "description": article.get("description", ""),
             "title": article.get("title", ""),
+            "reactions_total": article.get("reactions_total", 0),
+            "reactions_breakdown": article.get("reactions_breakdown", {}),
+            "user_has_reacted": article.get("user_has_reacted"),
         })
         article_json_raw = article_json_raw.replace("</script>", "<\\/script>")
     except Exception:
         pass
 
-    comments_raw = article.get("comments", "")
+    comments_raw = article.get("comments", [])
     comments = []
     if comments_raw:
-        try:
-            if comments_raw.strip().startswith("["):
-                parsed = json.loads(comments_raw)
-            else:
-                parsed = list(json.loads(comments_raw).values())
-        except Exception:
+        if isinstance(comments_raw, list):
+            parsed = comments_raw
+        elif isinstance(comments_raw, dict):
+            parsed = list(comments_raw.values())
+        elif isinstance(comments_raw, str):
+            try:
+                loaded = json.loads(comments_raw)
+                parsed = loaded if isinstance(loaded, list) else list(loaded.values())
+            except Exception:
+                parsed = []
+        else:
             parsed = []
 
         for c in parsed:
             if isinstance(c, dict):
-                author = c.get('author_name', c.get('user_name', 'Anonymous'))
-                text = c.get('text', c.get('body', c.get('content', '')))
+                raw_author = c.get('author_name') or c.get('user_name') or c.get('user') or c.get('author') or 'Anonymous'
+                if isinstance(raw_author, dict):
+                    author = raw_author.get('name') or raw_author.get('username') or raw_author.get('email') or 'Anonymous'
+                else:
+                    author = raw_author
+                text = c.get('text') or c.get('body') or c.get('content') or c.get('comment') or ''
                 created = c.get('created_at', '')
                 profile_pic = c.get('profile_pic', c.get('avatar_url', ''))
                 name_parts = str(author).strip().split()
@@ -556,7 +569,7 @@ def login(request):
 
 
 def _get_bearer_token(request):
-    authorization = request.headers.get('Authorization', '')
+    authorization = request.headers.get('Authorization', '') or request.META.get('HTTP_AUTHORIZATION', '')
     parts = authorization.split()
     if len(parts) == 2 and parts[0].lower() == 'bearer':
         return parts[1]
@@ -614,7 +627,7 @@ def login_redirect_for_user(user):
     if is_admin_user(user):
         return reverse('frontend:users')
     if is_staff_portal_user(user):
-        return reverse('frontend:staff')
+        return reverse('frontend:staff_articles')
     return reverse('frontend:index')
 
 
@@ -779,14 +792,13 @@ def require_remote_login(view_func):
     return _wrapped
 
 def dashboard(request):
-    """Staff dashboard overview page."""
-    context = {}
-    return render(request, 'staff/pages/dashboard.html', context)
+    """Legacy staff dashboard route; staff now lands on Articles."""
+    return redirect(reverse('frontend:staff_articles'))
 
 
 def staff_dashboard(request):
-    """Staff dashboard view (alias for /staff/)."""
-    return dashboard(request)
+    """Legacy staff landing route; staff now lands on Articles."""
+    return redirect(reverse('frontend:staff_articles'))
 
 
 @csrf_exempt
@@ -801,57 +813,71 @@ def staff_add_article(request):
         return JsonResponse({'detail': 'Authentication required'}, status=401)
 
     try:
-        # prefer JSON
         data = json.loads(request.body.decode()) if request.body else request.POST.dict()
     except Exception:
         data = request.POST.dict()
 
-    payload = {
-        'title': data.get('title', ''),
-        'body': data.get('body', ''),
-        'description': data.get('description', ''),
-    }
+    def build_staff_draft_payload(source):
+        title = str(source.get('title') or '').strip()
+        body = str(source.get('body') or source.get('content') or '').strip()
+        summary = str(source.get('summary') or body).strip()[:ARTICLE_SUMMARY_MAX_LENGTH]
+        payload = {
+            'title': title,
+            'body': body,
+            'summary': summary,
+        }
 
-    # Use the remote API's create endpoint for article creation
-    url = f"{NEWS_API_BASE}/articles/create/"
+        for key in (
+            'category_id',
+            'category_name',
+            'tags',
+            'image',
+            'author_name',
+            'slug',
+            'review_note',
+        ):
+            value = source.get(key)
+            if value not in (None, ''):
+                payload[key] = value
+
+        return payload
+
+    payload = build_staff_draft_payload(data)
+    if not payload['title']:
+        return JsonResponse({'title': ['Title is required.']}, status=400)
 
     if requests is None:
         return JsonResponse({'detail': 'requests library not installed on server. Install it in your virtualenv (pip install requests).'}, status=500)
 
-
     try:
         headers = {'Accept': 'application/json', 'Authorization': f'Bearer {token}'}
+        create_urls = [
+            f"{NEWS_API_BASE}/articles/create/",
+            f"{NEWS_API_BASE}/articles/",
+        ]
 
         # If the client sent multipart/form-data (file upload), forward as multipart
         content_type = request.META.get('CONTENT_TYPE', '')
         if content_type.startswith('multipart/'):
             files = {}
-            data_fields = {}
-
-            # request.POST contains form fields
-            for k, v in request.POST.items():
-                data_fields[k] = v
+            data_fields = build_staff_draft_payload(request.POST)
 
             # request.FILES contains uploaded files
             for k, f in request.FILES.items():
                 # requests accepts file tuples: (filename, fileobj, content_type)
                 files[k] = (f.name, f.read(), f.content_type)
 
-            resp = requests.post(url, data=data_fields, files=files, headers=headers, timeout=30)
+            resp = None
+            for url in create_urls:
+                resp = requests.post(url, data=data_fields, files=files, headers=headers, timeout=30)
+                if resp.status_code not in (404, 405):
+                    break
         else:
-            # include any optional fields from JSON/form data
-            for key in ('category', 'tags', 'status', 'image', 'featured', 'published'):
-                if key in data:
-                    if key in ('featured', 'published'):
-                        val = data.get(key)
-                        if isinstance(val, str):
-                            payload[key] = val.lower() in ('1', 'true', 'yes', 'on')
-                        else:
-                            payload[key] = bool(val)
-                    else:
-                        payload[key] = data[key]
-
-            resp = requests.post(url, json=payload, headers=headers, timeout=30)
+            resp = None
+            for url in create_urls:
+                resp = requests.post(url, json=payload, headers=headers, timeout=30)
+                if resp.status_code not in (404, 405):
+                    break
     except requests.RequestException as e:
         return JsonResponse({'detail': str(e)}, status=502)
 
@@ -943,3 +969,88 @@ def staff_advertisements(request):
 def staff_profile(request):
     context = {}
     return render(request, 'staff/pages/profile.html', context)
+
+
+# Portal API proxy views - forward requests to remote API
+@csrf_exempt
+def portal_token_obtain(request):
+    """Proxy for JWT token obtain endpoint"""
+    return api_proxy(request, 'api/token/')
+
+
+@csrf_exempt
+def portal_token_refresh(request):
+    """Proxy for JWT token refresh endpoint"""
+    return api_proxy(request, 'api/token/refresh/')
+
+
+@csrf_exempt
+def portal_articles_proxy(request):
+    """Proxy for portal articles endpoint"""
+    return api_proxy(request, 'portal/articles/')
+
+
+@csrf_exempt
+def portal_articles_create_proxy(request):
+    """Proxy for portal articles create endpoint"""
+    return api_proxy(request, 'portal/articles/create/')
+
+
+@csrf_exempt
+def portal_articles_feed(request):
+    """Proxy for articles feed endpoint"""
+    return api_proxy(request, 'articles/feed/')
+
+
+@csrf_exempt
+def portal_articles_trending(request):
+    """Proxy for articles trending endpoint"""
+    return api_proxy(request, 'articles/trending/')
+
+
+@csrf_exempt
+def portal_articles_categories(request):
+    """Proxy for articles categories endpoint"""
+    return api_proxy(request, 'articles/categories/')
+
+
+@csrf_exempt
+def portal_reporter_articles(request):
+    """Proxy for reporter articles endpoint"""
+    return api_proxy(request, 'articles/reporter/articles/')
+
+
+@csrf_exempt
+def portal_articles_create(request):
+    """Proxy for articles create endpoint"""
+    return api_proxy(request, 'articles/create/')
+
+
+@csrf_exempt
+def portal_article_detail(request, article_id):
+    """Proxy for article detail endpoint"""
+    return api_proxy(request, f'articles/{article_id}/')
+
+
+@csrf_exempt
+def portal_article_update(request, article_id):
+    """Proxy for article update endpoint"""
+    return api_proxy(request, f'articles/{article_id}/update/')
+
+
+@csrf_exempt
+def portal_article_delete(request, article_id):
+    """Proxy for article delete endpoint"""
+    return api_proxy(request, f'articles/{article_id}/delete/')
+
+
+@csrf_exempt
+def portal_ads_proxy(request):
+    """Proxy for ads list endpoint"""
+    return api_proxy(request, 'portal/ads/')
+
+
+@csrf_exempt
+def portal_ads_detail_proxy(request, ad_id):
+    """Proxy for ads detail endpoint"""
+    return api_proxy(request, f'portal/ads/{ad_id}/')

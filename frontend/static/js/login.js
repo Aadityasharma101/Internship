@@ -1,6 +1,6 @@
 const LOGIN_API_URL = "/auth/login/";
 const LOGIN_SUCCESS_REDIRECT = "/";
-const REDIRECT_DELAY = 1500;
+const REDIRECT_DELAY = 500;
 
 async function redirectAuthenticatedUser() {
     const accessToken = window.NewsPortalSession?.getStoredAccessToken?.();
@@ -11,7 +11,7 @@ async function redirectAuthenticatedUser() {
     try {
         const user = await window.NewsPortalSession?.fetchCurrentUser?.();
         if (user) {
-            window.location.replace(LOGIN_SUCCESS_REDIRECT);
+            window.location.replace(window.NewsPortalSession?.getDashboardPath?.(user) || LOGIN_SUCCESS_REDIRECT);
         }
     } catch {
         window.NewsPortalSession?.clear?.();

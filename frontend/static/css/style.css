@@ -1295,12 +1295,28 @@ button, input, textarea, select { font: inherit; }
     color: var(--ink);
 }
 
+.news-card__title {
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .editorial-card__summary,
 .category-card__summary,
 .news-card__summary {
     font-size: 0.95rem;
     line-height: 1.7;
     color: var(--muted);
+}
+
+.news-card__summary {
+    display: -webkit-box;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .category-pill {
@@ -1318,7 +1334,7 @@ button, input, textarea, select { font: inherit; }
 }
 
 .news-card {
-    min-height: 100%;
+    height: auto;
 }
 
 .news-card__body {

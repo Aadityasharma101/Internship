@@ -2,12 +2,56 @@
 {% load static %}
 
 {% block title %}Comments - Staff Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
+{% endblock %}
+
 {% block breadcrumb %}Comments{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Comments</h2>
-    <p class="text-muted">Moderate and review recent comments from users.</p>
+    <div>
+        <h2>Comments</h2>
+        <p class="text-muted">See user comments with the article they were posted on.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshCommentsBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+        <a class="btn-secondary-outline" href="{% url 'frontend:staff_articles' %}">
+            <i class="fa-solid fa-newspaper"></i>
+            Articles
+        </a>
+    </div>
+</div>
+
+<div class="articles-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total comments</span>
+        <strong id="totalComments">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Visible</span>
+        <strong id="approvedComments">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Pending</span>
+        <strong id="pendingComments">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Rejected</span>
+        <strong id="rejectedComments">0</strong>
+    </div>
+</div>
+
+<div class="articles-toolbar">
+    <div class="articles-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="commentSearchInput" placeholder="Search comments by article, user, text, or status">
+    </div>
+    <span class="toolbar-count" id="visibleCommentsCount">0 comments shown</span>
 </div>
 
 <div class="table-wrapper">
@@ -15,14 +59,17 @@
         <thead>
             <tr>
                 <th>Comment</th>
-                <th>Author</th>
                 <th>Article</th>
+                <th>User</th>
+                <th>Status</th>
                 <th>Posted</th>
-                <th>Actions</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody id="commentsTableBody">
-            <tr class="loading-row"><td colspan="5">No comments found.</td></tr>
+            <tr class="loading-row">
+                <td colspan="6">Loading comments...</td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -30,7 +77,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Placeholder: load comments via API when ready.
-</script>
+<script src="{% static 'staff/js/comments.js' %}?v=2"></script>
 {% endblock %}

@@ -2,11 +2,16 @@
     const Api = window.NewsPortalApi;
     const CommentService = window.NewsPortalCommentService;
     const Utils = window.StaffUtils;
+    const TABLE_COLSPAN = 6;
+
+    if (!Api || !CommentService || !Utils) {
+        return;
+    }
 
     const state = {
-        user: null,
         comments: []
     };
+
     const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
 
     const els = {
@@ -20,88 +25,150 @@
         rejected: document.getElementById('rejectedComments')
     };
 
+    function isVisible(comment) {
+        const status = String(comment.status || '').toLowerCase();
+        return comment.is_approved || status === 'approved' || status === 'visible';
+    }
+
+    function isRejected(comment) {
+        return String(comment.status || '').toLowerCase() === 'rejected';
+    }
+
     function statusClass(status) {
-        if (status === 'approved') {
+        const key = String(status || '').toLowerCase();
+
+        if (key === 'approved' || key === 'visible') {
             return 'pill-green';
         }
 
-        if (status === 'rejected') {
+        if (key === 'rejected') {
             return 'pill-red';
         }
 
         return 'pill-orange';
     }
 
+    function setText(element, value) {
+        if (element) {
+            element.textContent = String(value);
+        }
+    }
+
     function renderSummary(items) {
-        els.total.textContent = items.length;
-        els.approved.textContent = items.filter((comment) => comment.is_approved || comment.status === 'approved').length;
-        els.pending.textContent = items.filter((comment) => !comment.is_approved && comment.status !== 'rejected').length;
-        els.rejected.textContent = items.filter((comment) => comment.status === 'rejected').length;
+        const visible = items.filter(isVisible).length;
+        const rejected = items.filter(isRejected).length;
+        const pending = items.length - visible - rejected;
+
+        setText(els.total, items.length);
+        setText(els.approved, visible);
+        setText(els.pending, Math.max(0, pending));
+        setText(els.rejected, rejected);
+    }
+
+    function articleLink(comment) {
+        const articleId = Api.getValue(comment, ['article_id', 'article.id'], '');
+
+        if (!articleId) {
+            return '';
+        }
+
+        return `/news/${encodeURIComponent(articleId)}/`;
+    }
+
+    function renderArticleCell(comment) {
+        const href = articleLink(comment);
+        const title = comment.article_title || 'Untitled article';
+        const articleId = Api.getValue(comment, ['article_id', 'article.id'], '');
+
+        if (!href) {
+            return `
+                <div class="primary-cell">
+                    <strong>${Api.escapeHtml(title)}</strong>
+                    <span>No article link available</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="primary-cell">
+                <strong><a href="${Api.escapeHtml(href)}">${Api.escapeHtml(title)}</a></strong>
+                <span>Article #${Api.escapeHtml(articleId)}</span>
+            </div>
+        `;
+    }
+
+    function renderAction(comment) {
+        const href = articleLink(comment);
+
+        if (!href) {
+            return '<span class="article-meta-muted">No link</span>';
+        }
+
+        return `
+            <div class="row-actions">
+                <a href="${Api.escapeHtml(href)}" title="View article and comments" aria-label="View article and comments">
+                    <i class="fa-regular fa-eye"></i>
+                </a>
+            </div>
+        `;
     }
 
     function renderComments() {
-        const query = els.search.value.trim().toLowerCase();
-        const filtered = state.comments.filter((comment) => [
-            comment.author_name,
-            comment.article_title,
-            comment.text,
-            comment.status
-        ].join(' ').toLowerCase().includes(query));
-
-        els.visible.textContent = `${filtered.length} comment${filtered.length === 1 ? '' : 's'} shown`;
-
-        if (!filtered.length) {
-            Utils.setTableMessage(els.tbody, 6, query ? 'No comments match your search.' : 'No comments found.');
+        if (!els.tbody) {
             return;
         }
 
-        els.tbody.innerHTML = filtered.map((comment) => `
-            <tr>
-                <td>
-                    <div class="primary-cell">
-                        <strong>${Api.escapeHtml(comment.author_name || 'Anonymous')}</strong>
-                        <span>${Api.escapeHtml(comment.author_email || 'No email provided')}</span>
-                    </div>
-                </td>
-                <td>${Api.escapeHtml(comment.article_title || 'Untitled article')}</td>
-                <td>
-                    <div class="primary-cell">
-                        <strong>${Api.escapeHtml(comment.text || 'No comment text')}</strong>
-                    </div>
-                </td>
-                <td><span class="pill ${statusClass(comment.status)}">${Api.escapeHtml(comment.status || 'pending')}</span></td>
-                <td class="article-meta-muted">${Api.escapeHtml(Api.formatDate(comment.created_at || comment.updated_at))}</td>
-                <td>
-                    <div class="row-actions">
-                        <button type="button" data-action="approve" data-id="${Api.escapeHtml(comment.id)}" title="Approve comment" aria-label="Approve comment">
-                            <i class="fa-solid fa-check"></i>
-                        </button>
-                        <button type="button" data-action="reject" data-id="${Api.escapeHtml(comment.id)}" title="Reject comment" aria-label="Reject comment">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                        <button class="danger-action" type="button" data-action="delete" data-id="${Api.escapeHtml(comment.id)}" title="Delete comment" aria-label="Delete comment">
-                            <i class="fa-regular fa-trash-can"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        const query = (els.search?.value || '').trim().toLowerCase();
+        const filtered = state.comments.filter((comment) => [
+            comment.author_name,
+            comment.author_email,
+            comment.article_title,
+            comment.text,
+            comment.status,
+            comment.article_id
+        ].join(' ').toLowerCase().includes(query));
+
+        setText(els.visible, `${filtered.length} comment${filtered.length === 1 ? '' : 's'} shown`);
+
+        if (!filtered.length) {
+            Utils.setTableMessage(els.tbody, TABLE_COLSPAN, query ? 'No comments match your search.' : 'No comments found.');
+            return;
+        }
+
+        els.tbody.innerHTML = filtered.map((comment) => {
+            const status = comment.status || 'visible';
+
+            return `
+                <tr>
+                    <td>
+                        <div class="primary-cell">
+                            <strong>${Api.escapeHtml(comment.text || 'No comment text')}</strong>
+                            <span>${Api.escapeHtml(comment.replies?.length ? `${comment.replies.length} replies` : 'User comment')}</span>
+                        </div>
+                    </td>
+                    <td>${renderArticleCell(comment)}</td>
+                    <td>
+                        <div class="primary-cell">
+                            <strong>${Api.escapeHtml(comment.author_name || 'Anonymous')}</strong>
+                            <span>${Api.escapeHtml(comment.author_email || 'No email provided')}</span>
+                        </div>
+                    </td>
+                    <td><span class="pill ${statusClass(status)}">${Api.escapeHtml(status)}</span></td>
+                    <td class="article-meta-muted">${Api.escapeHtml(Api.formatDate(comment.created_at || comment.updated_at))}</td>
+                    <td>${renderAction(comment)}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     async function loadComments() {
-        Utils.setTableMessage(els.tbody, 6, 'Loading comments...');
+        if (!els.tbody) {
+            return;
+        }
+
+        Utils.setTableMessage(els.tbody, TABLE_COLSPAN, 'Loading comments...');
 
         try {
-            if (hasAuth) {
-                try {
-                    state.user = await window.NewsPortalSession.fetchCurrentUser();
-                } catch {
-                    state.user = null;
-                }
-            } else {
-                state.user = null;
-            }
-
             const requestOptions = hasAuth ? {
                 params: {
                     ordering: '-id'
@@ -127,74 +194,16 @@
             renderComments();
         } catch (error) {
             console.error('Unable to load comments:', error);
-            Utils.setTableMessage(els.tbody, 6, 'Unable to load comments. Please check the API token or try again.');
             state.comments = [];
             renderSummary([]);
+            Utils.setTableMessage(els.tbody, TABLE_COLSPAN, 'Unable to load comments right now.');
         }
     }
 
-    async function moderateComment(comment, status) {
-        try {
-            if (status === 'approved') {
-                await CommentService.approveComment(comment.id);
-            } else if (status === 'rejected') {
-                await CommentService.rejectComment(comment.id);
-            }
-
-            Api.notifyDataChanged?.('comments', { action: status, id: comment.id });
-            await loadComments();
-        } catch (error) {
-            console.error('Unable to moderate comment:', error);
-            window.alert('Unable to update this comment right now.');
-        }
-    }
-
-    async function deleteComment(comment) {
-        if (!window.confirm('Delete this comment? This cannot be undone.')) {
-            return;
-        }
-
-        try {
-            await CommentService.deleteComment(comment.id);
-            Api.notifyDataChanged?.('comments', { action: 'delete', id: comment.id });
-            await loadComments();
-        } catch (error) {
-            console.error('Unable to delete comment:', error);
-            window.alert('Unable to delete this comment right now.');
-        }
-    }
-
-    els.tbody.addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-action]');
-
-        if (!button) {
-            return;
-        }
-
-        const comment = state.comments.find((item) => String(item.id) === String(button.dataset.id));
-
-        if (!comment) {
-            return;
-        }
-
-        if (button.dataset.action === 'approve') {
-            moderateComment(comment, 'approved');
-        }
-
-        if (button.dataset.action === 'reject') {
-            moderateComment(comment, 'rejected');
-        }
-
-        if (button.dataset.action === 'delete') {
-            deleteComment(comment);
-        }
-    });
-
-    els.refresh.addEventListener('click', loadComments);
-    els.search.addEventListener('input', renderComments);
+    els.refresh?.addEventListener('click', loadComments);
+    els.search?.addEventListener('input', renderComments);
 
     document.addEventListener('DOMContentLoaded', loadComments);
-    window.addEventListener('pageshow', loadComments);
     Api.onDataChanged?.((event) => {
         if (event?.type === 'comments' || event?.type === 'articles') {
             loadComments();

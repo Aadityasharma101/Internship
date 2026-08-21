@@ -93,7 +93,7 @@
     <button id="nextArticleBtn" type="button">Next</button>
 </div>
 
-<div id="articleModal" class="modal hidden" data-default-status="submitted">
+<div id="articleModal" class="modal hidden" data-default-status="draft">
     <div class="modal-content article-modal">
         <h3 id="articleModalTitle">Create New Article</h3>
         <input type="hidden" id="articleId">
@@ -137,8 +137,8 @@
             </div>
 
             <div class="form-group full-width">
-                <label for="articleDescription">Description</label>
-                <textarea id="articleDescription" placeholder="Short summary"></textarea>
+                <label for="articleDescription">Review note</label>
+                <textarea id="articleDescription" placeholder="Optional note for reviewers"></textarea>
             </div>
 
             <div class="form-group full-width">
@@ -174,5 +174,5 @@
 
 {% block extra_js %}
 <script>window.API_BASE = "{{ API_BASE }}";</script>
-<script src="{% static 'staff/js/articles.js' %}?v=7"></script>
+<script src="{% static 'staff/js/articles.js' %}?v=9"></script>
 {% endblock %}

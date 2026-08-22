@@ -29,8 +29,8 @@
             title: Api.getValue(article, ['title', 'headline', 'name'], 'Untitled article'),
             subtitle: Api.getValue(article, ['subtitle', 'sub_title', 'summary'], ''),
             category_label: Api.getValue(article, ['category.name', 'category.title', 'category_name', 'category'], 'Uncategorized'),
-            thumbnail_url: Api.resolveMediaUrl(Api.getValue(article, ['thumbnail', 'thumbnail_url', 'image', 'image_url'], '')),
-            featured_image_url: Api.resolveMediaUrl(Api.getValue(article, ['featured_image', 'featured_image_url', 'cover_image'], '')),
+            thumbnail_url: Api.resolveMediaUrl(Api.getValue(article, ['thumbnail_url', 'image_url', 'thumbnail.url', 'image.url', 'thumbnail', 'image'], '')),
+            featured_image_url: Api.resolveMediaUrl(Api.getValue(article, ['featured_image_url', 'cover_image_url', 'featured_image.url', 'cover_image.url', 'featured_image', 'cover_image'], '')),
             content: Api.getValue(article, ['content', 'body', 'description'], ''),
             tags: Api.getValue(article, ['tags', 'tag_list'], []),
             publish_date: Api.getValue(article, ['publish_date', 'published_at', 'published_on'], ''),
@@ -93,29 +93,29 @@
 
     async function updateArticle(id, payload, options = {}) {
         const detailEndpoints = [
-            `${ARTICLE_API_BASE}/${id}/update/`,
-            `${ARTICLE_API_BASE}/${id}/`,
             `/api/articles/${id}/update/`,
-            `/api/articles/${id}/`
+            `${ARTICLE_API_BASE}/${id}/update/`
         ];
 
-        return Api.firstSuccessful(detailEndpoints, async (endpoint) => {
+        let lastError = null;
+
+        for (const endpoint of detailEndpoints) {
             try {
                 return await Api.request('PATCH', endpoint, {
                     ...options,
                     data: payload
                 });
             } catch (error) {
-                if (error?.response?.status === 405) {
-                    return Api.request('PUT', endpoint, {
-                        ...options,
-                        data: payload
-                    });
-                }
+                lastError = error;
+                const status = error?.response?.status;
 
-                throw error;
+                if (status && status !== 404 && status !== 405) {
+                    throw error;
+                }
             }
-        });
+        }
+
+        throw lastError || new Error('Unable to update article');
     }
 
     async function deleteArticle(id, options = {}) {

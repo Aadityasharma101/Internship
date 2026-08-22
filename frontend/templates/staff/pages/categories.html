@@ -2,28 +2,73 @@
 {% load static %}
 
 {% block title %}Categories - Staff Panel{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'admin/css/categories.css' %}">
+{% endblock %}
+
 {% block breadcrumb %}Categories{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Categories</h2>
-    <p class="text-muted">Manage content categories.</p>
+    <div>
+        <h2>Categories</h2>
+        <p class="text-muted">View all categories and the articles linked to each one.</p>
+    </div>
+
+    <div class="page-actions">
+        <button class="btn-secondary-outline" id="refreshCategoriesBtn" type="button">
+            <i class="fa-solid fa-rotate-right"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<div class="categories-summary">
+    <div class="summary-card">
+        <span class="summary-label">Total categories</span>
+        <strong id="totalCategories">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Total articles</span>
+        <strong id="totalCategoryArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Linked articles</span>
+        <strong id="linkedArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">Empty categories</span>
+        <strong id="emptyCategories">0</strong>
+    </div>
+</div>
+
+<div class="categories-toolbar">
+    <div class="categories-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="categorySearchInput" placeholder="Search categories by name, slug, or article count">
+    </div>
+    <span class="toolbar-count" id="visibleCategoriesCount">0 categories shown</span>
 </div>
 
 <div class="table-wrapper">
-    <table class="articles-table">
+    <table class="categories-table">
         <thead>
             <tr>
                 <th>Category</th>
                 <th>Slug</th>
                 <th>Articles</th>
-                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="categoriesTableBody">
-            <tr class="loading-row"><td colspan="4">No categories found.</td></tr>
+            <tr class="loading-row">
+                <td colspan="3">Loading categories...</td>
+            </tr>
         </tbody>
     </table>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'staff/js/categories.js' %}?v=2"></script>
 {% endblock %}

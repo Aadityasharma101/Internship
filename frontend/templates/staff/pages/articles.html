@@ -1,21 +1,28 @@
 {% extends 'staff/components/base.html' %}
 {% load static %}
 
-{% block title %}Articles - Staff Panel{% endblock %}
+{% block title %}{% if article_page_mode == 'mine' %}My Articles{% else %}Articles{% endif %} - Staff Panel{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'admin/css/articles.css' %}">
 <link rel="stylesheet" href="{% static 'admin/css/resources.css' %}">
 <link rel="stylesheet" href="{% static 'staff/css/articles.css' %}">
 {% endblock %}
 
-{% block breadcrumb %}Articles{% endblock %}
+{% block breadcrumb %}{% if article_page_mode == 'mine' %}My Articles{% else %}Articles{% endif %}{% endblock %}
 
 {% block content %}
 
+<div id="staffArticlesPage" data-mode="{{ article_page_mode|default:'all' }}">
 <div class="page-header">
     <div>
-        <h2>Articles</h2>
-        <p class="text-muted">Review published stories, drafts, categories, authors, and recent updates.</p>
+        <h2>{% if article_page_mode == 'mine' %}My Articles{% else %}Articles{% endif %}</h2>
+        <p class="text-muted">
+            {% if article_page_mode == 'mine' %}
+                Review articles posted from your staff account.
+            {% else %}
+                Review every article from the remote database.
+            {% endif %}
+        </p>
     </div>
 
     <div class="page-actions">
@@ -23,10 +30,17 @@
             <i class="fa-solid fa-rotate-right"></i>
             Refresh
         </button>
-        <a class="btn-secondary-outline" href="{% url 'frontend:staff_profile' %}">
-            <i class="fa-solid fa-user"></i>
-            Profile
+        {% if article_page_mode == 'mine' %}
+        <a class="btn-secondary-outline" href="{% url 'frontend:staff_articles' %}">
+            <i class="fa-solid fa-newspaper"></i>
+            All Articles
         </a>
+        {% else %}
+        <a class="btn-secondary-outline" href="{% url 'frontend:staff_my_articles' %}">
+            <i class="fa-solid fa-file-pen"></i>
+            My Articles
+        </a>
+        {% endif %}
         <a class="btn-secondary-outline" href="{% url 'frontend:staff_advertisements' %}">
             <i class="fa-solid fa-bullhorn"></i>
             Advertisements
@@ -42,6 +56,10 @@
     <div class="summary-card">
         <span class="summary-label">Total articles</span>
         <strong id="totalArticles">0</strong>
+    </div>
+    <div class="summary-card">
+        <span class="summary-label">My articles</span>
+        <strong id="myArticles">0</strong>
     </div>
     <div class="summary-card">
         <span class="summary-label">Published</span>
@@ -91,6 +109,7 @@
     <button id="prevArticleBtn" type="button">Previous</button>
     <span id="articlePageInfo">Page 1</span>
     <button id="nextArticleBtn" type="button">Next</button>
+</div>
 </div>
 
 <div id="articleModal" class="modal hidden" data-default-status="submitted">
@@ -174,5 +193,5 @@
 
 {% block extra_js %}
 <script>window.API_BASE = "{{ API_BASE }}";</script>
-<script src="{% static 'staff/js/articles.js' %}?v=7"></script>
+<script src="{% static 'staff/js/articles.js' %}?v=19"></script>
 {% endblock %}

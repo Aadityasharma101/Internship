@@ -175,7 +175,7 @@ async function initializeHomepage(apiBase) {
         }
 
         const sourceArticles = selectedCategory === 'all' ? (feedArticles.length ? feedArticles : trendingArticles) : filteredFeed;
-        const latestArticles   = take(sourceArticles, 9).map(mergeArticleData);
+        const latestArticles   = sourceArticles.map(mergeArticleData);
         const editorialArticles = take(selectedCategory === 'all' ? feedArticles.slice(1) : filteredFeed.slice(1), 6).map(mergeArticleData);
         
         // Ensure featured article always has a valid source
@@ -417,10 +417,10 @@ function resolveMediaUrl(url) {
 
 function getSummary(article) {
     if (!article) return '';
-    if (article.summary) return article.summary;
+    if (article.summary) return truncate(article.summary, 150);
     const src = article.body || article.description || '';
     if (!src) return 'Read the full story for more details.';
-    return truncate(src, 160);
+    return truncate(src, 150);
 }
 
 function truncate(text, limit) {
@@ -544,7 +544,7 @@ function renderNewsGrid(container, articles, selectedCategory = 'all') {
                         <span>${escapeHtml(a.displayDate || 'Recently')}</span>
                     </div>
                     <h4 class="news-card__title">${escapeHtml(a.title)}</h4>
-                    <p class="news-card__summary">${escapeHtml(a.summary || a.description || '')}</p>
+                    <p class="news-card__summary">${escapeHtml(truncate(a.summary || a.description || '', 150))}</p>
                     <div class="news-card__footer">
                         <span>${escapeHtml(a.authorLabel || 'News Desk')}</span>
                         <span>Read more →</span>
@@ -720,18 +720,23 @@ function navigateToCategory(categoryKey) {
 // ============================================================
 async function hydrateArticleImagesPrioritized(apiBase, sections) {
     try {
-        // Collect all articles from all sections
+        // Collect every article instance by ID so duplicate cards in different
+        // homepage sections receive the same hydrated image/detail payload.
         const articleMap = new Map();
         sections.forEach(({ articles }) => {
             if (!Array.isArray(articles)) return;
             articles.forEach((a) => {
-                if (a?.id && !articleMap.has(a.id)) {
-                    articleMap.set(a.id, a);
+                if (!a?.id) return;
+                if (!articleMap.has(a.id)) {
+                    articleMap.set(a.id, []);
                 }
+                articleMap.get(a.id).push(a);
             });
         });
 
-        const needingImages = [...articleMap.values()].filter((a) => a.needsImageHydration || !a.imageUrl);
+        const needingImages = [...articleMap.values()]
+            .filter((group) => group.some((a) => a.needsImageHydration || !a.imageUrl))
+            .map((group) => group[0]);
         console.log(`� Pre-loading article details...`);
         console.log(`   Total articles: ${articleMap.size}`);
         console.log(`   Need image hydration: ${needingImages.length}`);
@@ -760,15 +765,17 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
 
             // Update all articles with fetched details
             let updated = 0;
-            articleMap.forEach((article) => {
-                const detail = detailMap.get(article.id);
+            articleMap.forEach((group, articleId) => {
+                const detail = detailMap.get(articleId);
                 if (detail) {
-                    const merged = mergeArticleData(article, detail);
-                    Object.assign(article, merged);
-                    updated++;
+                    group.forEach((article) => {
+                        const merged = mergeArticleData(article, detail);
+                        Object.assign(article, merged);
+                        updated++;
+                    });
                 }
             });
-            console.log(`   Updated ${updated} articles with detail data`);
+            console.log(`   Updated ${updated} article instances with detail data`);
         } else {
             console.warn('⚠️ No article details fetched');
         }

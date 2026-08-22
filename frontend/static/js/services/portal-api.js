@@ -5,6 +5,7 @@
 
     function getApiOrigin(path = '') {
         const rawPath = String(path || '').trim();
+        const cleanRawPath = rawPath.replace(/^\/+/, '');
 
         if (/^https?:\/\//i.test(rawPath)) {
             return rawPath.replace(/\/$/, '');
@@ -21,7 +22,7 @@
             // If the caller is requesting API-style paths (e.g. 'articles/...'),
             // ensure the base includes the '/api' prefix so the final URL
             // becomes '{base}/api/articles/...' when the configured base omitted it.
-            if (/^(articles|api|remote|staff)\b/i.test(rawPath) && !/\/api(\/|$)/i.test(base)) {
+            if (/^(articles|api|remote|staff)\b/i.test(cleanRawPath) && !/\/api(\/|$)/i.test(base)) {
                 base = base.replace(/\/$/, '') + '/api';
             }
             return base;

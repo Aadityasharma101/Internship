@@ -230,7 +230,7 @@ def portal_articles_feed(request):
 
 @csrf_exempt
 def portal_reporter_articles(request):
-    return api_proxy(request, 'articles/reporter/articles/')
+    return api_proxy(request, 'api/articles/reporter/articles/')
 
 
 @csrf_exempt
@@ -508,7 +508,13 @@ def articles(request):
 
 def staff_articles(request):
     """Staff-facing articles page using the admin UI but served under staff templates."""
-    context = {}
+    context = {'article_page_mode': 'all'}
+    return render(request, 'staff/pages/articles.html', context)
+
+
+def staff_my_articles(request):
+    """Staff-facing page scoped to articles posted by the logged-in staff user."""
+    context = {'article_page_mode': 'mine'}
     return render(request, 'staff/pages/articles.html', context)
 
 
@@ -569,6 +575,5 @@ def staff_advertisements(request):
 
 
 def staff_profile(request):
-    context = {}
-    return render(request, 'staff/pages/profile.html', context)
+    return redirect(_staff_articles_path())
  

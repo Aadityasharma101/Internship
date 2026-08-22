@@ -87,6 +87,35 @@ body {
     font-weight: 700;
 }
 
+.sidebar-brand--staff-logo {
+    min-height: 74px;
+    padding: 14px 18px 12px;
+}
+
+.staff-brand-link {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    text-decoration: none;
+}
+
+.staff-brand-image {
+    display: block;
+    width: min(132px, 100%);
+    height: 42px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.staff-brand-label {
+    color: var(--accent-orange);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1;
+}
+
 /* Menu */
 .sidebar-menu {
     flex: 1;

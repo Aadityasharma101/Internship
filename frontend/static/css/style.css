@@ -1295,12 +1295,30 @@ button, input, textarea, select { font: inherit; }
     color: var(--ink);
 }
 
+.news-card__title {
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.05rem * 1.4 * 2);
+}
+
 .editorial-card__summary,
 .category-card__summary,
 .news-card__summary {
     font-size: 0.95rem;
     line-height: 1.7;
     color: var(--muted);
+}
+
+.news-card__summary {
+    display: -webkit-box;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(0.95rem * 1.7 * 3);
 }
 
 .category-pill {
@@ -1318,13 +1336,20 @@ button, input, textarea, select { font: inherit; }
 }
 
 .news-card {
-    min-height: 100%;
+    height: 100%;
+}
+
+.news-card > a {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .news-card__body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex: 1;
 }
 
 .news-card__footer {

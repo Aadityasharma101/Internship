@@ -59,40 +59,11 @@
     </section>
 
     <section class="profile-panel">
-        <h3 class="profile-panel-title">Edit Profile</h3>
-        <div class="form-grid">
-            <div class="form-group full-width">
-                <label for="profileInputName">Display Name</label>
-                <input type="text" id="profileInputName" placeholder="Enter your display name">
-            </div>
-            <div class="form-group full-width">
-                <label for="profileInputUsername">Username</label>
-                <input type="text" id="profileInputUsername" placeholder="Enter your username">
-            </div>
-            <div class="form-group full-width">
-                <label for="profileInputEmail">Email</label>
-                <input type="email" id="profileInputEmail" placeholder="Enter your email address">
-            </div>
-            <div class="form-group full-width">
-                <label for="profileInputImage">Profile Image</label>
-                <input type="file" id="profileInputImage" accept="image/*">
-                <div class="image-preview">
-                    <img id="profilePreviewImg" src="" alt="Preview" style="display:none; max-width:120px; max-height:120px; margin-top:8px; object-fit:cover; border-radius:6px;">
-                </div>
-            </div>
-        </div>
-
-        <p class="modal-status" id="profileFormStatus"></p>
-        <div class="modal-actions">
-            <button class="btn-primary" id="saveProfileBtn" type="button">Save Profile</button>
-        </div>
-
+        <h3 class="profile-panel-title">Activity</h3>
         <div class="profile-actions">
-            <a href="{% url 'frontend:staff_dashboard' %}" class="profile-action">Dashboard</a>
             <a href="{% url 'frontend:staff_articles' %}" class="profile-action">Articles</a>
             <a href="{% url 'frontend:staff_advertisements' %}" class="profile-action">Advertisements</a>
             <a href="{% url 'frontend:staff_comments' %}" class="profile-action">Comments</a>
-            <a href="/profile/" class="profile-action">Public profile</a>
         </div>
 
         <div class="profile-stats">
@@ -114,5 +85,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'staff/js/profile.js' %}?v=1"></script>
+<script src="{% static 'staff/js/profile.js' %}?v=2"></script>
 {% endblock %}

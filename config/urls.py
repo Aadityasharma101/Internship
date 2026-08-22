@@ -19,9 +19,11 @@ from django.urls import path, include
 from frontend import views as frontend_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic.base import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('favicon.ico', RedirectView.as_view(url=f'{settings.STATIC_URL}images/logo.png', permanent=True)),
     # Ensure direct access to staff add_article endpoint (avoid 404 from malformed includes)
     path('staff/add_article/', frontend_views.staff_add_article),
     path('', include('frontend.urls', namespace='frontend')),

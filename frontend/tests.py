@@ -98,6 +98,13 @@ class StaffArticleCreateTests(TestCase):
             fetch_redirect_response=False,
         )
 
+    def test_staff_my_articles_page_uses_staff_article_mode(self):
+        response = self.client.get(reverse('frontend:staff_my_articles'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-mode="mine"')
+        self.assertContains(response, 'My Articles')
+
     @patch('frontend.views.requests.request')
     def test_staff_add_article_proxies_to_documented_create_api(self, mock_request):
         mock_request.return_value = MockApiResponse(201, {
@@ -161,6 +168,52 @@ class StaffArticleCreateTests(TestCase):
         self.assertEqual(response.json()['status'], 'published')
         self.assertEqual(mock_request.call_args.args[0], 'POST')
         self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/45/publish/')
+
+    @patch('frontend.views.requests.request')
+    def test_staff_can_patch_article_update_through_proxy(self, mock_request):
+        mock_request.return_value = MockApiResponse(200, {
+            'id': 45,
+            'title': 'Updated draft',
+            'status': 'draft',
+        })
+
+        response = self.client.patch(
+            reverse('frontend:api_portal_article_update', args=[45]),
+            json.dumps({'title': 'Updated draft', 'body': 'Updated body'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION='Bearer staff-token',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['title'], 'Updated draft')
+        self.assertEqual(mock_request.call_args.args[0], 'PATCH')
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/45/update/')
+        kwargs = mock_request.call_args.kwargs
+        self.assertEqual(kwargs['headers']['Authorization'], 'Bearer staff-token')
+        self.assertEqual(json.loads(kwargs['data'].decode()), {
+            'title': 'Updated draft',
+            'body': 'Updated body',
+        })
+
+    @patch('frontend.views.requests.request')
+    def test_staff_reporter_articles_proxy_uses_api_path(self, mock_request):
+        mock_request.return_value = MockApiResponse(200, {
+            'count': 1,
+            'results': [{'id': 45, 'title': 'Draft story', 'status': 'draft'}],
+            'next': None,
+            'previous': None,
+        })
+
+        response = self.client.get(
+            reverse('frontend:api_portal_reporter_articles'),
+            HTTP_AUTHORIZATION='Bearer staff-token',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['count'], 1)
+        self.assertEqual(mock_request.call_args.args[0], 'GET')
+        self.assertEqual(mock_request.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/reporter/articles/')
+        self.assertEqual(mock_request.call_args.kwargs['headers']['Authorization'], 'Bearer staff-token')
 
 
 class ArticleApiViewTests(TestCase):

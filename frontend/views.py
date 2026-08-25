@@ -259,6 +259,21 @@ def portal_article_detail(request, article_id):
 
 
 @csrf_exempt
+def portal_article_comments(request, article_id):
+    return api_proxy(request, f'api/articles/{article_id}/comments/')
+
+
+@csrf_exempt
+def portal_article_comment(request, article_id):
+    return api_proxy(request, f'api/articles/{article_id}/comment/')
+
+
+@csrf_exempt
+def portal_comment_detail(request, comment_id):
+    return api_proxy(request, f'api/articles/comments/{comment_id}/')
+
+
+@csrf_exempt
 def portal_article_update(request, article_id):
     return api_proxy(request, f'api/articles/{article_id}/update/')
 

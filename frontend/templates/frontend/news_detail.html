@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}{{ article.title|default:"News Detail" }} - News Portal{% endblock %}
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/comment.css' %}">
+<link rel="stylesheet" href="{% static 'css/comment.css' %}?v=2">
 <style>
 .detail-container {
     max-width: 800px;
@@ -69,6 +69,60 @@
 .comment-form-card button:hover {
     background: #34495e;
 }
+/* Scoped menu styles ensure the comment action popover is not affected by
+   general button rules elsewhere on the page. */
+#comments-list .comment-menu {
+    position: relative;
+    display: inline-block;
+    align-self: flex-start;
+    flex: 0 0 auto;
+}
+#comments-list .comment-menu-popover {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 50;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+    margin-top: 6px;
+    padding: 6px;
+    border: 0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .1);
+}
+#comments-list .comment-menu-popover:not([hidden]) { display: flex; }
+#comments-list .comment-menu-popover .comment-menu-item {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #333333;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+}
+#comments-list .comment-menu-popover .comment-menu-item:hover,
+#comments-list .comment-menu-popover .comment-menu-item:focus-visible {
+    background: #f3f4f6;
+    outline: none;
+}
+#comments-list .comment-menu-popover .comment-menu-item--delete {
+    color: #e53e3e;
+}
+#comments-list .comment-menu-popover .comment-menu-item--delete:hover,
+#comments-list .comment-menu-popover .comment-menu-item--delete:focus-visible {
+    background: #fff1f1;
+}
 @media (max-width: 768px) {
     .article-full {
         padding: 1rem;
@@ -134,7 +188,7 @@
 </div>
 {% endblock %}
 {% block extra_js %}
-<script src="{% static 'js/comments.js' %}?v=2"></script>
+<script src="{% static 'js/comments.js' %}?v=8"></script>
 <script>
 (function() {
     const articleId = {{ article.id|default:0 }};
@@ -151,7 +205,9 @@
         }
     }
 
-    const API_BASE = document.body?.dataset?.apiBase || '/api';
+    // Use the local proxy so the browser always talks to this site.  The proxy
+    // forwards requests, including the user's JWT, to the shared API backend.
+    const articleApiPath = `/api/articles/${articleId}`;
 
     function normalizeCommentsPayload(data) {
         if (Array.isArray(data)) {
@@ -183,13 +239,19 @@
     }
 
     async function loadComments() {
-        fetch(`${API_BASE}/api/articles/${articleId}/`)
-            .then(res => res.json())
+        return fetch(`${articleApiPath}/comments/`)
+            .then(res => {
+                if (!res.ok) throw new Error('Could not load comments.');
+                return res.json();
+            })
             .then(data => {
                 renderComments(normalizeCommentsPayload(data), 'comments-list');
             })
             .catch(() => {
-                renderComments([], 'comments-list');
+                // Older API deployments expose comments only in article detail.
+                return fetch(`${articleApiPath}/`)
+                    .then(res => res.ok ? res.json() : Promise.reject())
+                    .then(data => renderComments(normalizeCommentsPayload(data), 'comments-list'));
             });
     }
 
@@ -225,7 +287,9 @@
         }
 
         try {
-            const response = await fetch(`${API_BASE}/api/articles/${articleId}/comment/`, {
+            const button = document.getElementById('post-comment-btn');
+            button.disabled = true;
+            const response = await fetch(`${articleApiPath}/comment/`, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -248,17 +312,173 @@
             }
 
             textarea.value = '';
-            loadComments();
+            await loadComments();
         } catch (err) {
             console.error('Failed to post comment:', err);
             alert(err.message || 'Could not post comment.');
+        } finally {
+            document.getElementById('post-comment-btn').disabled = false;
+        }
+    }
+
+    async function getCommentToken() {
+        const token = await window.NewsPortalSession?.getAccessToken?.();
+        if (!token) {
+            alert('Please sign in before changing a comment.');
+            window.location.href = '/login/';
+            return null;
+        }
+        return token;
+    }
+
+    window.enableInlineEdit = function(commentId) {
+        const comment = getRenderedComment(commentId);
+        if (!comment) return;
+        const commentTextEl = document.getElementById(`comment-text-${commentId}`);
+        if (!commentTextEl) return;
+        
+        const originalText = comment.content || comment.text || comment.body || commentTextEl.innerText;
+        
+        commentTextEl.innerHTML = `
+          <div class="edit-box" style="margin-top:0.5rem;">
+            <textarea id="edit-input-${commentId}" class="inline-edit-input" style="width:100%; min-height:60px; padding:0.5rem; border:1px solid #ccc; border-radius:4px; outline:none; font-family:inherit; resize:vertical; box-sizing:border-box;">${escapeHtml(originalText)}</textarea>
+            <div class="edit-actions" style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+              <button onclick="saveComment('${commentId}')" class="btn-save" style="padding:0.25rem 0.75rem; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">Save</button>
+              <button onclick="cancelEdit('${commentId}')" class="btn-cancel" style="padding:0.25rem 0.75rem; background:#6c757d; color:white; border:none; border-radius:4px; cursor:pointer;">Cancel</button>
+            </div>
+          </div>
+        `;
+        
+        const textarea = document.getElementById(`edit-input-${commentId}`);
+        textarea.addEventListener('focus', () => textarea.style.borderColor = '#007bff');
+        textarea.addEventListener('blur', () => textarea.style.borderColor = '#ccc');
+        textarea.focus();
+    };
+
+    window.cancelEdit = function(commentId) {
+        const comment = getRenderedComment(commentId);
+        if (!comment) return;
+        const commentTextEl = document.getElementById(`comment-text-${commentId}`);
+        if (commentTextEl) {
+            const originalText = comment.content || comment.text || comment.body || '';
+            commentTextEl.innerText = originalText;
+        }
+    };
+
+    window.saveComment = async function(commentId) {
+        const textarea = document.getElementById(`edit-input-${commentId}`);
+        if (!textarea) return;
+        
+        const content = textarea.value.trim();
+        if (!content) {
+            alert('A comment cannot be empty.');
+            return;
+        }
+        
+        const token = await getCommentToken();
+        if (!token) return;
+
+        const button = document.querySelector(`button[onclick="saveComment('${commentId}')"]`);
+        if (button) button.disabled = true;
+
+        try {
+            const response = await fetch(`/api/articles/comments/${commentId}/`, {
+                method: 'PATCH',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ content }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(getErrorMessage(data, 'Could not edit comment.'));
+            await loadComments();
+        } catch (error) {
+            alert(error.message || 'Could not edit comment.');
+        } finally {
+            if (button) button.disabled = false;
+        }
+    };
+
+    async function changeComment(action, commentId) {
+        if (action === 'edit') {
+            window.enableInlineEdit(commentId);
+            return;
+        }
+
+        const comment = getRenderedComment(commentId);
+        if (!comment) return;
+
+        const token = await getCommentToken();
+        if (!token) return;
+
+        if (action === 'delete') {
+            if (!window.confirm('Delete your comment?')) {
+                return;
+            }
+        }
+
+        const button = document.querySelector(`[data-comment-action="${action}"][data-comment-id="${commentId}"]`);
+        if (button) button.disabled = true;
+        try {
+            const response = await fetch(`/api/articles/comments/${commentId}/`, {
+                method: 'DELETE',
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(getErrorMessage(data, `Could not ${action} comment.`));
+            await loadComments();
+        } catch (error) {
+            alert(error.message || `Could not ${action} comment.`);
+        } finally {
+            if (button) button.disabled = false;
         }
     }
 
     document.getElementById('post-comment-btn').addEventListener('click', postComment);
+    document.getElementById('comments-list').addEventListener('click', event => {
+        const menuTrigger = event.target.closest('[data-comment-menu-trigger]');
+        if (menuTrigger) {
+            const menu = menuTrigger.closest('[data-comment-menu]');
+            const isOpen = menu.classList.contains('is-open');
+            document.querySelectorAll('[data-comment-menu].is-open').forEach(openMenu => {
+                openMenu.classList.remove('is-open');
+                openMenu.querySelector('[data-comment-menu-popover]')?.setAttribute('hidden', '');
+                openMenu.querySelector('[data-comment-menu-trigger]')?.setAttribute('aria-expanded', 'false');
+            });
+            if (!isOpen) {
+                menu.classList.add('is-open');
+                menu.querySelector('[data-comment-menu-popover]')?.removeAttribute('hidden');
+                menuTrigger.setAttribute('aria-expanded', 'true');
+            }
+            return;
+        }
+        const button = event.target.closest('[data-comment-action]');
+        if (button) {
+            const menu = button.closest('[data-comment-menu]');
+            menu?.classList.remove('is-open');
+            menu?.querySelector('[data-comment-menu-popover]')?.setAttribute('hidden', '');
+            menu?.querySelector('[data-comment-menu-trigger]')?.setAttribute('aria-expanded', 'false');
+            changeComment(button.dataset.commentAction, button.dataset.commentId);
+        }
+    });
+    document.addEventListener('click', event => {
+        if (event.target.closest('[data-comment-menu]')) return;
+        document.querySelectorAll('[data-comment-menu].is-open').forEach(menu => {
+            menu.classList.remove('is-open');
+            menu.querySelector('[data-comment-menu-popover]')?.setAttribute('hidden', '');
+            menu.querySelector('[data-comment-menu-trigger]')?.setAttribute('aria-expanded', 'false');
+        });
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        document.querySelectorAll('[data-comment-menu].is-open').forEach(menu => {
+            menu.classList.remove('is-open');
+            menu.querySelector('[data-comment-menu-popover]')?.setAttribute('hidden', '');
+            menu.querySelector('[data-comment-menu-trigger]')?.setAttribute('aria-expanded', 'false');
+        });
+    });
     document.addEventListener('DOMContentLoaded', function() {
         getArticleDetail();
         loadComments();
+        window.NewsPortalSession?.fetchCurrentUser?.().then(loadComments).catch(() => {});
         if (articleId && window.ArticleBookmarks) {
             const bookmarkArticle = { id: articleId, title: articleData?.title || document.querySelector('.article-title')?.textContent || '', bookmark_count: articleData?.bookmark_count || articleData?.bookmarks_count || 0 };
             document.getElementById('article-bookmark-control').innerHTML = window.ArticleBookmarks.renderButton(bookmarkArticle);

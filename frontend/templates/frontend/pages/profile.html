@@ -5,59 +5,521 @@
 {% block meta_description %}View your News Portal account profile, role, and reader activity.{% endblock %}
 
 {% block content %}
+<style>
+    :root {
+        --profile-primary: #3b82f6;
+        --profile-primary-hover: #2563eb;
+        --profile-bg: #f8fafc;
+        --profile-card: #ffffff;
+        --profile-text-main: #1e293b;
+        --profile-text-muted: #64748b;
+        --profile-border: #e2e8f0;
+        --profile-danger: #ef4444;
+        --profile-danger-hover: #dc2626;
+        --profile-success: #10b981;
+    }
+
+    body { background-color: var(--profile-bg); }
+
+    .profile-page {
+        padding: 2rem 1rem;
+        max-width: 1000px;
+        margin: 0 auto;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .profile-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    /* Header Card */
+    .profile-header-card {
+        background: var(--profile-card);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .profile-header-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 100px;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        z-index: 0;
+    }
+
+    .avatar-wrapper {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid var(--profile-card);
+        background: var(--profile-card);
+        z-index: 1;
+        margin-top: 2rem;
+    }
+
+    .profile-avatar-img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        background-color: var(--profile-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        font-weight: 600;
+    }
+
+    .profile-avatar-image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+
+    .avatar-upload-btn {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: var(--profile-primary);
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: 2px solid var(--profile-card);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+        display: none; /* hidden by default */
+    }
+
+    .avatar-upload-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    .edit-mode .avatar-upload-btn {
+        display: flex;
+    }
+
+    .avatar-input {
+        display: none;
+    }
+
+    .header-info {
+        z-index: 1;
+        margin-top: 4rem;
+        flex: 1;
+    }
+
+    .header-info h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        color: var(--profile-text-main);
+        font-weight: 700;
+    }
+
+    .header-info p {
+        margin: 0.25rem 0 0.75rem 0;
+        color: var(--profile-text-muted);
+        font-size: 1rem;
+    }
+
+    .badges {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .badge-role { background: #e0e7ff; color: #4338ca; }
+    .badge-status { background: #dcfce7; color: #15803d; }
+    
+    .header-actions {
+        z-index: 1;
+        margin-top: 4rem;
+        align-self: flex-start;
+    }
+
+    /* Tabs */
+    .tabs {
+        display: flex;
+        gap: 1rem;
+        border-bottom: 1px solid var(--profile-border);
+        margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--profile-text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+        color: var(--profile-text-main);
+    }
+
+    .tab-btn.active {
+        color: var(--profile-primary);
+        border-bottom-color: var(--profile-primary);
+    }
+
+    /* Content Area */
+    .tab-content {
+        display: none;
+        background: var(--profile-card);
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 2rem;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Grid layout for profile info */
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .info-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .info-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--profile-text-muted);
+    }
+
+    .info-value {
+        font-size: 1rem;
+        color: var(--profile-text-main);
+        padding: 0.5rem 0;
+    }
+    
+    .info-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    /* Form Styles */
+    .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--profile-border);
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        color: var(--profile-text-main);
+        transition: border-color 0.2s, box-shadow 0.2s;
+        box-sizing: border-box;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--profile-primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-input:disabled {
+        background-color: #f1f5f9;
+        cursor: not-allowed;
+    }
+
+    textarea.form-input {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .btn-primary {
+        background: var(--profile-primary);
+        color: white;
+    }
+
+    .btn-primary:hover { background: var(--profile-primary-hover); }
+    
+    .btn-secondary {
+        background: #f1f5f9;
+        color: var(--profile-text-main);
+    }
+    
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    .btn-danger { background: var(--profile-danger); color: white; }
+    .btn-danger:hover { background: var(--profile-danger-hover); }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--profile-border);
+    }
+
+    /* Saved Articles Grid */
+    .articles-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .article-card {
+        border: 1px solid var(--profile-border);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .article-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    
+    .article-img {
+        height: 160px;
+        background: #e2e8f0;
+        object-fit: cover;
+        width: 100%;
+    }
+
+    .article-content {
+        padding: 1.25rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .article-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem 0;
+        color: var(--profile-text-main);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .article-meta {
+        font-size: 0.8rem;
+        color: var(--profile-text-muted);
+        margin-top: auto;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        padding: 1rem 1.5rem;
+        border-radius: 0.5rem;
+        color: white;
+        font-weight: 500;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        z-index: 50;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+
+    .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    .toast-success { background-color: var(--profile-success); }
+    .toast-error { background-color: var(--profile-danger); }
+    
+    /* Loading state */
+    .btn.loading {
+        pointer-events: none;
+        opacity: 0.8;
+    }
+    .btn.loading::after {
+        content: "";
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    /* Hide edit fields in read mode */
+    .edit-only { display: none !important; }
+    .edit-mode .edit-only { display: flex !important; }
+    .edit-mode .info-value { display: none !important; }
+
+    @media (max-width: 768px) {
+        .profile-header-card { flex-direction: column; text-align: center; gap: 1rem; padding: 1.5rem; }
+        .header-info { margin-top: 1rem; }
+        .badges { justify-content: center; }
+        .header-actions { margin-top: 1rem; align-self: center; }
+        .tabs { overflow-x: auto; white-space: nowrap; padding-bottom: 0.5rem; }
+    }
+</style>
+
 <section class="profile-page">
     <div class="container profile-shell">
-        <div class="ad-slot-wrap" style="display:flex;justify-content:center;margin-bottom:1rem;">
+        <div class="ad-slot-wrap" style="display:flex;justify-content:center;">
             {% include 'frontend/components/advertisement_slot.html' with position='top_banner' class_name='ad-slot--top' %}
         </div>
-        <div class="profile-header">
-            <div class="profile-avatar" id="profileAvatar">NP</div>
-            <div>
-                <p class="section-kicker">My Account</p>
-                <h1 id="profileName">Loading profile...</h1>
-                <p id="profileEmail" class="profile-email">Checking your signed-in session.</p>
-            </div>
-        </div>
 
-        <div id="profileMessage" class="profile-message" role="status" aria-live="polite"></div>
+        <div id="profileMessage" class="profile-message" role="status" aria-live="polite" style="display:none;"></div>
 
-        <div class="profile-grid" id="profileContent" hidden>
-            <section class="profile-panel">
-                <h2>Profile</h2>
-                <dl class="profile-list">
-                    <div>
-                        <dt>Email</dt>
-                        <dd id="profileDetailEmail"></dd>
-                    </div>
-                    <div>
-                        <dt>Role</dt>
-                        <dd id="profileRole"></dd>
-                    </div>
-                    <div>
-                        <dt>Status</dt>
-                        <dd id="profileStatus"></dd>
-                    </div>
-                    <div>
-                        <dt>Bio</dt>
-                        <dd id="profileBio"></dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section class="profile-panel">
-                <h2>Reader Access</h2>
-                <div class="profile-actions">
-                    <a href="/newsletter/" class="profile-action">Newsletter</a>
-                    <a href="/" class="profile-action">Latest news</a>
-                    <a href="#" class="profile-action" id="profileDashboardLink">Dashboard</a>
+        <div id="profileContent" hidden>
+            <!-- Header Card -->
+            <div class="profile-header-card" id="profileHeader">
+                <div class="avatar-wrapper">
+                    <div id="profileAvatar" class="profile-avatar-img">NP</div>
+                    <label class="avatar-upload-btn" for="avatarUpload" aria-label="Upload new avatar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </label>
+                    <input type="file" id="avatarUpload" class="avatar-input" accept="image/*">
                 </div>
-            </section>
+                
+                <div class="header-info">
+                    <h1 id="profileNameDisplay">Loading...</h1>
+                    <p id="profileEmailDisplay">Checking session...</p>
+                    <div class="badges">
+                        <span class="badge badge-role" id="profileRoleBadge">User</span>
+                        <span class="badge badge-status" id="profileStatusBadge">Active</span>
+                    </div>
+                </div>
 
+                <div class="header-actions">
+                    <button type="button" class="btn btn-secondary" id="btnToggleEdit">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        Edit Profile
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <div class="tabs">
+                    <button class="tab-btn active" data-target="tab-profile">Profile Info</button>
+                    <button class="tab-btn" data-target="tab-settings">Security</button>
+                </div>
+
+                <!-- Tab: Profile -->
+                <div class="tab-content active" id="tab-profile">
+                    <form id="formProfileUpdate">
+                        <div class="info-grid">
+                            <div class="info-group">
+                                <label class="info-label">First Name</label>
+                                <div class="info-value" id="valFirstName"></div>
+                                <input type="text" class="form-input edit-only" id="inpFirstName" name="first_name" placeholder="Enter first name">
+                            </div>
+                            <div class="info-group">
+                                <label class="info-label">Last Name</label>
+                                <div class="info-value" id="valLastName"></div>
+                                <input type="text" class="form-input edit-only" id="inpLastName" name="last_name" placeholder="Enter last name">
+                            </div>
+                            <div class="info-group full-width">
+                                <label class="info-label">Email Address</label>
+                                <div class="info-value" id="valEmail"></div>
+                                <input type="email" class="form-input edit-only" id="inpEmail" name="email" disabled title="Email cannot be changed here">
+                            </div>
+                            <div class="info-group full-width">
+                                <label class="info-label">Bio</label>
+                                <div class="info-value" id="valBio"></div>
+                                <textarea class="form-input edit-only" id="inpBio" name="bio" placeholder="Tell us a little about yourself..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions edit-only">
+                            <button type="button" class="btn btn-secondary" id="btnCancelEdit">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="btnSaveProfile">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab: Settings -->
+                <div class="tab-content" id="tab-settings">
+                    <h3 style="margin-top:0; color: var(--profile-text-main);">Change Password</h3>
+                    <p style="color: var(--profile-text-muted); margin-bottom: 1.5rem;">Update your account password. You will need your current password.</p>
+                    <form id="formChangePassword" style="max-width: 500px;">
+                        <div class="info-group" style="margin-bottom: 1rem;">
+                            <label class="info-label" for="inpOldPassword">Current Password</label>
+                            <input type="password" class="form-input" id="inpOldPassword" required>
+                        </div>
+                        <div class="info-group" style="margin-bottom: 1rem;">
+                            <label class="info-label" for="inpNewPassword">New Password</label>
+                            <input type="password" class="form-input" id="inpNewPassword" required minlength="8">
+                        </div>
+                        <div class="info-group" style="margin-bottom: 2rem;">
+                            <label class="info-label" for="inpConfirmPassword">Confirm New Password</label>
+                            <input type="password" class="form-input" id="inpConfirmPassword" required minlength="8">
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="btnSavePassword">Update Password</button>
+                    </form>
+                    
+                    <hr style="border:none; border-top: 1px solid var(--profile-border); margin: 2rem 0;">
+                    
+                    <h3 style="color: var(--profile-text-main);">Account Actions</h3>
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <a href="/newsletter/" class="btn btn-secondary">Manage Newsletter</a>
+                        <a href="#" id="linkDashboard" class="btn btn-secondary">Go to Dashboard</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
+
+<!-- Toast Notification -->
+<div id="toastNotification" class="toast"></div>
+
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/profile.js' %}?v=2"></script>
+<script src="{% static 'js/profile.js' %}?v=4"></script>
 {% endblock %}

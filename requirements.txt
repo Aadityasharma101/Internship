@@ -2,3 +2,6 @@ Django>=4.2,<7
 requests>=2.31,<3
 django-cors-headers>=4.3,<5
 gunicorn>=21.2,<24
+cloudinary>=1.41,<2
+django-cloudinary-storage>=0.3,<1
+Pillow>=10,<12

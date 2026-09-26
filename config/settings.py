@@ -62,6 +62,34 @@ INSTALLED_APPS = [
 
 ]
 
+# User-uploaded media must use persistent storage in production.  Local
+# development continues to use MEDIA_ROOT when these credentials are absent.
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME')
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY')
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET')
+USE_CLOUDINARY = all((
+    CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET,
+))
+
+if USE_CLOUDINARY:
+    INSTALLED_APPS.extend(['cloudinary_storage', 'cloudinary'])
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
+        'API_KEY': CLOUDINARY_API_KEY,
+        'API_SECRET': CLOUDINARY_API_SECRET,
+    }
+    # Django 5+ uses STORAGES instead of DEFAULT_FILE_STORAGE.
+    STORAGES = {
+        'default': {
+            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+
 # Add corsheaders app only if available
 if HAS_CORSHEADERS:
     INSTALLED_APPS.insert(0, 'corsheaders')

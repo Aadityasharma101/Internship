@@ -225,9 +225,18 @@ function renderPortalAuthState(user = getKnownPortalUser()) {
     if (signedIn) {
         if (topbarAuth) {
             topbarAuth.innerHTML = `
-                <a class="topbar-user" href="/profile/">${escapePortalHtml(displayName)}</a>
-                <a class="topbar-btn" href="${dashboardPath}">${isPortalAdmin(user) || isPortalStaff(user) ? 'Dashboard' : 'Profile'}</a>
-                <button class="topbar-btn topbar-btn--logout" type="button" onclick="handleLogout()">Sign Out</button>
+                <div class="user-menu" data-user-menu>
+                    <button class="user-menu-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="user-menu-panel">
+                        <span class="user-menu-avatar" aria-hidden="true">${escapePortalHtml(displayName.slice(0, 1).toUpperCase())}</span>
+                        <span>${escapePortalHtml(displayName)}</span>
+                    </button>
+                    <div class="user-menu-panel" id="user-menu-panel" hidden>
+                        <div class="user-menu-heading"><span class="user-menu-avatar" aria-hidden="true">${escapePortalHtml(displayName.slice(0, 1).toUpperCase())}</span><span>${escapePortalHtml(displayName)}</span></div>
+                        <a href="/profile/">♙ <span>Profile</span></a>
+                        <a href="/bookmarks/">▣ <span>My Bookmarks</span></a>
+                        <button type="button" class="user-menu-logout" data-user-logout>↪ <span>Logout</span></button>
+                    </div>
+                </div>
             `;
         }
         if (headerAuth) {
@@ -259,6 +268,36 @@ function handleLogout() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('click', (event) => {
+        const menu = event.target.closest('[data-user-menu]');
+        const openMenu = document.querySelector('[data-user-menu].is-open');
+        if (!menu) {
+            openMenu?.classList.remove('is-open');
+            openMenu?.querySelector('.user-menu-panel')?.setAttribute('hidden', '');
+            openMenu?.querySelector('.user-menu-trigger')?.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        if (event.target.closest('[data-user-logout]')) {
+            handleLogout();
+            return;
+        }
+        const trigger = event.target.closest('.user-menu-trigger');
+        if (!trigger) return;
+        const panel = menu.querySelector('.user-menu-panel');
+        const expanded = trigger.getAttribute('aria-expanded') === 'true';
+        if (openMenu && openMenu !== menu) {
+            openMenu.classList.remove('is-open');
+            openMenu.querySelector('.user-menu-panel')?.setAttribute('hidden', '');
+            openMenu.querySelector('.user-menu-trigger')?.setAttribute('aria-expanded', 'false');
+        }
+        trigger.setAttribute('aria-expanded', String(!expanded));
+        panel.toggleAttribute('hidden', expanded);
+        menu.classList.toggle('is-open', !expanded);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        document.querySelector('[data-user-menu].is-open')?.querySelector('.user-menu-trigger')?.click();
+    });
     renderPortalAuthState();
     if (getStoredAccessToken() || getStoredRefreshToken()) {
         fetchCurrentPortalUser()

@@ -33,11 +33,48 @@ function getInitials(name) {
     return name.substring(0, 2).toUpperCase();
 }
 
+function displayCommentAuthor(comment) {
+    const suppliedName = comment.author_name || comment.user_name || comment.username || comment.author || '';
+    if (suppliedName) return suppliedName;
+
+    // The comments API currently returns the commenter in `user` as an email.
+    // Present its local part as a username instead of exposing the email address.
+    const user = String(comment.user || '').trim();
+    if (user.includes('@')) {
+        return user.split('@')[0]
+            .replace(/[._-]+/g, ' ')
+            .replace(/\b\w/g, letter => letter.toUpperCase()) || 'Anonymous';
+    }
+
+    return user || 'Anonymous';
+}
+
+function commentUserEmail(comment) {
+    const user = comment?.user || comment?.author || comment?.author_email || '';
+    return String(typeof user === 'object' ? (user.email || '') : user).trim().toLowerCase();
+}
+
+function isOwnComment(comment) {
+    const currentUser = window.NewsPortalSession?.getKnownUser?.();
+    const currentEmail = String(currentUser?.email || '').trim().toLowerCase();
+    return Boolean(currentEmail && currentEmail === commentUserEmail(comment));
+}
+
+const renderedComments = new Map();
+
 function renderCommentCard(comment) {
     const profilePic = comment.profile_pic || comment.author_profile_pic || '';
-    const authorName = comment.author_name || comment.user_name || 'Anonymous';
+    const authorName = displayCommentAuthor(comment);
     const createdAt = comment.created_at || '';
-    const text = comment.text || comment.body || '';
+    const text = comment.text || comment.body || comment.content || comment.comment || '';
+    const controls = isOwnComment(comment) && comment.id != null ? `
+        <div class="comment-menu" data-comment-menu>
+            <button type="button" class="comment-menu-trigger" data-comment-menu-trigger aria-label="Comment options" aria-haspopup="true" aria-expanded="false">⋮</button>
+            <div class="comment-menu-popover" data-comment-menu-popover hidden>
+                <button type="button" class="comment-menu-item" data-comment-action="edit" data-comment-id="${escapeHtml(comment.id)}">Edit</button>
+                <button type="button" class="comment-menu-item comment-menu-item--delete" data-comment-action="delete" data-comment-id="${escapeHtml(comment.id)}">Delete</button>
+            </div>
+        </div>` : '';
 
     return `
         <div class="comment-card">
@@ -54,8 +91,9 @@ function renderCommentCard(comment) {
                         ${escapeHtml(timeAgo(createdAt))}
                     </time>
                 </div>
-                <p class="comment-text">${escapeHtml(text)}</p>
+                <p class="comment-text" id="comment-text-${escapeHtml(comment.id || '')}">${escapeHtml(text)}</p>
             </div>
+            ${controls}
         </div>
     `;
 }
@@ -64,13 +102,18 @@ function renderComments(comments, containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const count = comments?.length || 0;
+    const items = Array.isArray(comments) ? comments : [];
+    renderedComments.clear();
+    items.forEach(comment => {
+        if (comment?.id != null) renderedComments.set(String(comment.id), comment);
+    });
+    const count = items.length;
     const header = container.closest('.comments-section')?.querySelector('.comments-header');
     if (header) {
         header.textContent = `Comments (${count})`;
     }
 
-    if (!comments || comments.length === 0) {
+    if (items.length === 0) {
         container.innerHTML = `
             <div class="comments-list">
                 <p class="comments-empty">No comments yet. Be the first to comment!</p>
@@ -81,9 +124,13 @@ function renderComments(comments, containerId) {
 
     container.innerHTML = `
         <div class="comments-list">
-            ${comments.map(renderCommentCard).join('')}
+            ${items.map(renderCommentCard).join('')}
         </div>
     `;
+}
+
+function getRenderedComment(commentId) {
+    return renderedComments.get(String(commentId));
 }
 
 function escapeHtml(text) {

@@ -217,7 +217,7 @@ class StaffArticleCreateTests(TestCase):
 
 
 class ArticleApiViewTests(TestCase):
-    @patch('frontend.views.requests.get')
+    @patch('frontend.views.requests.request')
     def test_index_uses_remote_article_feed_api(self, mock_get):
         mock_get.return_value = MockApiResponse(200, {
             'results': [
@@ -232,7 +232,9 @@ class ArticleApiViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['articles'][0]['title'], 'Live from the API')
-        self.assertEqual(mock_get.call_args.args[0], 'https://news-portal-hvgs.onrender.com/api/articles/feed/?ordering=-id')
+        self.assertEqual(mock_get.call_args.args[0], 'GET')
+        self.assertEqual(mock_get.call_args.args[1], 'https://news-portal-hvgs.onrender.com/api/articles/feed/')
+        self.assertEqual(mock_get.call_args.kwargs['params'], {'ordering': '-id'})
 
 
 class AuthLoginTests(TestCase):

@@ -37,7 +37,7 @@
         document.getElementById('profileDashboardLink').textContent = window.NewsPortalSession?.isAdmin(user)
             ? 'Admin dashboard'
             : window.NewsPortalSession?.isStaff(user)
-                ? 'Staff articles'
+                ? 'Staff dashboard'
                 : 'My profile';
         contentEl.hidden = false;
         setMessage('', '');

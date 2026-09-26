@@ -35,12 +35,9 @@ function getInitials(name) {
 
 function renderCommentCard(comment) {
     const profilePic = comment.profile_pic || comment.author_profile_pic || '';
-    const rawAuthor = comment.author_name || comment.user_name || comment.user || comment.author || 'Anonymous';
-    const authorName = typeof rawAuthor === 'object'
-        ? (rawAuthor.name || rawAuthor.username || rawAuthor.email || 'Anonymous')
-        : rawAuthor;
+    const authorName = comment.author_name || comment.user_name || 'Anonymous';
     const createdAt = comment.created_at || '';
-    const text = comment.text || comment.body || comment.content || comment.comment || comment.message || '';
+    const text = comment.text || comment.body || '';
 
     return `
         <div class="comment-card">

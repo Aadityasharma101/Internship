@@ -135,7 +135,7 @@ function getPortalDashboardPath(user) {
         return '/users/';
     }
     if (isPortalStaff(user)) {
-        return '/staff/articles/';
+        return '/staff/';
     }
     return '/profile/';
 }
@@ -221,21 +221,19 @@ function renderPortalAuthState(user = getKnownPortalUser()) {
     const headerAuth = document.getElementById('header-auth-buttons');
     const dashboardPath = user ? getPortalDashboardPath(user) : '/profile/';
     const displayName = getPortalDisplayName(user);
-    const accountLabel = isPortalAdmin(user) ? 'Dashboard' : (isPortalStaff(user) ? 'Articles' : 'Profile');
-    const headerLabel = isPortalAdmin(user) ? 'Dashboard' : (isPortalStaff(user) ? 'Articles' : 'My Account');
 
     if (signedIn) {
         if (topbarAuth) {
             topbarAuth.innerHTML = `
                 <a class="topbar-user" href="/profile/">${escapePortalHtml(displayName)}</a>
-                <a class="topbar-btn" href="${dashboardPath}">${accountLabel}</a>
+                <a class="topbar-btn" href="${dashboardPath}">${isPortalAdmin(user) || isPortalStaff(user) ? 'Dashboard' : 'Profile'}</a>
                 <button class="topbar-btn topbar-btn--logout" type="button" onclick="handleLogout()">Sign Out</button>
             `;
         }
         if (headerAuth) {
             headerAuth.innerHTML = `
                 <a href="/profile/" class="btn-nav btn-nav--ghost">Profile</a>
-                <a href="${dashboardPath}" class="btn-nav btn-nav--primary">${headerLabel}</a>
+                <a href="${dashboardPath}" class="btn-nav btn-nav--primary">${isPortalAdmin(user) || isPortalStaff(user) ? 'Dashboard' : 'My Account'}</a>
             `;
         }
         return;

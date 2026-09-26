@@ -29,76 +29,6 @@
     line-height: 1.7;
     font-size: 1rem;
 }
-.reaction-panel {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e5e7eb;
-}
-.reaction-summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    color: #4b5563;
-    font-size: 0.92rem;
-    margin-bottom: 0.85rem;
-}
-.reaction-total {
-    font-weight: 700;
-    color: #2c3e50;
-}
-.reaction-breakdown {
-    display: flex;
-    gap: 0.45rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-.reaction-breakdown-pill {
-    border: 1px solid #e5e7eb;
-    border-radius: 999px;
-    padding: 0.2rem 0.55rem;
-    background: #f9fafb;
-    color: #4b5563;
-    font-size: 0.78rem;
-    font-weight: 600;
-}
-.reaction-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-.reaction-btn {
-    border: 1px solid #d1d5db;
-    background: #fff;
-    color: #2c3e50;
-    border-radius: 999px;
-    padding: 0.45rem 0.8rem;
-    font-size: 0.88rem;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-}
-.reaction-btn:hover,
-.reaction-btn.is-active {
-    border-color: #2c3e50;
-    background: #eef2f7;
-}
-.reaction-count {
-    color: #6b7280;
-    font-weight: 600;
-}
-.reaction-login-note,
-.comment-login-note {
-    color: #6b7280;
-    font-size: 0.86rem;
-    margin: 0.75rem 0 0;
-}
-.comment-form-card.is-locked textarea {
-    background: #f9fafb;
-    cursor: pointer;
-}
 .comment-form-card {
     background: white;
     border-radius: 12px;
@@ -146,13 +76,6 @@
     .article-title {
         font-size: 1.3rem;
     }
-    .reaction-summary {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-    .reaction-breakdown {
-        justify-content: flex-start;
-    }
 }
 </style>
 {% endblock %}
@@ -178,20 +101,6 @@
         <div class="article-body" id="article-body">
             <p>Article content unavailable at the moment.</p>
         </div>
-        <div class="reaction-panel" id="reaction-panel">
-            <div class="reaction-summary">
-                <span class="reaction-total" id="reaction-total">{{ article.reactions_total|default:0 }} reactions</span>
-                <span class="reaction-breakdown" id="reaction-breakdown"></span>
-            </div>
-            <div class="reaction-actions" role="group" aria-label="Article reactions">
-                <button class="reaction-btn" type="button" data-reaction="like">Like <span class="reaction-count" data-reaction-count="like">0</span></button>
-                <button class="reaction-btn" type="button" data-reaction="love">Love <span class="reaction-count" data-reaction-count="love">0</span></button>
-                <button class="reaction-btn" type="button" data-reaction="wow">Wow <span class="reaction-count" data-reaction-count="wow">0</span></button>
-                <button class="reaction-btn" type="button" data-reaction="sad">Sad <span class="reaction-count" data-reaction-count="sad">0</span></button>
-                <button class="reaction-btn" type="button" data-reaction="angry">Angry <span class="reaction-count" data-reaction-count="angry">0</span></button>
-            </div>
-            <p class="reaction-login-note" id="reaction-login-note">Sign in to react to this article.</p>
-        </div>
     </div>
 
     <div class="comments-section" id="comments-section">
@@ -216,25 +125,16 @@
             <h3>Add a Comment</h3>
             <textarea id="comment-text" placeholder="Write your comment here..."></textarea>
             <button id="post-comment-btn">Post Comment</button>
-            <p class="comment-login-note" id="comment-login-note">Sign in to post a comment.</p>
         </div>
     </div>
 </div>
 {% endblock %}
 {% block extra_js %}
-<script src="{% static 'js/comments.js' %}?v=3"></script>
+<script src="{% static 'js/comments.js' %}?v=2"></script>
 <script>
 (function() {
     const articleId = {{ article.id|default:0 }};
     const articleData = {{ article_json|safe }};
-    const REACTION_TYPES = ['like', 'love', 'wow', 'sad', 'angry'];
-    const REACTION_LABELS = {
-        like: 'Like',
-        love: 'Love',
-        wow: 'Wow',
-        sad: 'Sad',
-        angry: 'Angry',
-    };
 
     function getArticleDetail() {
         const detail = document.getElementById('article-body');
@@ -247,16 +147,7 @@
         }
     }
 
-    function getApiOrigin() {
-        const configuredBase = document.body?.dataset?.apiBase || window.NEWS_PORTAL_API_BASE || 'https://news-portal-hvgs.onrender.com';
-        return String(configuredBase).trim().replace(/\/+$/, '').replace(/\/api$/, '');
-    }
-
-    function apiUrl(path) {
-        const cleanPath = String(path || '').replace(/^\/+/, '');
-        const origin = getApiOrigin();
-        return origin ? `${origin}/${cleanPath}` : `/${cleanPath}`;
-    }
+    const API_BASE = document.body?.dataset?.apiBase || '/api';
 
     function normalizeCommentsPayload(data) {
         if (Array.isArray(data)) {
@@ -287,179 +178,15 @@
         return [];
     }
 
-    function formatReactionName(value) {
-        const key = String(value || '').toLowerCase();
-        if (REACTION_LABELS[key]) {
-            return REACTION_LABELS[key];
-        }
-        return key.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-    }
-
-    function normalizeReactionBreakdown(data) {
-        const raw = data?.reactions_breakdown || data?.reaction_breakdown || data?.reactions || {};
-        if (typeof raw === 'string' && raw.trim()) {
-            try {
-                return normalizeReactionBreakdown({ reactions_breakdown: JSON.parse(raw) });
-            } catch {
-                return {};
-            }
-        }
-
-        if (Array.isArray(raw)) {
-            return raw.reduce((acc, item) => {
-                const type = item?.reaction || item?.react_type || item?.type || item?.value;
-                if (type) {
-                    acc[type] = (acc[type] || 0) + 1;
-                }
-                return acc;
-            }, {});
-        }
-
-        if (raw && typeof raw === 'object') {
-            return Object.entries(raw).reduce((acc, [key, value]) => {
-                const count = Number(value) || 0;
-                if (count > 0) {
-                    acc[key] = count;
-                }
-                return acc;
-            }, {});
-        }
-
-        return {};
-    }
-
-    function getReactionTotal(data, breakdown) {
-        const total = Number(data?.reactions_total ?? data?.reaction_count ?? data?.reactions_count);
-        if (Number.isFinite(total)) {
-            return total;
-        }
-        return Object.values(breakdown).reduce((sum, count) => sum + (Number(count) || 0), 0);
-    }
-
-    function renderReactions(data = {}) {
-        const breakdown = normalizeReactionBreakdown(data);
-        const total = getReactionTotal(data, breakdown);
-        const totalEl = document.getElementById('reaction-total');
-        const breakdownEl = document.getElementById('reaction-breakdown');
-        const currentReaction = String(data?.user_has_reacted || data?.user_reaction || '').toLowerCase();
-
-        if (totalEl) {
-            totalEl.textContent = `${total} reaction${total === 1 ? '' : 's'}`;
-        }
-
-        document.querySelectorAll('[data-reaction]').forEach((button) => {
-            const reaction = button.dataset.reaction;
-            const countEl = button.querySelector(`[data-reaction-count="${reaction}"]`);
-            if (countEl) {
-                countEl.textContent = breakdown[reaction] || 0;
-            }
-            button.classList.toggle('is-active', currentReaction === reaction);
-        });
-
-        if (!breakdownEl) {
-            return;
-        }
-
-        const entries = Object.entries(breakdown).sort(([left], [right]) => {
-            const leftIndex = REACTION_TYPES.indexOf(left);
-            const rightIndex = REACTION_TYPES.indexOf(right);
-            if (leftIndex === -1 && rightIndex === -1) {
-                return left.localeCompare(right);
-            }
-            if (leftIndex === -1) {
-                return 1;
-            }
-            if (rightIndex === -1) {
-                return -1;
-            }
-            return leftIndex - rightIndex;
-        });
-
-        breakdownEl.innerHTML = entries.length
-            ? entries.map(([type, count]) => `<span class="reaction-breakdown-pill">${escapeHtml(formatReactionName(type))} ${Number(count) || 0}</span>`).join('')
-            : '<span class="reaction-breakdown-pill">No reactions yet</span>';
-    }
-
-    function hasStoredSession() {
-        const session = window.NewsPortalSession;
-        return Boolean(session?.getStoredAccessToken?.() || session?.getStoredRefreshToken?.());
-    }
-
-    function updateActionState() {
-        const signedIn = hasStoredSession();
-        const textarea = document.getElementById('comment-text');
-        const postBtn = document.getElementById('post-comment-btn');
-        const commentForm = document.querySelector('.comment-form-card');
-        const commentNote = document.getElementById('comment-login-note');
-        const reactionNote = document.getElementById('reaction-login-note');
-
-        if (textarea) {
-            textarea.readOnly = !signedIn;
-            textarea.placeholder = signedIn ? 'Write your comment here...' : 'Sign in to write a comment.';
-        }
-        if (postBtn) {
-            postBtn.textContent = signedIn ? 'Post Comment' : 'Sign in to Comment';
-        }
-        if (commentForm) {
-            commentForm.classList.toggle('is-locked', !signedIn);
-        }
-        if (commentNote) {
-            commentNote.hidden = signedIn;
-        }
-        if (reactionNote) {
-            reactionNote.hidden = signedIn;
-        }
-
-        document.querySelectorAll('[data-reaction]').forEach((button) => {
-            button.title = signedIn ? `React with ${formatReactionName(button.dataset.reaction)}` : 'Sign in to react';
-        });
-    }
-
-    async function getActionToken(actionText) {
-        const session = window.NewsPortalSession;
-        let token = null;
-        try {
-            token = session ? await session.getAccessToken() : null;
-        } catch {
-            token = null;
-        }
-
-        if (!token) {
-            updateActionState();
-            alert(`Please sign in before ${actionText}.`);
-            window.location.href = '/login/';
-            return null;
-        }
-
-        return token;
-    }
-
-    function handleUnauthorized() {
-        window.NewsPortalSession?.clear();
-        updateActionState();
-        alert('Your session has expired. Please sign in again.');
-        window.location.href = '/login/';
-    }
-
-    async function loadArticleEngagement() {
-        if (!articleId) {
-            return;
-        }
-
-        try {
-            const response = await fetch(apiUrl(`/api/articles/${articleId}/`), {
-                headers: { Accept: 'application/json' },
+    async function loadComments() {
+        fetch(`${API_BASE}/api/articles/${articleId}/`)
+            .then(res => res.json())
+            .then(data => {
+                renderComments(normalizeCommentsPayload(data), 'comments-list');
+            })
+            .catch(() => {
+                renderComments([], 'comments-list');
             });
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(getErrorMessage(data, 'Could not load article engagement.'));
-            }
-            renderComments(normalizeCommentsPayload(data), 'comments-list');
-            renderReactions(data);
-        } catch (err) {
-            console.error('Failed to load article engagement:', err);
-            renderReactions(articleData);
-        }
     }
 
     function getErrorMessage(data, fallback) {
@@ -473,19 +200,28 @@
 
     async function postComment() {
         const textarea = document.getElementById('comment-text');
-        const token = await getActionToken('posting a comment');
-        if (!token) {
-            return;
-        }
-
         const text = textarea.value.trim();
         if (!text) {
             alert('Please enter a comment.');
             return;
         }
 
+        const session = window.NewsPortalSession;
+        let token = null;
         try {
-            const response = await fetch(apiUrl(`/api/articles/${articleId}/comment/`), {
+            token = session ? await session.getAccessToken() : null;
+        } catch {
+            token = null;
+        }
+
+        if (!token) {
+            alert('Please sign in before posting a comment.');
+            window.location.href = '/login/';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/api/articles/${articleId}/comment/`, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -497,7 +233,9 @@
             const data = await response.json().catch(() => null);
 
             if (response.status === 401) {
-                handleUnauthorized();
+                window.NewsPortalSession?.clear();
+                alert('Your session has expired. Please sign in again.');
+                window.location.href = '/login/';
                 return;
             }
 
@@ -506,63 +244,17 @@
             }
 
             textarea.value = '';
-            loadArticleEngagement();
+            loadComments();
         } catch (err) {
             console.error('Failed to post comment:', err);
             alert(err.message || 'Could not post comment.');
         }
     }
 
-    async function postReaction(reaction) {
-        const token = await getActionToken('reacting');
-        if (!token) {
-            return;
-        }
-
-        try {
-            const response = await fetch(apiUrl(`/api/articles/${articleId}/react/`), {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ reaction }),
-            });
-            const data = await response.json().catch(() => null);
-
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error(getErrorMessage(data, 'Could not save reaction.'));
-            }
-
-            renderReactions(data || {});
-            loadArticleEngagement();
-        } catch (err) {
-            console.error('Failed to save reaction:', err);
-            alert(err.message || 'Could not save reaction.');
-        }
-    }
-
+    document.getElementById('post-comment-btn').addEventListener('click', postComment);
     document.addEventListener('DOMContentLoaded', function() {
         getArticleDetail();
-        renderReactions(articleData);
-        updateActionState();
-        loadArticleEngagement();
-
-        document.getElementById('post-comment-btn')?.addEventListener('click', postComment);
-        document.getElementById('comment-text')?.addEventListener('focus', function() {
-            if (!hasStoredSession()) {
-                this.blur();
-            }
-        });
-        document.querySelectorAll('[data-reaction]').forEach((button) => {
-            button.addEventListener('click', () => postReaction(button.dataset.reaction));
-        });
+        loadComments();
     });
 })();
 </script>

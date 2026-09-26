@@ -3,10 +3,28 @@ let lastArticleResponse = null;
 let currentArticles = [];
 let activeArticleEndpoint = '/articles/feed/';
 
-// The article service is mounted at the site root, unlike Users/Roles/Ads
-// which are mounted below /api/.
-const ARTICLE_ENDPOINTS = ['/articles/feed/', '/articles/reporter/articles/'];
-const ARTICLE_MUTATION_ENDPOINTS = ['/articles/create/'];
+// Prefer the local Django proxy endpoints so staff/article actions resolve on this site.
+const REMOTE_BASE = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE.replace(/\/$/, '') : '';
+const ARTICLE_ENDPOINTS = [
+    '/articles/feed/',
+    '/portal/articles/',
+    '/remote/articles/feed/',
+    '/api/articles/feed/',
+    'articles/feed/',
+    `${REMOTE_BASE}/articles/feed/`,
+    `${REMOTE_BASE}/remote/articles/feed/`,
+    `${REMOTE_BASE}/api/articles/feed/`
+];
+
+const ARTICLE_MUTATION_ENDPOINTS = [
+    '/articles/create/',
+    '/portal/articles/create/',
+    '/remote/articles/create/',
+    '/api/articles/create/',
+    `${REMOTE_BASE}/articles/create/`,
+    `${REMOTE_BASE}/remote/articles/create/`,
+    `${REMOTE_BASE}/api/articles/create/`
+];
 
 const articlesTableBody = document.getElementById('articlesTableBody');
 const prevArticleBtn = document.getElementById('prevArticleBtn');
@@ -38,7 +56,7 @@ const articleFields = {
     published: document.getElementById('articlePublished')
 };
 
-const { escapeHTML, formatDate, formatApiError, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
+const { escapeHTML, formatDate, getValue, loadList, setMessage, createItem, updateItem, deleteItem } = ResourceHelpers;
 
 function text(value, fallback = 'Not available') {
     return value === null || value === undefined || value === '' ? fallback : String(value);
@@ -224,7 +242,10 @@ function resetForm() {
             field.value = '';
         }
     });
-    articleFields.status.value = 'draft';
+
+    const defaultStatus = articleModal?.dataset?.defaultStatus || 'draft';
+    articleFields.status.value = defaultStatus;
+    articleFields.published.checked = defaultStatus === 'published';
     articleFormStatus.textContent = '';
 }
 
@@ -281,7 +302,10 @@ function buildPayload() {
 }
 
 function buildCreatePayload(payload) {
-    const createPayload = { ...payload };
+    const createPayload = {
+        ...payload,
+        status: payload.status
+    };
 
     if (payload.status === 'published') {
         createPayload.published_at = new Date().toISOString();
@@ -304,14 +328,7 @@ async function saveArticle() {
 
     try {
         if (id) {
-            try {
-                await api.patch(apiUrl(`/articles/${id}/update/`), payload);
-            } catch (error) {
-                if (error?.response?.status !== 405) {
-                    throw error;
-                }
-                await api.put(apiUrl(`/articles/${id}/update/`), payload);
-            }
+            await updateItem('/articles/', id, payload);
         } else {
             await createItem(ARTICLE_MUTATION_ENDPOINTS, buildCreatePayload(payload));
         }
@@ -319,9 +336,27 @@ async function saveArticle() {
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to save article:', error);
-        articleFormStatus.textContent = formatApiError(error, 'Unable to save article. Check required fields and permissions.');
+        articleFormStatus.textContent = 'Unable to save article. Check required fields and permissions.';
     } finally {
         saveArticleBtn.disabled = false;
+    }
+}
+
+async function initializeArticlesPage() {
+    await loadArticles();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') === '1') {
+        openCreateModal();
+        return;
+    }
+
+    const editId = params.get('edit');
+    if (editId) {
+        const article = currentArticles.find((item) => String(item.id) === String(editId));
+        if (article) {
+            openEditModal(article);
+        }
     }
 }
 
@@ -331,7 +366,7 @@ async function removeArticle(article) {
     }
 
     try {
-        await api.delete(apiUrl(`/articles/${article.id}/delete/`));
+        await deleteItem(activeArticleEndpoint, article.id);
         await loadArticles(currentArticlePage);
     } catch (error) {
         console.error('Unable to delete article:', error);
@@ -384,4 +419,4 @@ articleModal.addEventListener('click', (event) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => loadArticles());
+document.addEventListener('DOMContentLoaded', initializeArticlesPage);

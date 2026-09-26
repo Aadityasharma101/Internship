@@ -176,7 +176,7 @@ async function initializeHomepage(apiBase) {
 
         const sourceArticles = selectedCategory === 'all' ? (feedArticles.length ? feedArticles : trendingArticles) : filteredFeed;
         const latestArticles   = sourceArticles.map(mergeArticleData);
-        const editorialArticles = take(selectedCategory === 'all' ? feedArticles.slice(1) : filteredFeed.slice(1), 10).map(mergeArticleData);
+        const editorialArticles = take(selectedCategory === 'all' ? feedArticles.slice(1) : filteredFeed.slice(1), 6).map(mergeArticleData);
         
         // Ensure featured article always has a valid source
         let featuredArticleData = null;
@@ -417,10 +417,10 @@ function resolveMediaUrl(url) {
 
 function getSummary(article) {
     if (!article) return '';
-    if (article.summary) return article.summary;
+    if (article.summary) return truncate(article.summary, 150);
     const src = article.body || article.description || '';
     if (!src) return 'Read the full story for more details.';
-    return truncate(src, 160);
+    return truncate(src, 150);
 }
 
 function truncate(text, limit) {
@@ -544,7 +544,7 @@ function renderNewsGrid(container, articles, selectedCategory = 'all') {
                         <span>${escapeHtml(a.displayDate || 'Recently')}</span>
                     </div>
                     <h4 class="news-card__title">${escapeHtml(a.title)}</h4>
-                    <p class="news-card__summary">${escapeHtml(a.summary || a.description || '')}</p>
+                    <p class="news-card__summary">${escapeHtml(truncate(a.summary || a.description || '', 150))}</p>
                     <div class="news-card__footer">
                         <span>${escapeHtml(a.authorLabel || 'News Desk')}</span>
                         <span>Read more →</span>
@@ -720,8 +720,8 @@ function navigateToCategory(categoryKey) {
 // ============================================================
 async function hydrateArticleImagesPrioritized(apiBase, sections) {
     try {
-        // Collect every article instance by ID so duplicates across sections
-        // can all receive the same hydrated detail payload.
+        // Collect every article instance by ID so duplicate cards in different
+        // homepage sections receive the same hydrated image/detail payload.
         const articleMap = new Map();
         sections.forEach(({ articles }) => {
             if (!Array.isArray(articles)) return;

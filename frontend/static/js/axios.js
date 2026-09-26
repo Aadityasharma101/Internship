@@ -1,7 +1,14 @@
 // static/admin/js/api.js
 
-const API_ORIGIN_URL = 'https://news-portal-hvgs.onrender.com';
-const API_BASE_URL = `${API_ORIGIN_URL}/api/`;
+const API_ORIGIN_URL = (() => {
+    const configured = (typeof window !== 'undefined' && (window.NEWS_PORTAL_API_BASE || window.API_BASE_URL || window.API_BASE)) ? (window.NEWS_PORTAL_API_BASE || window.API_BASE_URL || window.API_BASE) : '';
+    if (configured && /^https?:\/\//i.test(configured)) {
+        return String(configured).replace(/\/$/, '').replace(/\/api$/i, '');
+    }
+
+    return window.location?.origin || 'http://127.0.0.1:8000';
+})();
+const API_BASE_URL = API_ORIGIN_URL;
 const AUTH_INVALID_KEY = 'news_portal_auth_invalid';
 
 function apiUrl(path = '') {
@@ -9,17 +16,24 @@ function apiUrl(path = '') {
         return path;
     }
 
-    // Local-only routes (if enabled) stay on this Django application. The
-    // documented Ads endpoint remains on the remote API at /api/ads/.
-    if (/^\/api\/admin(?:\/|$)/.test(path)) {
-        return `${window.location.origin}${path}`;
-    }
-
-    if (path.startsWith('/')) {
+    // If caller provided a full absolute path, return it unchanged.
+    // If the path starts with '/api', assume it's already correct.
+    if (path.startsWith('/api')) {
         return `${API_ORIGIN_URL}${path}`;
     }
 
-    return path;
+    // If the path is site-relative (starts with '/'), but missing '/api',
+    // insert '/api' so requests resolve to the remote API (e.g. '/articles/' -> '/api/articles/').
+    if (path.startsWith('/')) {
+        return `${API_ORIGIN_URL}/api${path}`.replace(/([^:]\/)\/+/, '$1');
+    }
+
+    // For non-leading-slash paths like 'articles/feed/', prefix with '/api/'.
+    if (path && !path.startsWith('/')) {
+        return `${API_ORIGIN_URL}/api/${path.replace(/^\/+/, '')}`;
+    }
+
+    return API_ORIGIN_URL;
 }
 
 function decodeJwtPayload(token) {

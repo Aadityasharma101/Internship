@@ -73,14 +73,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         button.addEventListener('click', handleLogout);
     });
 
-    // Ensure staff 'Manage' links exist in the sidebar when the template doesn't include them
+    // Ensure staff advertisement link exists in the sidebar when the template doesn't include it.
     function ensureManageLinks() {
         try {
             const sidebarMenu = document.querySelector('.sidebar-menu');
             if (!sidebarMenu) return;
 
             // don't duplicate links if already present
-            if (sidebarMenu.querySelector("a[href='/staff/advertisements/']") || sidebarMenu.querySelector("a[href='/staff/profile/']")) {
+            if (sidebarMenu.querySelector("a[href='/staff/advertisements/']")) {
                 return;
             }
 
@@ -95,12 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             liAds.className = 'menu-item';
             liAds.innerHTML = '<a href="/staff/advertisements/"><i class="fa-solid fa-bullhorn"></i> Advertisements</a>';
 
-            const liProfile = document.createElement('li');
-            liProfile.className = 'menu-item';
-            liProfile.innerHTML = '<a href="/staff/profile/"><i class="fa-solid fa-user"></i> Profile</a>';
-
             ul.appendChild(liAds);
-            ul.appendChild(liProfile);
 
             sidebarMenu.appendChild(section);
             sidebarMenu.appendChild(ul);

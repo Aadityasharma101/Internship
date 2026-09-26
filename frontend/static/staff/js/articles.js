@@ -3,7 +3,6 @@
     const ArticleService = window.NewsPortalArticleService;
     const Utils = window.StaffUtils;
 
-    const hasAuth = Boolean(window.NewsPortalAuth?.hasStoredAuthToken?.());
     // Prefer global `NEWS_PORTAL_API_BASE` if set, otherwise fall back to server-provided data-api-base
     // or the known remote default. Ensure the base includes the '/api' segment.
     let REMOTE_API_BASE = '';
@@ -17,12 +16,12 @@
     const articleApiBase = `${REMOTE_API_BASE.replace(/\/+$/,'')}/articles`;
     // Standard REST endpoints: list/feed, detail, create (POST to /articles/)
     const publicListEndpoints = [`${articleApiBase}/feed/`, `${articleApiBase}/`];
-    const reporterListEndpoints = [`${articleApiBase}/reporter/articles/`, `${articleApiBase}/`];
+    const reporterListEndpoints = ['/api/articles/reporter/articles/', `${articleApiBase}/reporter/articles/`];
     // Try the explicit 'create' action endpoint first (some API deployments
     // require POST to '/articles/create/') and fall back to the collection
     // root '/articles/' for compatibility.
     const createEndpoints = [`${articleApiBase}/create/`, `${articleApiBase}/`];
-    const SUMMARY_MAX_LENGTH = 500;
+    const pageMode = document.getElementById('staffArticlesPage')?.dataset?.mode || 'all';
     const statusActionMap = {
         submitted: 'submit',
         under_review: 'start-review',
@@ -35,6 +34,8 @@
     const state = {
         user: null,
         articles: [],
+        summaryArticles: [],
+        ownArticles: [],
         response: null,
         page: 1,
         endpoint: publicListEndpoints[0],
@@ -52,6 +53,7 @@
         search: document.getElementById('articleSearchInput'),
         visible: document.getElementById('visibleArticlesCount'),
         total: document.getElementById('totalArticles'),
+        myArticles: document.getElementById('myArticles'),
         publishedCount: document.getElementById('publishedArticles'),
         draft: document.getElementById('draftArticles'),
         featured: document.getElementById('featuredArticles'),
@@ -74,6 +76,18 @@
         featuredArticle: document.getElementById('articleFeatured'),
         publishedCheckbox: document.getElementById('articlePublished')
     };
+
+    function hasStaffAuth() {
+        return Boolean(
+            window.NewsPortalAuth?.hasStoredAuthToken?.()
+            || window.NewsPortalSession?.getStoredAccessToken?.()
+            || window.NewsPortalSession?.getStoredRefreshToken?.()
+        );
+    }
+
+    function isMyArticlesPage() {
+        return pageMode === 'mine';
+    }
 
     function normalizeStatus(article) {
         if (article?.is_published === true || article?.published === true) {
@@ -104,9 +118,6 @@
         const firstName = Api.getValue(article, ['author.first_name', 'user.first_name']);
         const lastName = Api.getValue(article, ['author.last_name', 'user.last_name']);
         const fullName = `${firstName || ''} ${lastName || ''}`.trim();
-        const staffFirstName = Api.getValue(state.user, ['first_name'], '');
-        const staffLastName = Api.getValue(state.user, ['last_name'], '');
-        const staffName = `${staffFirstName || ''} ${staffLastName || ''}`.trim();
 
         return fullName || Api.getValue(article, [
             'author.full_name',
@@ -119,11 +130,26 @@
             'user.username',
             'created_by.username',
             'created_by.email'
-        ], staffName || Api.getValue(state.user, ['full_name', 'name', 'username', 'email'], 'Unknown author'));
+        ], 'Unknown author');
     }
 
     function getArticleImage(article) {
-        return Api.getValue(article, ['image', 'image_url', 'thumbnail', 'thumbnail_url', 'featured_image', 'cover_image', 'media.url'], '');
+        const image = Api.getValue(article, [
+            'thumbnail_url',
+            'featured_image_url',
+            'image_url',
+            'image.url',
+            'image',
+            'thumbnail.url',
+            'thumbnail',
+            'featured_image.url',
+            'featured_image',
+            'cover_image.url',
+            'cover_image',
+            'media.url'
+        ], '');
+
+        return Api.resolveMediaUrl(image);
     }
 
     function getPublishedDisplay(article) {
@@ -145,6 +171,44 @@
         return Boolean(Api.getValue(article, ['is_featured', 'featured', 'is_trending', 'trending'], false));
     }
 
+    function articleBelongsToCurrentStaff(article) {
+        if (article?.__staffOwned === true) {
+            return true;
+        }
+
+        const user = state.user;
+        if (!user) {
+            return false;
+        }
+
+        if (ArticleService.articleMatchesUser?.(article, user)) {
+            return true;
+        }
+
+        const userName = [
+            Api.getValue(user, ['first_name'], ''),
+            Api.getValue(user, ['last_name'], '')
+        ].filter(Boolean).join(' ').trim();
+
+        const userValues = [
+            user.id,
+            user.username,
+            user.email,
+            userName,
+            Api.getValue(user, ['full_name', 'name'], '')
+        ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+
+        const articleValues = [
+            Api.getValue(article, ['author.id', 'user.id', 'created_by.id', 'author_id', 'user_id'], ''),
+            Api.getValue(article, ['author.username', 'user.username', 'created_by.username'], ''),
+            Api.getValue(article, ['author.email', 'user.email', 'created_by.email', 'author_email'], ''),
+            Api.getValue(article, ['author.name', 'author.full_name', 'user.name', 'user.full_name', 'created_by.name', 'author_name'], ''),
+            getArticleAuthor(article)
+        ].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+
+        return userValues.some((candidate) => articleValues.includes(candidate));
+    }
+
     function statusClass(status) {
         const key = String(status || '').toLowerCase();
 
@@ -161,34 +225,6 @@
 
     function escape(value) {
         return Api.escapeHtml(value);
-    }
-
-    function limitSummary(value) {
-        return String(value || '').trim().slice(0, SUMMARY_MAX_LENGTH);
-    }
-
-    function getSaveErrorMessage(error) {
-        const data = error?.response?.data;
-
-        if (!data) {
-            return error?.message || 'Unable to save article. Check required fields and permissions.';
-        }
-
-        if (typeof data === 'string') {
-            return data;
-        }
-
-        if (data.detail || data.message) {
-            const detail = data.detail || data.message;
-            return Array.isArray(detail) ? detail.join(' ') : detail;
-        }
-
-        return Object.entries(data)
-            .map(([field, value]) => {
-                const message = Array.isArray(value) ? value.join(' ') : String(value);
-                return `${field.replace(/_/g, ' ')}: ${message}`;
-            })
-            .join(' ') || 'Unable to save article. Check required fields and permissions.';
     }
 
     function renderArticleImage(article) {
@@ -214,7 +250,13 @@
         els.visible.textContent = `${filtered.length} article${filtered.length === 1 ? '' : 's'} shown`;
 
         if (!filtered.length) {
-            Utils.setTableMessage(els.tbody, 8, query ? 'No articles match your search.' : 'No articles found.');
+            Utils.setTableMessage(
+                els.tbody,
+                8,
+                query
+                    ? 'No articles match your search.'
+                    : (isMyArticlesPage() ? 'No articles posted from your account yet.' : 'No articles found.')
+            );
             return;
         }
 
@@ -245,12 +287,6 @@
                             <a href="/news/${escape(article.id)}/" target="_blank" rel="noopener" title="View article" aria-label="View ${escape(title)}">
                                 <i class="fa-regular fa-eye"></i>
                             </a>
-                            <button type="button" data-action="edit" data-id="${escape(article.id)}" title="Edit article" aria-label="Edit ${escape(title)}">
-                                <i class="fa-regular fa-pen-to-square"></i>
-                            </button>
-                            <button class="danger-action" type="button" data-action="delete" data-id="${escape(article.id)}" title="Delete article" aria-label="Delete ${escape(title)}">
-                                <i class="fa-regular fa-trash-can"></i>
-                            </button>
                         </div>
                     </td>
                 </tr>
@@ -259,7 +295,8 @@
     }
 
     function updateSummary(items, totalCount) {
-        els.total.textContent = totalCount ?? items.length;
+        els.total.textContent = state.summaryArticles.length;
+        els.myArticles.textContent = state.ownArticles.length;
         els.publishedCount.textContent = items.filter(isPublished).length;
         els.draft.textContent = items.filter((article) => !isPublished(article)).length;
         els.featured.textContent = items.filter(isFeatured).length;
@@ -308,13 +345,11 @@
         els.title.value = '';
         els.category.value = '';
         els.articleStatus.value = defaultStatus;
-        els.articleStatus.disabled = true;
         els.image.value = '';
         els.description.value = '';
         els.body.value = '';
         els.featuredArticle.checked = false;
-        els.publishedCheckbox.checked = false;
-        els.publishedCheckbox.disabled = true;
+        els.publishedCheckbox.checked = defaultStatus === 'published';
         els.status.textContent = '';
         els.modalTitle.textContent = 'Create New Article';
         els.save.textContent = 'Create Article';
@@ -324,7 +359,7 @@
 
     async function loadArticleDetail(id) {
         try {
-            const detail = await Api.request('GET', `${articleApiBase}/${id}/`, { auth: hasAuth });
+            const detail = await Api.request('GET', `${articleApiBase}/${id}/`, { auth: hasStaffAuth() });
             return detail || {};
         } catch {
             return {};
@@ -339,13 +374,11 @@
         els.title.value = getArticleTitle(record) === 'Untitled article' ? '' : getArticleTitle(record);
         els.category.value = Api.getValue(record, ['category.id', 'category.name', 'category.category_name', 'category', 'category_name'], '');
         els.articleStatus.value = normalizeStatus(record);
-        els.articleStatus.disabled = false;
         els.image.value = getArticleImage(record) || '';
         els.description.value = Api.getValue(record, ['description', 'summary', 'excerpt'], '');
         els.body.value = Api.getValue(record, ['body', 'content'], '');
         els.featuredArticle.checked = isFeatured(record);
         els.publishedCheckbox.checked = isPublished(record);
-        els.publishedCheckbox.disabled = false;
         els.status.textContent = '';
         els.modalTitle.textContent = 'Edit Article';
         els.save.textContent = 'Save Changes';
@@ -373,15 +406,13 @@
     }
 
     function collectPayload(statusOverride = null) {
-        const isCreate = !els.id.value;
         const status = normalizeCreateStatus(
-            isCreate ? 'draft' : (statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'draft')
+            statusOverride || (els.publishedCheckbox.checked ? 'published' : els.articleStatus.value) || 'submitted'
         );
         const imageUrl = els.image.value.trim();
         const categoryValue = els.category.value.trim();
         const body = els.body.value.trim();
-        const reviewNote = els.description.value.trim();
-        const summary = limitSummary(body);
+        const summary = els.description.value.trim() || body.slice(0, 500);
 
         // If an image file is attached, use FormData so binary upload is supported.
         if (state.imageFile) {
@@ -389,16 +420,10 @@
             formData.append('title', els.title.value.trim());
             formData.append('body', body);
             formData.append('summary', summary);
-            formData.append('published', 'false');
-            formData.append('is_published', 'false');
-            if (reviewNote) {
-                formData.append('review_note', reviewNote);
-            }
 
             if (categoryValue) {
                 if (/^\d+$/.test(categoryValue)) {
                     formData.append('category_id', String(Number(categoryValue)));
-                    formData.append('category', String(Number(categoryValue)));
                 } else {
                     formData.append('category_name', categoryValue);
                 }
@@ -414,18 +439,12 @@
         const payload = {
             title: els.title.value.trim(),
             body,
-            summary,
-            published: false,
-            is_published: false
+            summary
         };
-        if (reviewNote) {
-            payload.review_note = reviewNote;
-        }
 
         if (categoryValue) {
             if (/^\d+$/.test(categoryValue)) {
                 payload.category_id = Number(categoryValue);
-                payload.category = Number(categoryValue);
             } else {
                 payload.category_name = categoryValue;
             }
@@ -440,64 +459,8 @@
         return { data: payload, desiredStatus: status, isForm: false };
     }
 
-    function localUrl(path) {
-        const cleanPath = String(path || '').replace(/^\/+/, '');
-        return `${window.location.origin}/${cleanPath}`;
-    }
-
-    async function getFreshStaffToken() {
-        if (window.NewsPortalSession?.getAccessToken) {
-            try {
-                return await window.NewsPortalSession.getAccessToken();
-            } catch {
-                return null;
-            }
-        }
-
-        return localStorage.getItem('access_token') || localStorage.getItem('accessToken');
-    }
-
-    async function parseStaffResponse(response) {
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-            const error = new Error(`HTTP ${response.status}`);
-            error.response = { status: response.status, data };
-            throw error;
-        }
-
-        return data;
-    }
-
-    async function createStaffDraftArticle(payload) {
-        const token = await getFreshStaffToken();
-        if (!token) {
-            const error = new Error('Please sign in again before creating an article.');
-            error.response = { status: 401, data: { detail: error.message } };
-            throw error;
-        }
-
-        const headers = {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`
-        };
-        const isForm = payload instanceof FormData;
-
-        if (!isForm) {
-            headers['Content-Type'] = 'application/json';
-        }
-
-        const response = await fetch(localUrl('/staff/add_article/'), {
-            method: 'POST',
-            headers,
-            body: isForm ? payload : JSON.stringify(payload)
-        });
-
-        return parseStaffResponse(response);
-    }
-
     async function appendCurrentStaffAuthor(formData) {
-        if (!hasAuth) {
+        if (!hasStaffAuth()) {
             return;
         }
 
@@ -542,6 +505,46 @@
         return updated || { ...article, status: normalizedStatus };
     }
 
+    function formatApiErrorFields(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            return '';
+        }
+
+        return Object.entries(data)
+            .filter(([field]) => !['detail', 'message', 'error'].includes(field))
+            .map(([field, value]) => {
+                const label = field.replace(/_/g, ' ');
+                const text = Array.isArray(value) ? value.join(' ') : String(value ?? '');
+                return text ? `${label}: ${text}` : '';
+            })
+            .filter(Boolean)
+            .join(' ');
+    }
+
+    function getSaveErrorMessage(error) {
+        const status = error?.response?.status;
+        const data = error?.response?.data;
+        const apiDetail = data?.detail || data?.message || data?.error || formatApiErrorFields(data);
+
+        if (apiDetail) {
+            return apiDetail;
+        }
+
+        if (status === 401) {
+            return 'Please log in again before saving this article.';
+        }
+
+        if (status === 403) {
+            return 'This staff account does not have permission to edit this article.';
+        }
+
+        if (status === 405) {
+            return 'This article cannot be edited from this endpoint. Please try again after refreshing.';
+        }
+
+        return 'Unable to save article. Check required fields and permissions.';
+    }
+
     async function saveArticle() {
         const id = els.id.value;
         const payload = collectPayload();
@@ -571,7 +574,7 @@
                 await appendCurrentStaffAuthor(payload.data);
                 // create attempt
                     try {
-                        savedArticle = await createStaffDraftArticle(payload.data);
+                        savedArticle = await Api.request('POST', createEndpoints[0], { data: payload.data, auth: true, timeoutMs: 30000 });
                     } catch (createError) {
                         console.warn('Staff: create failed', createError?.response || createError);
                         // If the create failed due to validation (400) and we used FormData (image attached),
@@ -591,7 +594,7 @@
                                 }
 
                                 await appendCurrentStaffAuthor(jsonPayload);
-                                savedArticle = await createStaffDraftArticle(jsonPayload);
+                                savedArticle = await Api.request('POST', createEndpoints[0], { data: jsonPayload, auth: true, timeoutMs: 30000 });
 
                                 // attempt to upload image via update
                                 try {
@@ -611,9 +614,7 @@
                         }
                     }
                 try {
-                    if (payload.desiredStatus !== 'draft') {
-                        savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
-                    }
+                    savedArticle = await applyArticleStatus(savedArticle, payload.desiredStatus);
                 } catch (statusError) {
                     console.warn('Failed to apply desired status after create:', statusError);
                     // creation succeeded; continue and show success to user
@@ -666,6 +667,17 @@
         return [...byKey.values()];
     }
 
+    function normalizeLoadedArticles(items) {
+        return (items || []).map((item) => ArticleService.normalizeArticle ? ArticleService.normalizeArticle(item) : item);
+    }
+
+    function markStaffOwnedArticles(items) {
+        return (items || []).map((article) => ({
+            ...article,
+            __staffOwned: true
+        }));
+    }
+
     async function hydrateArticleDetails(records) {
         const items = records || [];
         const details = await Promise.all(items.map(async (article) => {
@@ -693,7 +705,7 @@
         });
 
         let reporterRecords = [];
-        if (hasAuth) {
+        if (hasStaffAuth()) {
             try {
                 const reporterResult = await Api.loadList(reporterListEndpoints, page, {
                     auth: true,
@@ -701,7 +713,7 @@
                         ordering: '-id'
                     }
                 });
-                reporterRecords = reporterResult.data.results || [];
+                reporterRecords = markStaffOwnedArticles(reporterResult.data.results || []);
             } catch (error) {
                 console.warn('Reporter article list unavailable; showing public feed.', error);
             }
@@ -711,40 +723,76 @@
             endpoint: publicResult.endpoint,
             data: {
                 ...publicResult.data,
-                count: undefined,
                 results: await hydrateArticleDetails(mergeArticleLists(publicResult.data.results || [], reporterRecords))
             }
         };
+    }
+
+    async function loadSummaryArticles() {
+        const publicResult = await Utils.loadAllPages((page, options) => Api.loadList(publicListEndpoints, page, {
+            auth: false,
+            ...options,
+            params: {
+                ordering: '-id',
+                ...(options.params || {})
+            }
+        }));
+
+        let reporterRecords = [];
+        if (hasStaffAuth()) {
+            try {
+                const reporterResult = await Utils.loadAllPages((page, options) => Api.loadList(reporterListEndpoints, page, {
+                    auth: true,
+                    ...options,
+                    params: {
+                        ordering: '-id',
+                        ...(options.params || {})
+                    }
+                }));
+                reporterRecords = markStaffOwnedArticles(reporterResult.data.results || []);
+            } catch (error) {
+                console.warn('Reporter article totals unavailable; using public totals.', error);
+            }
+        }
+
+        return hydrateArticleDetails(mergeArticleLists(publicResult.data.results || [], reporterRecords));
     }
 
     async function loadArticles(page = 1) {
         Utils.setTableMessage(els.tbody, 8, 'Loading articles...', 'loading');
 
         try {
-            if (hasAuth) {
+            if (hasStaffAuth()) {
                 try {
                     state.user = await window.NewsPortalSession.fetchCurrentUser();
                 } catch {
-                    state.user = null;
+                    state.user = window.NewsPortalSession?.getKnownUser?.() || null;
                 }
             } else {
                 state.user = null;
             }
-            const result = await loadVisibleArticles(page);
+            const summaryItems = await loadSummaryArticles();
 
-            state.endpoint = result.endpoint || state.endpoint;
-            state.response = result.data;
-            state.page = page;
+            state.endpoint = publicListEndpoints[0];
+            state.response = { previous: null, next: null };
+            state.page = 1;
 
-            const records = result.data.results.map((item) => ArticleService.normalizeArticle ? ArticleService.normalizeArticle(item) : item);
-            state.articles = Utils.sortByNewest(records);
+            const allArticles = Utils.sortByNewest(normalizeLoadedArticles(summaryItems));
+            const ownArticles = Utils.sortByNewest(allArticles.filter(articleBelongsToCurrentStaff));
+
+            state.summaryArticles = allArticles;
+            state.ownArticles = ownArticles;
+            state.articles = isMyArticlesPage() ? ownArticles : allArticles;
 
             updateSummary(state.articles, state.articles.length);
             renderArticles(state.articles);
-            updatePagination(result.data);
+            updatePagination(state.response);
         } catch (error) {
             console.error('Error loading articles:', error);
             Utils.setTableMessage(els.tbody, 8, 'Unable to load articles. Please check the API token or try again.');
+            state.articles = [];
+            state.summaryArticles = [];
+            state.ownArticles = [];
             updateSummary([], 0);
             updatePagination({ previous: null, next: null });
         }

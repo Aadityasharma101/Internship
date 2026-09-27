@@ -70,7 +70,7 @@
         const headers = await authHeaders();
         await Promise.all([...new Set(articleIds.map(Number).filter(Boolean))].map(async (id) => {
             try {
-                const response = await fetch(apiUrl(`/api/articles/${id}/reactions/`), { headers: { Accept: 'application/json', ...headers } });
+                const response = await fetch(apiUrl(`/api/articles/${id}/reactions/`), { cache: 'no-store', headers: { Accept: 'application/json', ...headers } });
                 if (response.ok) paint(id, await response.json());
             } catch (error) { console.warn('Could not load article reactions.', error); }
         }));
@@ -94,6 +94,7 @@
             const refreshed = await fetch(apiUrl(`/api/articles/${id}/reactions/`), { headers: { Accept: 'application/json', ...headers } });
             if (!refreshed.ok) throw new Error('Reaction saved, but its current state could not be loaded.');
             paint(id, await refreshed.json());
+            window.dispatchEvent(new CustomEvent('article-reaction-changed', { detail: { id, total: state.get(id).total } }));
         } catch (error) { alert(error.message || 'Unable to save reaction.'); }
         finally { button.disabled = false; }
     }
@@ -111,5 +112,5 @@
         document.querySelectorAll('[data-reaction-picker]').forEach((picker) => { if (!event.target.closest('.reaction-control')) picker.hidden = true; });
     });
 
-    window.ArticleReactions = { renderControl, load, paint };
+    window.ArticleReactions = { renderControl, load, paint, getTotal: (id) => state.get(Number(id))?.total };
 }());

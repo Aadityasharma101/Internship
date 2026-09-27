@@ -13,6 +13,13 @@ let HOME_API_BASE = DEFAULT_MEDIA_BASE;
 let HOME_REFRESH_TIMER = null;
 let CATEGORY_LABELS_BY_KEY = new Map();
 let IS_LOADING = false; // Prevent concurrent re-initialization
+let TRENDING_CANDIDATES = [];
+
+window.addEventListener('article-reaction-changed', (event) => {
+    const article = TRENDING_CANDIDATES.find((item) => String(item.id) === String(event.detail.id));
+    if (article) article.reactions_total = event.detail.total;
+    renderTrendingGrid(document.getElementById('trending-news-grid'), rankTrendingArticles(TRENDING_CANDIDATES).slice(0, 8));
+});
 
 // Debug helper: inspect article data from console
 window.DEBUG_ARTICLES = {
@@ -137,7 +144,7 @@ async function initializeHomepage(apiBase) {
     try {
         // Step 1: Fetch all data in parallel
         const [feedResult, trendingResult, categoryResult] = await Promise.allSettled([
-            fetchAllPages(`${apiBase}/api/articles/feed/?ordering=-id`),
+            fetchAllPages(`${apiBase}/api/articles/feed/?ordering=-id`, Infinity),
             fetchJsonApi(`${apiBase}/api/articles/trending/`),
             fetchJsonApi(`${apiBase}/api/articles/categories/`),
         ]);
@@ -187,7 +194,9 @@ async function initializeHomepage(apiBase) {
         }
         const featuredArticle = featuredArticleData ? mergeArticleData(featuredArticleData) : null;
         
-        const trendingCards    = take(trendingArticles, 8).map(mergeArticleData);
+        const trendingCandidates = [...new Map(
+            [...trendingArticles, ...feedArticles].map((article) => [String(article.id), article])
+        ).values()].map((article) => mergeArticleData(article));
         const videoArticles    = take(feedArticles.filter(hasVideoContent), 3).map(mergeArticleData);
 
         // Step 2: Hydrate article details BEFORE rendering (critical fix)
@@ -195,7 +204,7 @@ async function initializeHomepage(apiBase) {
         await hydrateArticleImagesPrioritized(apiBase, [
             { articles: [featuredArticle].filter(Boolean), priority: 'high' },
             { articles: latestArticles,                    priority: 'high' },
-            { articles: trendingCards,                     priority: 'medium' },
+            { articles: trendingCandidates,                priority: 'medium' },
             { articles: editorialArticles,                 priority: 'medium' },
             { articles: selectedCategory === 'all' ? feedArticles : filteredFeed, priority: 'low' },
             { articles: videoArticles,                     priority: 'medium' },
@@ -203,11 +212,17 @@ async function initializeHomepage(apiBase) {
         console.log('✓ All article details loaded');
 
         await window.ArticleBookmarks?.hydrate?.([
-            featuredArticle, ...latestArticles, ...trendingCards, ...editorialArticles, ...videoArticles,
+            featuredArticle, ...latestArticles, ...editorialArticles, ...videoArticles,
         ].filter(Boolean));
         await window.ArticleReactions?.load?.([
-            featuredArticle, ...latestArticles, ...trendingCards, ...editorialArticles, ...videoArticles,
+            featuredArticle, ...latestArticles, ...trendingCandidates, ...editorialArticles, ...videoArticles,
         ].filter(Boolean).map((article) => article.id));
+        trendingCandidates.forEach((article) => {
+            const total = window.ArticleReactions?.getTotal?.(article.id);
+            if (total != null) article.reactions_total = total;
+        });
+        TRENDING_CANDIDATES = trendingCandidates;
+        const trendingCards = rankTrendingArticles(trendingCandidates).slice(0, 8);
 
         // Step 3: Render everything at once (no delays)
         renderFeaturedHero(featuredHero, featuredArticle, selectedCategory);
@@ -318,6 +333,14 @@ function extractArticles(payload) {
 }
 
 function take(arr, n) { return arr.slice(0, n); }
+
+function rankTrendingArticles(articles) {
+    const count = (value) => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+    const reactions = (article) => count(article.reactions_total);
+    const views = (article) => count(article.view_count);
+    // Stable sort preserves the source order when both metrics are equal.
+    return [...articles].sort((a, b) => reactions(b) - reactions(a) || views(b) - views(a));
+}
 
 // ============================================================
 // ARTICLE DATA NORMALISATION
@@ -746,7 +769,8 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
         });
 
         const needingImages = [...articleMap.values()]
-            .filter((group) => group.some((a) => a.needsImageHydration || !a.imageUrl))
+            .filter((group) => group.some((a) => a.needsImageHydration || !a.imageUrl
+                || a.view_count == null || a.reactions_total == null))
             .map((group) => group[0]);
         console.log(`� Pre-loading article details...`);
         console.log(`   Total articles: ${articleMap.size}`);

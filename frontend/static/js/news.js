@@ -757,25 +757,34 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
         // Collect every article instance by ID so duplicate cards in different
         // homepage sections receive the same hydrated image/detail payload.
         const articleMap = new Map();
+
         sections.forEach(({ articles }) => {
             if (!Array.isArray(articles)) return;
+
             articles.forEach((a) => {
                 if (!a?.id) return;
+
                 if (!articleMap.has(a.id)) {
                     articleMap.set(a.id, []);
                 }
+
                 articleMap.get(a.id).push(a);
             });
         });
 
         const needingImages = [...articleMap.values()]
-            .filter((group) => group.some((a) => a.needsImageHydration || !a.imageUrl
-                || a.view_count == null || a.reactions_total == null))
+            .filter((group) => group.some((a) =>
+                a.needsImageHydration ||
+                !a.imageUrl ||
+                a.view_count == null ||
+                a.reactions_total == null
+            ))
             .map((group) => group[0]);
+
         console.log(`� Pre-loading article details...`);
         console.log(`   Total articles: ${articleMap.size}`);
         console.log(`   Need image hydration: ${needingImages.length}`);
-        
+
         if (!needingImages.length) {
             console.log('✓ All articles already have images');
             return;
@@ -789,6 +798,7 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
         );
 
         const detailMap = new Map();
+
         needingImages.forEach((a, i) => {
             if (details[i]) {
                 detailMap.set(a.id, details[i]);
@@ -798,10 +808,12 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
         if (detailMap.size) {
             console.log(`✅ Fetched details for ${detailMap.size} articles`);
 
-            // Update all articles with fetched details
+            // Update all copies of each article across all homepage sections.
             let updated = 0;
+
             articleMap.forEach((group, articleId) => {
                 const detail = detailMap.get(articleId);
+
                 if (detail) {
                     group.forEach((article) => {
                         const merged = mergeArticleData(article, detail);
@@ -810,6 +822,7 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
                     });
                 }
             });
+
             console.log(`   Updated ${updated} article instances with detail data`);
         } else {
             console.warn('⚠️ No article details fetched');

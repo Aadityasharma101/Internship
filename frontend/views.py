@@ -473,7 +473,7 @@ def _resolve_next_path_for_user(user):
     if bool(user.get('is_staff')) or role_name == 'staff':
         return _staff_articles_path()
 
-    return reverse('frontend:profile')
+    return reverse('frontend:index')
 
 
 def _staff_articles_path():

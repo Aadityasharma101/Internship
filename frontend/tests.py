@@ -250,6 +250,26 @@ class AdminContentApiTests(TestCase):
 class AuthLoginTests(TestCase):
     @patch('frontend.views.requests.get')
     @patch('frontend.views.requests.post')
+    def test_regular_user_login_redirects_to_homepage(self, mock_post, mock_get):
+        access_token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDgwMDAsInJvbGUiOiJ1c2VyIn0.signature'
+        mock_post.return_value = MockApiResponse(200, {'access': access_token})
+        mock_get.return_value = MockApiResponse(200, {
+            'email': 'reader@example.com',
+            'role': 'user',
+            'is_staff': False,
+        })
+
+        response = self.client.post(
+            reverse('frontend:auth_login'),
+            {'email': 'reader@example.com', 'password': 'secret'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['next'], reverse('frontend:index'))
+
+    @patch('frontend.views.requests.get')
+    @patch('frontend.views.requests.post')
     def test_admin_login_returns_browser_tokens_and_admin_redirect(self, mock_post, mock_get):
         access_token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDgwMDAsInJvbGUiOiJhZG1pbiJ9.signature'
         refresh_token = 'eyJhbGciOiJub25lIn0.eyJleHAiOjQxMDI0NDgwMDAsInR5cGGUiOiJyZWZyZXNoIn0.signature'

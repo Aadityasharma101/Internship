@@ -731,18 +731,24 @@ function navigateToCategory(categoryKey) {
 // ============================================================
 async function hydrateArticleImagesPrioritized(apiBase, sections) {
     try {
-        // Collect all articles from all sections
+        // Collect all article instances from every section. The same article can
+        // appear in the featured, latest, and editorial sections as separate
+        // object copies, so every copy must receive its hydrated image.
         const articleMap = new Map();
         sections.forEach(({ articles }) => {
             if (!Array.isArray(articles)) return;
             articles.forEach((a) => {
-                if (a?.id && !articleMap.has(a.id)) {
-                    articleMap.set(a.id, a);
+                if (a?.id) {
+                    const instances = articleMap.get(a.id) || [];
+                    instances.push(a);
+                    articleMap.set(a.id, instances);
                 }
             });
         });
 
-        const needingImages = [...articleMap.values()].filter((a) => a.needsImageHydration || !a.imageUrl);
+        const needingImages = [...articleMap.entries()]
+            .filter(([, instances]) => instances.some((a) => a.needsImageHydration || !a.imageUrl))
+            .map(([id]) => ({ id }));
         console.log(`� Pre-loading article details...`);
         console.log(`   Total articles: ${articleMap.size}`);
         console.log(`   Need image hydration: ${needingImages.length}`);
@@ -771,12 +777,14 @@ async function hydrateArticleImagesPrioritized(apiBase, sections) {
 
             // Update all articles with fetched details
             let updated = 0;
-            articleMap.forEach((article) => {
-                const detail = detailMap.get(article.id);
+            articleMap.forEach((instances, id) => {
+                const detail = detailMap.get(id);
                 if (detail) {
-                    const merged = mergeArticleData(article, detail);
-                    Object.assign(article, merged);
-                    updated++;
+                    instances.forEach((article) => {
+                        const merged = mergeArticleData(article, detail);
+                        Object.assign(article, merged);
+                        updated++;
+                    });
                 }
             });
             console.log(`   Updated ${updated} articles with detail data`);
